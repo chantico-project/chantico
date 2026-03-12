@@ -30,6 +30,13 @@ func MakeJob(measurementDevice chantico.MeasurementDevice) *batchv1.Job {
 		log.Printf("ERR: %s\n", err)
 	}
 
+	configFileName := fmt.Sprintf("config_%s.yml", measurementDevice.UID)
+	generatorFileName := fmt.Sprintf("generator_%s.yml", measurementDevice.UID)
+
+	outputPath := filepath.Join("/data", snmpConfigDir, configFileName)
+	generatorPath := filepath.Join("/data", snmpConfigDir, generatorFileName)
+	mibsDir := filepath.Join("/data", snmpMibsDir)
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      measurementDevice.Status.JobName,
@@ -43,21 +50,19 @@ func MakeJob(measurementDevice chantico.MeasurementDevice) *batchv1.Job {
 						{
 							Name:  "create-snmp-config",
 							Image: img.SnmpGenerator,
+							Command: []string{
+								"/bin/generator",
+							},
+							Args: []string{
+								"generate",
+								"--output-path", outputPath,
+								"--generator-path", generatorPath,
+								"--mibs-dir", mibsDir,
+							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      vol.ChanticoVolumeMount,
-									MountPath: "/opt/snmp.yml",
-									SubPath:   getConfigPath(measurementDevice),
-								},
-								{
-									Name:      vol.ChanticoVolumeMount,
-									MountPath: "/opt/generator.yml",
-									SubPath:   getGeneratorPath(measurementDevice),
-								},
-								{
-									Name:      vol.ChanticoVolumeMount,
-									MountPath: "/opt/mibs",
-									SubPath:   snmpMibsDir,
+									MountPath: "/data/",
 								},
 							},
 						},
@@ -71,19 +76,6 @@ func MakeJob(measurementDevice chantico.MeasurementDevice) *batchv1.Job {
 	return job
 }
 
-func getGeneratorPath(measurementDevice chantico.MeasurementDevice) string {
-	return filepath.Join(
-		snmpConfigDir,
-		fmt.Sprintf("generator_%s.yml", measurementDevice.UID),
-	)
-}
-
-func getConfigPath(measurementDevice chantico.MeasurementDevice) string {
-	return filepath.Join(
-		snmpConfigDir,
-		fmt.Sprintf("config_%s.yml", measurementDevice.UID),
-	)
-}
 
 type generatorModule struct {
 	Walk []string `yaml:"walk"`
