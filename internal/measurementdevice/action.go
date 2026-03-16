@@ -22,6 +22,7 @@ import (
 	ph "chantico/internal/patch"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // In that context Pure means does not modify the kubernetes cluster resources
@@ -296,7 +297,7 @@ func ReloadSNMPService(
 					time.Sleep(chanticok8s.K8sGracePeriod)
 					err = kubernetesClient.Status().Update(ctx, measurementDevice)
 					if err != nil {
-						log.Printf("Could not update status")
+						log.Printf("Could not update status", err)
 					}
 					return
 				}
@@ -309,6 +310,7 @@ func ReloadSNMPService(
 func ScheduleSNMPGeneratorJob(
 	ctx context.Context,
 	kubernetesClient client.Client,
+	scheme *runtime.Scheme,
 	measurementDevice *chantico.MeasurementDevice,
 ) *ActionResult {
 	measurementDevice.Status.JobName = fmt.Sprintf("update-snmp-%s-%d", measurementDevice.Name, int(time.Now().Unix()))
@@ -316,6 +318,8 @@ func ScheduleSNMPGeneratorJob(
 	log.Printf("New Status: %s\n", measurementDevice.Status.State)
 
 	updateJob := MakeJob(*measurementDevice)
+	err = controllerutil.SetControllerReference(measurementDevice, updateJob, r.)
+
 	err := kubernetesClient.Create(ctx, updateJob)
 	if err != nil {
 		measurementDevice.Status.State = StateFailed

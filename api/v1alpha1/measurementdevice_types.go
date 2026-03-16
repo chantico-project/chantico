@@ -49,15 +49,14 @@ type MeasurementDeviceSpec struct {
 type MeasurementDeviceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	State            string `json:"state,omitempty"`
-	JobName          string `json:"jobName,omitempty"`
-	UpdateTime       string `json:"updateTime,omitempty"`
-	UpdateGeneration int64  `json:"updateGeneration,omitempty"`
-	ErrorMessage     string `json:"errorMessage,omitempty"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	Conditions       []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=md;msd
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 
 // MeasurementDevice is the Schema for the measurementdevices API
 type MeasurementDevice struct {
@@ -82,7 +81,7 @@ func init() {
 }
 
 const (
-	SNMPUpdateFinalizer = "measurementdevice.finalizer.chantico.ci.tno.nl/snmp-update"
+	MeasurementDeviceFinalizer = "measurementdevice.finalizer.chantico.ci.tno.nl/snmp-update"
 )
 
 const (

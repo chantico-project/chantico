@@ -73,6 +73,7 @@ func MakeJob(measurementDevice chantico.MeasurementDevice) *batchv1.Job {
 			},
 		},
 	}
+
 	return job
 }
 
