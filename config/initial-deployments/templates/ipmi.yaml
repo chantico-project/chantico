@@ -1,0 +1,80 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: chantico
+  name: chantico-ipmi
+  namespace: chantico
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chantico-ipmi
+  template:
+    metadata:
+      labels:
+        app: chantico-ipmi
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: ipmi-exporter
+          image: "registry.hub.docker.com/prometheuscommunity/ipmi-exporter:v1.10.1"
+          args:
+            - "--config.file"
+            - "/config.yml"
+          volumeMounts:
+            - name: chantico-volume-mount
+              mountPath: /config.yml
+              subPath: ipmi/yml/config.yml
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 9290
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+      - image: busybox
+        name: structure-initialization
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            mkdir -p /tmp/chantico-volume-mount/ipmi/yml;
+            if [ ! -f /tmp/chantico-volume-mount/ipmi/yml/config.yml ]; then
+              touch /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+              echo "modules:" > /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+              echo "  default:" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+              echo "    user: guest" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+              echo "    pass: public" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+              echo "    driver: LAN_2_0" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+              echo "    driver: ADMINISTRATOR" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+              echo "    timeout: 10000" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+            fi
+            chmod -R 1777 /tmp/chantico-volume-mount/ipmi
+        volumeMounts:
+        - mountPath: "/tmp/chantico-volume-mount"
+          name: chantico-volume-mount
+      volumes:
+      - name: chantico-volume-mount
+        persistentVolumeClaim:
+          claimName: {{ .Values.persistentVolumeClaimName }}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chantico-ipmi
+spec:
+  selector:
+    app: chantico-ipmi
+  ports:
+    - protocol: TCP
+      port: 9290
+      targetPort: 9290
