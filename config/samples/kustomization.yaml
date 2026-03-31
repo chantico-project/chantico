@@ -5,4 +5,5 @@ resources:
 - chantico_v1alpha1_measurementdevice.yaml
 - chantico_v1alpha1_physicalmeasurement.yaml
 - chantico_v1alpha1_datacenterresource.yaml
+- chantico_v1alpha1_ipmidevice.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

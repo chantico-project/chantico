@@ -8,6 +8,7 @@ rules:
   - chantico.ci.tno.nl
   resources:
   - datacenterresources
+  - ipmidevices
   - measurementdevices
   - physicalmeasurements
   verbs:
@@ -22,12 +23,14 @@ rules:
   - chantico.ci.tno.nl
   resources:
   - datacenterresources/finalizers
+  - ipmidevices/finalizers
   verbs:
   - update
 - apiGroups:
   - chantico.ci.tno.nl
   resources:
   - datacenterresources/status
+  - ipmidevices/status
   - measurementdevices/status
   - physicalmeasurements/status
   verbs:

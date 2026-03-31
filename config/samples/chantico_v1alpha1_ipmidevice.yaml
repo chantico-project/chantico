@@ -1,0 +1,9 @@
+apiVersion: chantico.ci.tno.nl/v1alpha1
+kind: IPMIDevice
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: ipmidevice-sample
+spec:
+  # TODO(user): Add fields here

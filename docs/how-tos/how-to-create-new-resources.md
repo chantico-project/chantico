@@ -1,20 +1,22 @@
 ---
-title: "How to create new resources"
+title: "How to create new custom resource definitions"
 menu:
   main:
     parent: howto
     weight: 40
 ---
 
-This guide describes how to add a new Kubernetes custom resource (CRD) to Chantico using Kubebuilder.
+This guide describes how to add a new Kubernetes custom resource (CRD) to 
+Chantico using Operator SDK and Kubebuilder.
 
 ## Prerequisites
 
-1. Install `kubebuilder`:
+1. Install `operator-sdk`:
 ```bash
-curl -L -o kubebuilder "https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)"
-chmod +x kubebuilder && sudo mv kubebuilder /usr/local/bin/
+make operator-sdk
 ```
+
+It will be installed in `bin/operator-sdk`.
 
 1. Make sure your local environment is set up:
 [How to set up the local development environment](how-to-setup-the-local-development-environment.md)
@@ -23,7 +25,8 @@ chmod +x kubebuilder && sudo mv kubebuilder /usr/local/bin/
 
 1. Generate the resource scaffolding:
 ```bash
-kubebuilder create api --group chantico --version v1alpha1 --kind <RESOURCE_TYPE>
+bin/operator-sdk create api --group chantico --version v1alpha1 --kind \
+    <RESOURCE_TYPE>
 ```
 
 1. Remove the generated integration tests (these are not used in this repo):
