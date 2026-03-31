@@ -40,27 +40,28 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
-      - image: busybox
-        name: structure-initialization
-        command: ["/bin/sh"]
-        args:
-          - -c
-          - |
-            mkdir -p /tmp/chantico-volume-mount/ipmi/yml;
-            if [ ! -f /tmp/chantico-volume-mount/ipmi/yml/config.yml ]; then
-              touch /tmp/chantico-volume-mount/ipmi/yml/config.yml;
-              echo "modules:" > /tmp/chantico-volume-mount/ipmi/yml/config.yml;
-              echo "  default:" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
-              echo "    user: guest" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
-              echo "    pass: public" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
-              echo "    driver: LAN_2_0" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
-              echo "    driver: ADMINISTRATOR" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
-              echo "    timeout: 10000" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
-            fi
-            chmod -R 1777 /tmp/chantico-volume-mount/ipmi
-        volumeMounts:
-        - mountPath: "/tmp/chantico-volume-mount"
-          name: chantico-volume-mount
+      initContainers:
+        - image: busybox
+          name: structure-initialization
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              mkdir -p /tmp/chantico-volume-mount/ipmi/yml;
+              if [ ! -f /tmp/chantico-volume-mount/ipmi/yml/config.yml ]; then
+                touch /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+                echo "modules:" > /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+                echo "  default:" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+                echo "    user: guest" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+                echo "    pass: public" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+                echo "    driver: LAN_2_0" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+                echo "    privilege: ADMINISTRATOR" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+                echo "    timeout: 10000" >> /tmp/chantico-volume-mount/ipmi/yml/config.yml;
+              fi
+              chmod -R 1777 /tmp/chantico-volume-mount/ipmi
+          volumeMounts:
+          - mountPath: "/tmp/chantico-volume-mount"
+            name: chantico-volume-mount
       volumes:
       - name: chantico-volume-mount
         persistentVolumeClaim:
