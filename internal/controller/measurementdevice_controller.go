@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/fs"
 	"strconv"
+	"time"
 
 	// "sigs.k8s.io/cluster-api/util/patch"
 
@@ -58,6 +59,43 @@ import (
 type MeasurementDeviceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+}
+
+// Define a custom type for the Action
+type Action int
+
+// Declare the possible Action values using iota
+const (
+	ActionContinue Action = iota // 0
+	ActionRequeue                // 1
+	ActionStop                   // 2
+)
+
+type StepResult struct {
+	Action       Action
+	RequeueAfter time.Duration
+	Err          error
+}
+
+type StepFunction func(context.Context, *chantico.MeasurementDevice) StepResult
+
+func Continue() StepResult {
+	return StepResult{
+		Action: ActionContinue,
+	}
+}
+func Requeue(duration time.Duration) StepResult {
+	return StepResult{
+		Action:       ActionRequeue,
+		RequeueAfter: duration,
+	}
+}
+func Stop(err error) StepResult {
+	return StepResult{
+		Action: ActionStop,
+		Err:    err,
+	}
+
 }
 
 // +kubebuilder:rbac:groups=chantico.ci.tno.nl,resources=measurementdevices,verbs=get;list;watch;create;update;patch;delete
@@ -115,61 +153,30 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}()
 
-	// Runs all functions, every function performs a check on the actual state, and then decides whether it needs to take action
-	functions := []func(context.Context, *chantico.MeasurementDevice) (bool, error){
+	// Runs all StepFunctions. Every function performs a check on the actual state, and decides what action to take.
+	steps := []StepFunction{
+		r.reconcileDeletion,
 		r.ensureFinalizerIsSet,
+		r.reconcileGeneratorFile,
+		r.reconcileMibFile,
+		r.reconcileSNMPFileExistence,
+		r.reconcileSNMPGeneratorJob,
+		r.reconcileSNMPFile,
 	}
-	for _, function := range functions {
-		stop, err := function(ctx, measurementDevice)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if stop {
-			return ctrl.Result{}, nil
+	for _, step := range steps {
+		result := step(ctx, measurementDevice)
+
+		switch result.Action {
+		case ActionContinue:
+			continue
+		case ActionRequeue:
+			return ctrl.Result{RequeueAfter: result.RequeueAfter}, nil
+		case ActionStop:
+			return ctrl.Result{}, result.Err
 		}
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// maybe some named return for ctrl.Result{}?? so we can simplify the smaller reconcile loops?
-
-// if res := r.reconcileFinalizer(ctx, measurementDevice); res.Stop {
-// 	log.Println("stopping finalizer reconcile", res.Error)
-// 	return res.Result, res.Error
-// }
-
-// if res := r.reconcileGeneratorFile(ctx, measurementDevice); res.Stop {
-// 	log.Println("stopping generator file reconcile", res.Error)
-// 	return res.Result, res.Error
-// }
-
-// if res := r.reconcileSNMPFileExistence(ctx, measurementDevice); res.Stop {
-// 	log.Println("stopping SNMP file existence reconcile", res.Error)
-// 	return res.Result, res.Error
-// }
-
-// // All MIBs are parsed for the walk, how are they unique?
-
-// if res := r.reconcileSNMPGeneratorJob(ctx, measurementDevice); res.Stop {
-// 	log.Println("stopping job reconcile", res.Error)
-// 	return res.Result, res.Error
-// }
-
-// if res := r.reconcileSNMPFile(ctx, measurementDevice); res.Stop {
-// 	log.Println("stopping SNMP file reconcile", res.Error)
-// 	return res.Result, res.Error
-
-// }
-
-// // look at the new file, add the SHA of snmp-....yaml file so other controllers can see update
-
-// return ctrl.Result{}, nil
-
-type ReconcileResult struct {
-	Result ctrl.Result
-	Error  error
-	Stop   bool
 }
 
 /*
@@ -208,27 +215,26 @@ func (r *MeasurementDeviceReconciler) reconcileStatus(ctx context.Context, measu
 	return nil
 }
 
-func (r *MeasurementDeviceReconciler) reconcileDeletion() {
-	// logic
+func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, measurementDevice *chantico.MeasurementDevice) StepResult {
+	return Continue()
 }
 
-func (r *MeasurementDeviceReconciler) ensureFinalizerIsSet(ctx context.Context, measurementDevice *chantico.MeasurementDevice) (bool, error) {
+func (r *MeasurementDeviceReconciler) ensureFinalizerIsSet(ctx context.Context, measurementDevice *chantico.MeasurementDevice) StepResult {
 	if controllerutil.ContainsFinalizer(measurementDevice, chantico.MeasurementDeviceFinalizer) {
-		return false, nil
+		return Continue()
 	}
-
 	controllerutil.AddFinalizer(measurementDevice, chantico.MeasurementDeviceFinalizer)
-	return true, nil
+	return Stop(nil)
 }
 
-func (r *MeasurementDeviceReconciler) reconcileMibFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) ReconcileResult {
+func (r *MeasurementDeviceReconciler) reconcileMibFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) StepResult {
 	/*
 		I think we should be more explicit for MIB files, or directories. This way we can prevent name space collisions.
 	*/
-	return ReconcileResult{}
+	return Continue()
 }
 
-func (r *MeasurementDeviceReconciler) reconcileSNMPFileExistence(ctx context.Context, measurementDevice *chantico.MeasurementDevice) ReconcileResult {
+func (r *MeasurementDeviceReconciler) reconcileSNMPFileExistence(ctx context.Context, measurementDevice *chantico.MeasurementDevice) StepResult {
 	/*
 		We need to have an SNMP file (even if it is empty, it will be filled later by SNMP Generator).
 	*/
@@ -240,26 +246,26 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPFileExistence(ctx context.Con
 	_, err := os.ReadFile(pathToFile)
 	if err == nil {
 		// file exists, awesome
-		return ReconcileResult{}
+		return Continue()
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
 		// another error, maybe permissions, or smth
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
 
 	// create file
 	dir := filepath.Dir(pathToFile)
 	if err := os.MkdirAll(dir, 0777); err != nil {
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
 	err = os.WriteFile(pathToFile, []byte{}, 0777)
 	if err != nil {
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
-	return ReconcileResult{}
+	return Continue()
 }
 
-func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) ReconcileResult {
+func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) StepResult {
 	/*
 		get observed generator (from file)
 		get desired generator (from spec)
@@ -273,7 +279,7 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 	observedGenerator, err := os.ReadFile(pathToFile)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		// error when trying to read file, other than not exist error
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
 
 	desiredGenerator, err := yaml.Marshal(snmp.GeneratorConfig{
@@ -288,24 +294,24 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 	})
 	if err != nil {
 		// maybe add error message to object
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
 
 	observedSha := sha256.Sum256(observedGenerator)
 	desiredSha := sha256.Sum256(desiredGenerator)
 	if bytes.Equal(desiredSha[:], observedSha[:]) {
 		// desired == observed, do nothing
-		return ReconcileResult{}
+		return Continue()
 	}
 
 	dir := filepath.Dir(pathToFile)
 	if err := os.MkdirAll(dir, 0777); err != nil {
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
 
 	if err := os.WriteFile(pathToFile, desiredGenerator, 0777); err != nil {
 		// error when writing to file
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
 
 	patched := measurementDevice.DeepCopy()
@@ -317,16 +323,16 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 		ObservedGeneration: measurementDevice.Generation,
 	})
 	if err := r.Patch(ctx, patched, client.MergeFrom(measurementDevice)); err != nil {
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
 
 	// successfully wrote to file
-	return ReconcileResult{}
+	return Continue()
 }
 
 func int32Ptr(i int32) *int32 { return &i }
 
-func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Context, measurementDevice *chantico.MeasurementDevice) ReconcileResult {
+func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Context, measurementDevice *chantico.MeasurementDevice) StepResult {
 	/*
 		desired state:
 		- there should be a single job
@@ -335,7 +341,7 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 	*/
 	jobList := &batchv1.JobList{}
 	if err := r.List(ctx, jobList, client.InNamespace(measurementDevice.GetNamespace())); err != nil {
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
 
 	// this can be optimized with indexing (at the manager)
@@ -353,7 +359,7 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 
 		volume, err := vol.GetChanticoVolume() // ugly?
 		if err != nil {
-			return ReconcileResult{Error: err, Stop: true}
+			return Stop(err)
 		}
 
 		/*
@@ -409,15 +415,15 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 			},
 		}
 		if err := controllerutil.SetControllerReference(measurementDevice, job, r.Scheme); err != nil {
-			return ReconcileResult{Error: err, Stop: true}
+			return Stop(err)
 		}
 
 		if err := r.Create(ctx, job); err != nil {
-			return ReconcileResult{Error: err, Stop: true}
+			return Stop(err)
 		}
 
 		log.Println("creating job")
-		return ReconcileResult{Stop: true}
+		return Stop(err)
 
 	} else if len(ownedJobs) == 1 {
 		job := ownedJobs[0]
@@ -427,16 +433,16 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 		observedGeneration, exists := annotations["measurementdevice.generation.chantico"]
 		if !exists {
 			err := fmt.Errorf("Annotation has not been set for job. Should not be possible.")
-			return ReconcileResult{Error: err, Stop: true}
+			return Stop(err)
 		}
 		desiredGeneration := strconv.FormatInt(measurementDevice.GetGeneration(), 10)
 		if observedGeneration != desiredGeneration {
 			// job is not up to date
 			if err := r.Delete(ctx, &job); err != nil {
 				err := fmt.Errorf("Could not delete job.")
-				return ReconcileResult{Error: err, Stop: true}
+				return Stop(err)
 			}
-			return ReconcileResult{Stop: true}
+			return Stop(nil)
 		}
 
 		if !isJobSuccessful(&job) {
@@ -451,7 +457,7 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 			// if err := r.Patch(ctx, patched, client.MergeFrom(measurementDevice)); err != nil {
 			// 	return ReconcileResult{Error: err, Stop: true}
 			// }
-			return ReconcileResult{Stop: true}
+			return Stop(nil)
 		}
 
 		patched := measurementDevice.DeepCopy()
@@ -462,22 +468,22 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 			ObservedGeneration: measurementDevice.Generation,
 		})
 		if err := r.Patch(ctx, patched, client.MergeFrom(measurementDevice)); err != nil {
-			return ReconcileResult{Error: err, Stop: true}
+			return Stop(err)
 		}
 
-		return ReconcileResult{}
+		return Continue()
 	} else {
 		err := fmt.Errorf("MeasurementDevice owns multiple owned jobs. This should not be possible.")
-		return ReconcileResult{Error: err, Stop: true}
+		return Stop(err)
 	}
 }
 
-func (r *MeasurementDeviceReconciler) reconcileSNMPFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) ReconcileResult {
+func (r *MeasurementDeviceReconciler) reconcileSNMPFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) StepResult {
 	/*
 		update the hash of the snmp file in annotations or in status
 	*/
 
-	return ReconcileResult{}
+	return Continue()
 }
 
 func (r *MeasurementDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
