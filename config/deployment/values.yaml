@@ -2,6 +2,11 @@ persistentVolumeClaimName: chantico-snmp-prometheus-volume-claim
 prometheusRetention: 5h
 snmpExporterAddress: chantico-snmp:9116
 imagePullSecretName: regcred
+victoriaMetrics:
+  # Long-term retention period (e.g. 12 months)
+  retention: 12
+  # Storage path inside the PVC subPath
+  storagePath: /tmp/victoria-metrics-volume/storage
 controller:
   include: true
   image: ""
