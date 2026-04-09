@@ -95,17 +95,11 @@ spec:
                       type: string
                     type: array
                 required:
-                - collector_cmd
-                - collectors
-                - custom_args
-                - default_args
                 - driver
-                - exclude_sensor_ids
                 - pass
                 - privilege
                 - timeout
                 - user
-                - workaround_flags
                 type: object
             required:
             - auth

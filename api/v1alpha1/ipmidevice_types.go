@@ -27,12 +27,12 @@ type IPMIConfig struct {
 	Privilege        string              `yaml:"privilege" json:"privilege"`
 	Driver           string              `yaml:"driver" json:"driver"`
 	Timeout          uint32              `yaml:"timeout" json:"timeout"`
-	Collectors       []string            `yaml:"collectors" json:"collectors"`
-	ExcludeSensorIDs []int64             `yaml:"exclude_sensor_ids" json:"exclude_sensor_ids"`
-	WorkaroundFlags  []string            `yaml:"workaround_flags" json:"workaround_flags"`
-	CollectorCmd     map[string]string   `yaml:"collector_cmd" json:"collector_cmd"`
-	CollectorArgs    map[string][]string `yaml:"default_args" json:"default_args"`
-	CustomArgs       map[string][]string `yaml:"custom_args" json:"custom_args"`
+	Collectors       []string            `yaml:"collectors,omitempty" json:"collectors,omitempty"`
+	ExcludeSensorIDs []int64             `yaml:"exclude_sensor_ids,omitempty" json:"exclude_sensor_ids,omitempty"`
+	WorkaroundFlags  []string            `yaml:"workaround_flags,omitempty" json:"workaround_flags,omitempty"`
+	CollectorCmd     map[string]string   `yaml:"collector_cmd,omitempty" json:"collector_cmd,omitempty"`
+	CollectorArgs    map[string][]string `yaml:"default_args,omitempty" json:"default_args,omitempty"`
+	CustomArgs       map[string][]string `yaml:"custom_args,omitempty" json:"custom_args,omitempty"`
 
 	SELEvents []*IpmiSELEvent `yaml:"sel_events,omitempty" json:"sel_events,omitempty"`
 }

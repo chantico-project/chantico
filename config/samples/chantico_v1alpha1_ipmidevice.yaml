@@ -8,7 +8,7 @@ metadata:
 spec:
   auth:
     user: guest
-    password: public
+    pass: public
     privilege: ADMINISTRATOR
     driver: LAN_2_0
     timeout: 10000
