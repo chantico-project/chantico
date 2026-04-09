@@ -4,8 +4,6 @@ import (
 	"slices"
 
 	chantico "chantico/api/v1alpha1"
-
-	batchv1 "k8s.io/api/batch/v1"
 )
 
 type State string
@@ -24,7 +22,6 @@ const (
 
 func UpdateState(
 	ipmiDevice *chantico.IPMIDevice,
-	snmpJob *batchv1.Job,
 ) {
 	// Covers the initialization pathological cases
 	if ipmiDevice == nil {
@@ -65,15 +62,7 @@ func UpdateState(
 		ipmiDevice.Status.UpdateGeneration = ipmiDevice.ObjectMeta.Generation
 		return
 
-	case StatePendingIPMIConfigUpdate:
-		if snmpJob.Status.Succeeded == 1 {
-			ipmiDevice.Status.State = StateSucceededIPMIConfigUpdate
-		} else if snmpJob.Status.Failed > 0 {
-			ipmiDevice.Status.State = StateFailed
-			// log.Fatalf("JOB: %#v", snmpJob)
-		}
-		return
-	case StateSucceededIPMIConfigUpdate, StatePendingIPMIReload:
+	case StatePendingIPMIConfigUpdate, StateSucceededIPMIConfigUpdate, StatePendingIPMIReload:
 		return
 	case StateEndPoint, StateFailed, StateRemove, StateDelete:
 		return

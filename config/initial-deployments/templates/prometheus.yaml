@@ -64,7 +64,7 @@ spec:
                   - files:
                       - /tmp/prometheus-volume/targets/*.ipmi.json
                     refresh_interval: 30s
-                metrics_path: /snmp
+                metrics_path: /metrics
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: __param_target

@@ -18,13 +18,16 @@ package controller
 
 import (
 	"context"
+	"log"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	chantico "chantico/api/v1alpha1"
 	chanticov1alpha1 "chantico/api/v1alpha1"
+	id "chantico/internal/ipmidevice"
+	ph "chantico/internal/patch"
 )
 
 // IPMIDeviceReconciler reconciles a IPMIDevice object
@@ -47,10 +50,22 @@ type IPMIDeviceReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *IPMIDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	// Get the information needed to determine the state of the IPMIDevice
+	ipmiDevice := &chantico.IPMIDevice{}
+	err := r.Get(ctx, req.NamespacedName, ipmiDevice)
+	if err != nil {
+		return ctrl.Result{}, nil
+	}
 
-	// TODO(user): your logic here
+	log.Printf("Updating state of IPMI device %s\n", ipmiDevice.Name)
+	patch := ph.Initialize(ctx, r.Client, ipmiDevice)
+	id.UpdateState(ipmiDevice)
+	patch.PatchStatus()
 
+	result := id.StateMachine.ExecuteActions(ctx, r.Client, ipmiDevice, patch)
+	if result != nil && result.Result != nil {
+		return *result.Result, nil
+	}
 	return ctrl.Result{}, nil
 }
 

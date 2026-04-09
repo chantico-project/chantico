@@ -2,11 +2,13 @@ package ipmidevice
 
 import (
 	"maps"
+	"os"
 	"path/filepath"
 
 	"go.yaml.in/yaml/v2"
 
 	chantico "chantico/api/v1alpha1"
+	vol "chantico/internal/volumes"
 )
 
 const (
@@ -16,6 +18,7 @@ const (
 
 func getConfigPath() string {
 	return filepath.Join(
+		os.Getenv(vol.ChanticoVolumeLocationEnv),
 		ipmiYmlDir,
 		"config.yml",
 	)

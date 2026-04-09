@@ -74,6 +74,8 @@ func GenerateIPMIConfig(ipmiDevice chantico.IPMIDevice) (string, error) {
 
 /*
 Combines module into config.yml
+XXX: Based on SNMP controller action logic, but this has pre-logging printfs and
+no proper state change upon errors
 */
 func CreateIPMIDeploymentConfig(
 	ipmiDevice *chantico.IPMIDevice,
@@ -84,6 +86,7 @@ func CreateIPMIDeploymentConfig(
 	fileContents, err := os.ReadFile(configFilePath)
 	if err != nil {
 		fmt.Printf("Could not load file %s: %s", configFilePath, err)
+		return nil
 	}
 
 	newIPMIConfig, err := GenerateIPMIConfig(*ipmiDevice)
@@ -107,7 +110,8 @@ func CreateIPMIDeploymentConfig(
 		fmt.Printf("Could not write to %s: %s", configFilePath, err)
 		return nil
 	}
-	return nil
+	ipmiDevice.Status.State = StateSucceededIPMIConfigUpdate
+	return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
 }
 
 var ipmiReloadMutex sync.Mutex = sync.Mutex{}
