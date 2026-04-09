@@ -58,7 +58,7 @@ func TestTargetFileAddition(t *testing.T) {
 				},
 			},
 			expectedFiles: []string{
-				"prometheus/targets/physical_measurement.json",
+				"prometheus/targets/physical_measurement.snmp.json",
 			},
 		},
 	}
@@ -67,7 +67,7 @@ func TestTargetFileAddition(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tmpDir := testCreateTmpDirectories(t)
 
-			_ = WriteTargetFile(tc.physicalMeasurement)
+			_ = WriteSNMPTargetFile(tc.physicalMeasurement)
 
 			for _, expectedFile := range tc.expectedFiles {
 				absPath := filepath.Join(tmpDir, expectedFile)
@@ -114,7 +114,7 @@ func TestTargetFileDeletion(t *testing.T) {
 	}{
 		"target file deleted": {
 			beforeFiles: []string{
-				"prometheus/targets/physical_measurement.json",
+				"prometheus/targets/physical_measurement.snmp.json",
 			},
 			physicalMeasurement: &chantico.PhysicalMeasurement{
 				ObjectMeta: metav1.ObjectMeta{
@@ -190,8 +190,8 @@ func TestMultipleTargetFiles(t *testing.T) {
 			},
 			expectedFiles: 2,
 			expectedTargets: map[string]string{
-				"measurement-1.json": "device-type-a",
-				"measurement-2.json": "device-type-b",
+				"measurement-1.snmp.json": "device-type-a",
+				"measurement-2.snmp.json": "device-type-b",
 			},
 		},
 		"two measurements for same device": {
@@ -219,8 +219,8 @@ func TestMultipleTargetFiles(t *testing.T) {
 			},
 			expectedFiles: 2,
 			expectedTargets: map[string]string{
-				"measurement-1.json": "same-device",
-				"measurement-2.json": "same-device",
+				"measurement-1.snmp.json": "same-device",
+				"measurement-2.snmp.json": "same-device",
 			},
 		},
 	}
@@ -230,7 +230,7 @@ func TestMultipleTargetFiles(t *testing.T) {
 			tmpDir := testCreateTmpDirectories(t)
 
 			for _, pm := range tc.physicalMeasurements {
-				WriteTargetFile(pm)
+				WriteSNMPTargetFile(pm)
 			}
 
 			targetsDir := filepath.Join(tmpDir, "prometheus/targets")

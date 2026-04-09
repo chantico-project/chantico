@@ -1,4 +1,5 @@
 persistentVolumeClaimName: chantico-snmp-prometheus-volume-claim
 prometheusRetention: 5h
 snmpExporterAddress: chantico-snmp:9116
+ipmiExporterAddress: chantico-ipmi:9290
 imagePullSecretName: regcred

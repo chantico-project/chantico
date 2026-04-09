@@ -32,7 +32,8 @@ type PhysicalMeasurementSpec struct {
 
 	Ip                string   `json:"ip"`
 	ServiceId         string   `json:"serviceId"`
-	MeasurementDevice string   `json:"measurementDevice"`
+	MeasurementDevice string   `json:"measurementDevice,omitempty"`
+	IPMIDevice        string   `json:"ipmiDevice,omitempty"`
 	ResourceIds       []string `json:"resourceIds,omitempty"`
 }
 

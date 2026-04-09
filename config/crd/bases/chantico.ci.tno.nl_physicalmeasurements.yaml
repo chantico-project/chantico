@@ -42,6 +42,8 @@ spec:
             properties:
               ip:
                 type: string
+              ipmiDevice:
+                type: string
               measurementDevice:
                 type: string
               resourceIds:
@@ -52,7 +54,6 @@ spec:
                 type: string
             required:
             - ip
-            - measurementDevice
             - serviceId
             type: object
           status:
