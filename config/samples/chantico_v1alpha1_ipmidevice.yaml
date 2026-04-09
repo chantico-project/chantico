@@ -5,6 +5,7 @@ metadata:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
   name: ipmidevice-misd
+  namespace: chantico
 spec:
   auth:
     user: guest
