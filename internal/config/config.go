@@ -31,7 +31,14 @@ func New() (Config, error) {
 	if mountPath == "" {
 		errs = append(errs, fmt.Errorf("no mount path specified. CHANTICOVOLUMELOCATIONENV missing."))
 	} else {
-		// do we need to check if the volume exists?
+		// checking whether directory exists
+		info, err := os.Stat(mountPath)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("CHANTICOVOLUMELOCATIONENV error checking directory: %s", mountPath))
+		} else if !info.IsDir() {
+			errs = append(errs, fmt.Errorf("CHANTICOVOLUMELOCATIONENV is not a directory: %s", mountPath))
+		}
+
 	}
 
 	if len(errs) > 0 {
