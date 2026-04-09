@@ -4,6 +4,11 @@ metadata:
   labels:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
-  name: ipmidevice-sample
+  name: ipmidevice-misd
 spec:
-  # TODO(user): Add fields here
+  auth:
+    user: guest
+    password: public
+    privilege: ADMINISTRATOR
+    driver: LAN_2_0
+    timeout: 10000

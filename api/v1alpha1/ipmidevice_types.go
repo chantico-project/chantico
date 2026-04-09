@@ -86,3 +86,15 @@ type IPMIDeviceList struct {
 func init() {
 	SchemeBuilder.Register(&IPMIDevice{}, &IPMIDeviceList{})
 }
+
+const (
+	IPMIUpdateFinalizer = "ipmidevice.finalizer.chantico.ci.tno.nl/ipmi-update"
+)
+
+func (r *IPMIDevice) GetState() string            { return r.Status.State }
+func (r *IPMIDevice) SetState(s string)           { r.Status.State = s }
+func (r *IPMIDevice) GetUpdateGeneration() int64  { return r.Status.UpdateGeneration }
+func (r *IPMIDevice) SetUpdateGeneration(g int64) { r.Status.UpdateGeneration = g }
+func (r *IPMIDevice) GetFinalizerName() string    { return SNMPUpdateFinalizer }
+func (r *IPMIDevice) GetErrorMessage() string     { return r.Status.ErrorMessage }
+func (r *IPMIDevice) SetErrorMessage(msg string)  { r.Status.ErrorMessage = msg }
