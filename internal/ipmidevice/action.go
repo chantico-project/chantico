@@ -30,14 +30,12 @@ var StateMachine = sm.Machine[*chantico.IPMIDevice]{
 		StateEntryPoint: {
 			{Type: sm.ActionFunctionPure, Pure: CreateIPMIDeploymentConfig},
 		},
-		StatePendingIPMIConfigUpdate: {},
 		StateSucceededIPMIConfigUpdate: {
 			{Type: sm.ActionFunctionPure, Pure: CreateIPMIDeploymentConfig},
 			{Type: sm.ActionFunctionIO, IO: ReloadIPMIService},
 		},
 		StateDelete: {
 			{Type: sm.ActionFunctionPure, Pure: DeleteIPMIConfig},
-			{Type: sm.ActionFunctionPure, Pure: CreateIPMIDeploymentConfig},
 			{Type: sm.ActionFunctionIO, IO: ReloadIPMIService},
 			{Type: sm.ActionFunctionPure, Pure: sm.RemoveFinalizer[*chantico.IPMIDevice]},
 		},
@@ -59,7 +57,30 @@ func UpdateModification(
 func DeleteIPMIConfig(
 	ipmiDevice *chantico.IPMIDevice,
 ) *sm.ActionResult {
-	// TODO: Remove from combined config.yml
+	configFilePath := getConfigPath()
+
+	// Create the file contents structure
+	fileContents, err := os.ReadFile(configFilePath)
+	if err != nil {
+		fmt.Printf("Could not load file %s: %s", configFilePath, err)
+		return nil
+	}
+
+	newIPMIConfig, err := DeleteIPMIConfigModule(fileContents, ipmiDevice.Name)
+	if err != nil {
+		fmt.Printf("Could not delete IPMI config module: %s", err)
+		return nil
+	}
+
+	err = os.WriteFile(
+		configFilePath,
+		[]byte(newIPMIConfig),
+		0666,
+	)
+	if err != nil {
+		fmt.Printf("Could not write to %s: %s", configFilePath, err)
+		return nil
+	}
 	return nil
 }
 

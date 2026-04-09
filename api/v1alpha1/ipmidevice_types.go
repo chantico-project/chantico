@@ -23,7 +23,7 @@ import (
 // Courtesy of the ipmi_exporter repository: https://github.com/prometheus-community/ipmi_exporter/blob/master/config.go
 type IPMIConfig struct {
 	User             string              `yaml:"user" json:"user"`
-	Password         string              `yaml:"pass" json:"pass"`
+	Password         string              `yaml:"pass" json:"pass"` // XXX: Prefer obtaining this from a configMap or secret with a valueFrom reference
 	Privilege        string              `yaml:"privilege" json:"privilege"`
 	Driver           string              `yaml:"driver" json:"driver"`
 	Timeout          uint32              `yaml:"timeout" json:"timeout"`

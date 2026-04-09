@@ -11,7 +11,6 @@ type State string
 const (
 	StateInit                      = "Init"
 	StateEntryPoint                = "Entry Point"
-	StatePendingIPMIConfigUpdate   = "Pending IPMI Config Update"
 	StateSucceededIPMIConfigUpdate = "Succeeded IPMI Config Update"
 	StatePendingIPMIReload         = "Pending IPMI Config Reload"
 	StateDelete                    = "Delete"
@@ -62,7 +61,7 @@ func UpdateState(
 		ipmiDevice.Status.UpdateGeneration = ipmiDevice.ObjectMeta.Generation
 		return
 
-	case StatePendingIPMIConfigUpdate, StateSucceededIPMIConfigUpdate, StatePendingIPMIReload:
+	case StateSucceededIPMIConfigUpdate, StatePendingIPMIReload:
 		return
 	case StateEndPoint, StateFailed, StateRemove, StateDelete:
 		return

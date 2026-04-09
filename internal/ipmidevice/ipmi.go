@@ -44,3 +44,26 @@ func MergeIPMIConfigs(fileContents [][]byte) (string, error) {
 	}
 	return string(out), err
 }
+
+func DeleteIPMIConfigModule(
+	fileContent []byte,
+	moduleName string,
+) (string, error) {
+	acc := ipmiConfig{Modules: map[string]chantico.IPMIConfig{}}
+	ipmiconfig := ipmiConfig{Modules: map[string]chantico.IPMIConfig{}}
+	err := yaml.Unmarshal(fileContent, &ipmiconfig)
+	if err != nil {
+		return "", err
+	}
+	for name, config := range ipmiconfig.Modules {
+		if name == moduleName {
+			continue
+		}
+		acc.Modules[name] = config
+	}
+	out, err := yaml.Marshal(acc)
+	if err != nil {
+		return "", err
+	}
+	return string(out), err
+}
