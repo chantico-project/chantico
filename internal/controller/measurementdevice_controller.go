@@ -53,6 +53,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"chantico/internal/config"
 )
 
 // Define a custom type for the Action
@@ -139,6 +141,7 @@ CRD: SNMPConfig -> Prom/Generator (MIBS, Generator.yaml) -> snmp.yaml
 type MeasurementDeviceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Config config.Config
 }
 
 func (r *MeasurementDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -280,7 +283,7 @@ func (r *MeasurementDeviceReconciler) ensureSNMPFileExists(ctx context.Context, 
 	// for now create snmp dir, for some reason this is now done from an init container...
 	// Chantico CR, then the Chantico controller will create the folders
 
-	pathToFile := filepath.Join(os.Getenv(vol.ChanticoVolumeLocationEnv), "snmp/snmp", fmt.Sprintf("snmp-%s.yaml", measurementDevice.GetUID()))
+	pathToFile := filepath.Join(r.Config.MountPath, "snmp/snmp", fmt.Sprintf("snmp-%s.yaml", measurementDevice.GetUID()))
 
 	_, err := os.ReadFile(pathToFile)
 	if err == nil {
@@ -314,7 +317,7 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 		sidenote: rather than writing to file, you can also update the status
 	*/
 
-	pathToFile := filepath.Join(os.Getenv(vol.ChanticoVolumeLocationEnv), "snmp/generators", fmt.Sprintf("generator-%s.yaml", measurementDevice.GetUID()))
+	pathToFile := filepath.Join(r.Config.MountPath, "snmp/generators", fmt.Sprintf("generator-%s.yaml", measurementDevice.GetUID()))
 	observedGenerator, err := os.ReadFile(pathToFile)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		fmt.Println("Error reading file")
@@ -435,7 +438,7 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 						Containers: []corev1.Container{
 							{
 								Name:  "snmp-generator",
-								Image: "prom/snmp-generator:v0.29.0",
+								Image: r.Config.Images.SnmpGenerator,
 								Command: []string{
 									"/bin/generator",
 								},
