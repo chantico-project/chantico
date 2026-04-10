@@ -20,6 +20,7 @@ import (
 	"context"
 	"log"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,5 +74,6 @@ func (r *IPMIDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *IPMIDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chanticov1alpha1.IPMIDevice{}).
+		Owns(&corev1.Secret{}).
 		Complete(r)
 }

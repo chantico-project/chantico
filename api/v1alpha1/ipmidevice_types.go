@@ -22,8 +22,8 @@ import (
 
 // Courtesy of the ipmi_exporter repository: https://github.com/prometheus-community/ipmi_exporter/blob/master/config.go
 type IPMIConfig struct {
-	User             string              `yaml:"user" json:"user"`
-	Password         string              `yaml:"pass" json:"pass"` // XXX: Prefer obtaining this from a configMap or secret with a valueFrom reference
+	User             string              `yaml:"user,omitempty" json:"user,omitempty"`
+	Password         string              `yaml:"pass,omitempty" json:"pass,omitempty"`
 	Privilege        string              `yaml:"privilege" json:"privilege"`
 	Driver           string              `yaml:"driver" json:"driver"`
 	Timeout          uint32              `yaml:"timeout" json:"timeout"`
@@ -48,7 +48,8 @@ type IPMIDeviceSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// IPMI configuration for the exporter
-	Auth IPMIConfig `yaml:"auth" json:"auth"`
+	Auth      IPMIConfig `yaml:"auth" json:"auth"`
+	SecretRef string     `yaml:"secretRef,omitempty" json:"secretRef,omitempty"`
 }
 
 // IPMIDeviceStatus defines the observed state of IPMIDevice

@@ -14,6 +14,7 @@ import (
 
 	"go.yaml.in/yaml/v2"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -26,12 +27,13 @@ var StateMachine = sm.Machine[*chantico.IPMIDevice]{
 	Actions: map[string][]sm.ActionFunction[*chantico.IPMIDevice]{
 		StateInit: {
 			{Type: sm.ActionFunctionPure, Pure: sm.InitializeFinalizer[*chantico.IPMIDevice]},
+			{Type: sm.ActionFunctionIO, IO: MoveCredentialsToSecret},
 		},
 		StateEntryPoint: {
-			{Type: sm.ActionFunctionPure, Pure: CreateIPMIDeploymentConfig},
+			{Type: sm.ActionFunctionIO, IO: CreateIPMIDeploymentConfig},
 		},
 		StateSucceededIPMIConfigUpdate: {
-			{Type: sm.ActionFunctionPure, Pure: CreateIPMIDeploymentConfig},
+			{Type: sm.ActionFunctionIO, IO: CreateIPMIDeploymentConfig}, // XXX: Remove this once we have new controller logic
 			{Type: sm.ActionFunctionIO, IO: ReloadIPMIService},
 		},
 		StateDelete: {
@@ -52,6 +54,60 @@ func UpdateModification(
 	ipmiDevice.Status.UpdateTime = metav1.Time{Time: time.Now()}.Format(time.RFC3339)
 	ipmiDevice.Status.UpdateGeneration = ipmiDevice.ObjectMeta.Generation
 	return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
+}
+
+func MoveCredentialsToSecret(
+	ctx context.Context,
+	kubernetesClient client.Client,
+	ipmiDevice *chantico.IPMIDevice,
+) *sm.ActionResult {
+	var secretName = ipmiDevice.Name + "-credentials"
+	if ipmiDevice.Spec.SecretRef != "" {
+		secretName = ipmiDevice.Spec.SecretRef
+	}
+	var secret corev1.Secret
+	if err := kubernetesClient.Get(ctx, client.ObjectKey{Name: secretName, Namespace: "chantico"}, &secret); err == nil {
+		// TODO: Validation of secret contents (should be basic-auth with username and password keys)
+		log.Printf("Secret %s already exists, skipping creation", secretName)
+		return nil
+	}
+
+	// Create Secret
+	secret = corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: "chantico",
+		},
+		Type: corev1.SecretTypeBasicAuth,
+		Data: map[string][]byte{
+			"username": []byte(ipmiDevice.Spec.Auth.User),
+			"password": []byte(ipmiDevice.Spec.Auth.Password),
+		},
+	}
+
+	// TODO: Set controller reference so that the secret gets deleted when the IPMI device config is deleted
+	// This requires the reconciler scheme which needs to be passed to this function, once we have new logic
+	/*
+		if err := ctrl.SetControllerReference(ipmiDevice, &secret, r.Scheme); err != nil {
+			// TODO: Error reporting to user (with new return value logic)
+			log.Printf("Secret %s could not be linked to IPMI device config %s", secretName, ipmiDevice.Name)
+			ipmiDevice.Status.State = StateFailed
+			return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
+		}
+	*/
+
+	if err := kubernetesClient.Create(ctx, &secret); err != nil {
+		// TODO: Error reporting to user (with new return value logic)
+		log.Printf("Secret %s could not be created for IPMI device config %s", secretName, ipmiDevice.Name)
+		ipmiDevice.Status.State = StateFailed
+		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
+	}
+
+	// Remove credentials from the IPMI device config spec and set the secret reference
+	ipmiDevice.Spec.SecretRef = secretName
+	ipmiDevice.Spec.Auth.User = ""
+	ipmiDevice.Spec.Auth.Password = ""
+	return &sm.ActionResult{PatchType: ph.PatchResource}
 }
 
 func DeleteIPMIConfig(
@@ -84,9 +140,12 @@ func DeleteIPMIConfig(
 	return nil
 }
 
-func GenerateIPMIConfig(ipmiDevice chantico.IPMIDevice) (string, error) {
+func GenerateIPMIConfig(ipmiDevice *chantico.IPMIDevice, secret *corev1.Secret) (string, error) {
 	modules := map[string]chantico.IPMIConfig{}
-	modules[ipmiDevice.Name] = ipmiDevice.Spec.Auth
+	auth := *ipmiDevice.Spec.Auth.DeepCopy()
+	auth.User = string(secret.Data["username"])
+	auth.Password = string(secret.Data["password"])
+	modules[ipmiDevice.Name] = auth
 	ipmiDeviceConfig := ipmiConfig{Modules: modules}
 
 	out, err := yaml.Marshal(ipmiDeviceConfig)
@@ -99,6 +158,8 @@ XXX: Based on SNMP controller action logic, but this has pre-logging printfs and
 no proper state change upon errors
 */
 func CreateIPMIDeploymentConfig(
+	ctx context.Context,
+	kubernetesClient client.Client,
 	ipmiDevice *chantico.IPMIDevice,
 ) *sm.ActionResult {
 	configFilePath := getConfigPath()
@@ -110,7 +171,12 @@ func CreateIPMIDeploymentConfig(
 		return nil
 	}
 
-	newIPMIConfig, err := GenerateIPMIConfig(*ipmiDevice)
+	var secret corev1.Secret
+	if err := kubernetesClient.Get(ctx, client.ObjectKey{Name: ipmiDevice.Spec.SecretRef, Namespace: "chantico"}, &secret); err != nil {
+		log.Printf("Secret %s not found", ipmiDevice.Spec.SecretRef)
+		return nil
+	}
+	newIPMIConfig, err := GenerateIPMIConfig(ipmiDevice, &secret)
 	if err != nil {
 		fmt.Printf("Could not generate IPMI config: %s", err)
 		return nil
