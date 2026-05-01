@@ -83,10 +83,11 @@ const (
 type ConditionType string
 
 const (
-	ConditionReady         ConditionType = "Ready"
-	ConditionJob           ConditionType = "Job"
-	ConditionConfig        ConditionType = "Config"
-	ConditionGeneratorFile ConditionType = "GeneratorFile"
+	ConditionReady          ConditionType = "Ready"
+	ConditionJob            ConditionType = "Job"
+	ConditionConfig         ConditionType = "Config"
+	ConditionGeneratorFile  ConditionType = "GeneratorFile"
+	ConditionExporterReload ConditionType = "ExporterReload"
 )
 
 type ConditionReason string

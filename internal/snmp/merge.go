@@ -8,7 +8,7 @@ import (
 	"maps"
 	"sort"
 
-	"sigs.k8s.io/yaml"
+	"go.yaml.in/yaml/v2"
 )
 
 // Merge merges multiple snmp_exporter config files into a single one.
@@ -17,15 +17,15 @@ import (
 // later entries win on key collision (callers should pre-sort their
 // inputs deterministically — see MergeFiles).
 func Merge(fragments [][]byte) ([]byte, error) {
-	out := GeneratorConfig{
-		Auths:   map[string]*GeneratorAuth{},
-		Modules: map[string]*GeneratorModule{},
+	out := MergedConfig{
+		Auths:   map[string]any{},
+		Modules: map[string]any{},
 	}
 	for i, raw := range fragments {
 		if len(bytes.TrimSpace(raw)) == 0 {
 			continue
 		}
-		var frag GeneratorConfig
+		var frag MergedConfig
 		if err := yaml.Unmarshal(raw, &frag); err != nil {
 			return nil, fmt.Errorf("fragment %d: %w", i, err)
 		}

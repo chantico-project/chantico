@@ -31,7 +31,7 @@ func BuildGeneratorJob(snmpGeneratorImage string, snmpDevice *chantico.SNMPDevic
 			Name:      snmpDevice.GetName(),
 			Namespace: snmpDevice.GetNamespace(),
 			Annotations: map[string]string{
-				"snmpdevice.generation.chantico": strconv.FormatInt(snmpDevice.GetGeneration(), 10),
+				GenerationAnnotation: strconv.FormatInt(snmpDevice.GetGeneration(), 10),
 			},
 		},
 		Spec: batchv1.JobSpec{

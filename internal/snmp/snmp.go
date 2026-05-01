@@ -22,3 +22,9 @@ type GeneratorConfig struct {
 	Modules map[string]*GeneratorModule `yaml:"modules"`
 	Version int                         `yaml:"version,omitempty"`
 }
+
+type MergedConfig struct {
+	Auths   map[string]any `yaml:"auths" json:"auths"`
+	Modules map[string]any `yaml:"modules" json:"modules"`
+	Version int            `yaml:"version,omitempty" json:"version,omitempty"`
+}

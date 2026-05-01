@@ -1,7 +1,7 @@
 apiVersion: chantico.ci.tno.nl/v1alpha1
 kind: SNMPDevice
 metadata:
-  name: tno
+  name: tno2
   namespace: chantico
   labels:
     app.kubernetes.io/name: chantico
