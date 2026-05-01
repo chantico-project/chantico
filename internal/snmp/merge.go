@@ -1,4 +1,4 @@
-package snmpexporter
+package snmp
 
 import (
 	"bytes"
@@ -9,8 +9,6 @@ import (
 	"sort"
 
 	"sigs.k8s.io/yaml"
-
-	"chantico/internal/snmp"
 )
 
 // Merge merges multiple snmp_exporter config files into a single one.
@@ -19,15 +17,15 @@ import (
 // later entries win on key collision (callers should pre-sort their
 // inputs deterministically — see MergeFiles).
 func Merge(fragments [][]byte) ([]byte, error) {
-	out := snmp.GeneratorConfig{
-		Auths:   map[string]*snmp.GeneratorAuth{},
-		Modules: map[string]*snmp.GeneratorModule{},
+	out := GeneratorConfig{
+		Auths:   map[string]*GeneratorAuth{},
+		Modules: map[string]*GeneratorModule{},
 	}
 	for i, raw := range fragments {
 		if len(bytes.TrimSpace(raw)) == 0 {
 			continue
 		}
-		var frag snmp.GeneratorConfig
+		var frag GeneratorConfig
 		if err := yaml.Unmarshal(raw, &frag); err != nil {
 			return nil, fmt.Errorf("fragment %d: %w", i, err)
 		}

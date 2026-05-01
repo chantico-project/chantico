@@ -1,5 +1,5 @@
 # apiVersion: chantico.ci.tno.nl/v1alpha1
-# kind: MeasurementDevice
+# kind: SNMPDevice
 # metadata:
 #   labels:
 #     app.kubernetes.io/name: chantico
@@ -15,7 +15,7 @@
 #     # - tnoPduPowerValue
 # ---
 # apiVersion: chantico.ci.tno.nl/v1alpha1
-# kind: MeasurementDevice
+# kind: SNMPDevice
 # metadata:
 #   labels:
 #     app.kubernetes.io/name: chantico
@@ -31,12 +31,12 @@
 #     - tnoPduPowerValue
 # ---
 apiVersion: chantico.ci.tno.nl/v1alpha1
-kind: MeasurementDevice
+kind: SNMPDevice
 metadata:
   labels:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
-  name: tno5
+  name: tno
   namespace: chantico
 spec:
   auth:

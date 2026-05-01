@@ -38,6 +38,7 @@ import (
 	chanticov1alpha1 "chantico/api/v1alpha1"
 	"chantico/internal/config"
 	"chantico/internal/controller"
+	"chantico/internal/snmpgenerator"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -155,6 +156,7 @@ func main() {
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		Config: config,
+		Paths:  snmpgenerator.NewPaths(config.MountPath),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SnmpGenerator")
 		os.Exit(1)

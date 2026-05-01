@@ -1,8 +1,8 @@
 ## Append samples of your project ##
 resources:
 #- chantico_v1alpha1_pdu.yaml
-#- chantico_v1alpha1_measurement.yaml
-- chantico_v1alpha1_measurementdevice.yaml
-- chantico_v1alpha1_physicalmeasurement.yaml
+- chantico_v1alpha1_snmpexporter.yaml
+- chantico_v1alpha1_snmpdevice_mock.yaml
+- chantico_v1alpha1_physicalmeasurement_mock.yaml
 - chantico_v1alpha1_datacenterresource.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

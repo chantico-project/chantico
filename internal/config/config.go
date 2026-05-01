@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Images struct {
@@ -16,8 +18,9 @@ type Images struct {
 }
 
 type Config struct {
-	Images    Images
-	MountPath string
+	Images         Images
+	MountPath      string
+	SnmpDeployment client.ObjectKey
 }
 
 func New() (Config, error) {
@@ -53,6 +56,10 @@ func New() (Config, error) {
 			Postgres:      "postgres:17.6",
 			Filebrowser:   "filebrowser/filebrowser:v2.32.2",
 			Prometheus:    "prom/prometheus:v3.7.3",
+		},
+		SnmpDeployment: client.ObjectKey{
+			Name:      "chantico-snmp",
+			Namespace: "chantico",
 		},
 		MountPath: mountPath,
 	}, nil

@@ -1,12 +1,14 @@
 apiVersion: chantico.ci.tno.nl/v1alpha1
-kind: MeasurementDevice
+kind: SNMPDevice
 metadata:
   name: tno
   namespace: chantico
+  labels:
+    app.kubernetes.io/name: chantico
 spec:
   auth:
     community: public
     version: 2
   walks:
     - tnoPduEnergyValue
-    # - tnoPduPowerValue
+    - tnoPduPowerValue
