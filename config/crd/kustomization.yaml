@@ -2,7 +2,7 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/chantico.ci.tno.nl_measurementdevices.yaml
+- bases/chantico.ci.tno.nl_snmpdevices.yaml
 - bases/chantico.ci.tno.nl_physicalmeasurements.yaml
 - bases/chantico.ci.tno.nl_datacenterresources.yaml
 # +kubebuilder:scaffold:crdkustomizeresource

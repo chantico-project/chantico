@@ -1,16 +1,16 @@
-# permissions for end users to edit measurementdevices.
+# permissions for end users to edit snmpdevices.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
-  name: measurementdevice-editor-role
+  name: snmpdevice-editor-role
 rules:
 - apiGroups:
   - chantico.ci.tno.nl
   resources:
-  - measurementdevices
+  - snmpdevices
   verbs:
   - create
   - delete
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - chantico.ci.tno.nl
   resources:
-  - measurementdevices/status
+  - snmpdevices/status
   verbs:
   - get

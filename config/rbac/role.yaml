@@ -5,11 +5,24 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - chantico.ci.tno.nl
   resources:
   - datacenterresources
   - physicalmeasurements
   - snmpdevices
+  - snmpexporters
   verbs:
   - create
   - delete
@@ -30,6 +43,7 @@ rules:
   - datacenterresources/status
   - physicalmeasurements/status
   - snmpdevices/status
+  - snmpexporters/status
   verbs:
   - get
   - patch
@@ -39,6 +53,7 @@ rules:
   resources:
   - physicalmeasurements/finalizers
   - snmpdevices/finalizers
+  - snmpexporters/finalizers
   verbs:
   - create
   - patch

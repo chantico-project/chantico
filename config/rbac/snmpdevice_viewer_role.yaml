@@ -1,16 +1,16 @@
-# permissions for end users to view measurementdevices.
+# permissions for end users to view snmpdevices.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
-  name: measurementdevice-viewer-role
+  name: snmpdevice-viewer-role
 rules:
 - apiGroups:
   - chantico.ci.tno.nl
   resources:
-  - measurementdevices
+  - snmpdevices
   verbs:
   - get
   - list
@@ -18,6 +18,6 @@ rules:
 - apiGroups:
   - chantico.ci.tno.nl
   resources:
-  - measurementdevices/status
+  - snmpdevices/status
   verbs:
   - get

@@ -4,20 +4,27 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: measurementdevices.chantico.ci.tno.nl
+  name: snmpdevices.chantico.ci.tno.nl
 spec:
   group: chantico.ci.tno.nl
   names:
-    kind: MeasurementDevice
-    listKind: MeasurementDeviceList
-    plural: measurementdevices
-    singular: measurementdevice
+    kind: SNMPDevice
+    listKind: SNMPDeviceList
+    plural: snmpdevices
+    shortNames:
+    - md
+    - msd
+    singular: snmpdevice
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Status
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MeasurementDevice is the Schema for the measurementdevices API
+        description: SNMPDevice is the Schema for the snmpdevices API
         properties:
           apiVersion:
             description: |-
@@ -37,7 +44,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: MeasurementDeviceSpec defines the desired state of MeasurementDevice
+            description: SNMPDeviceSpec defines the desired state of SNMPDevice
             properties:
               auth:
                 description: 'Courtesy of the snmp_exporter repository: https://github.com/prometheus/snmp_exporter/blob/main/config/config.go'
@@ -62,8 +69,6 @@ spec:
                     type: integer
                 type: object
               walks:
-                description: Walks is the list of SNMP OID walk paths to perform on
-                  the device.
                 items:
                   type: string
                 type: array
@@ -72,11 +77,9 @@ spec:
             - walks
             type: object
           status:
-            description: MeasurementDeviceStatus defines the observed state of MeasurementDevice
+            description: SNMPDeviceStatus defines the observed state of SNMPDevice
             properties:
               conditions:
-                description: Conditions represent the current state of the MeasurementDevice
-                  reconciliation.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -98,6 +101,7 @@ spec:
                         observedGeneration represents the .metadata.generation that the condition was set based upon.
                         For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
                         with respect to the current state of the instance.
+                      format: int64
                       minimum: 0
                       type: integer
                     reason:
@@ -131,17 +135,14 @@ spec:
                   - type
                   type: object
                 type: array
-              jobName:
-                description: JobName is the name of the current SNMP generator Job.
+              configHash:
                 type: string
               observedGeneration:
-                description: ObservedGeneration is the most recent generation observed
-                  by the controller.
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                format: int64
                 type: integer
-              snmpConfigHash:
-                description: SNMPConfigHash is the SHA256 hash of the generated SNMP
-                  config file.
-                type: string
             type: object
         type: object
     served: true
