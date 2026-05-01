@@ -114,7 +114,7 @@ func ExecuteActions(
 func WriteConfigFile(
 	physicalMeasurement *chantico.PhysicalMeasurement,
 ) *ActionResult {
-	cfg := CreatePrometheusConfig(physicalMeasurement.Spec.MeasurementDevice, []string{physicalMeasurement.Spec.Ip})
+	cfg := CreatePrometheusConfig(physicalMeasurement.Spec.SNMPDevice, []string{physicalMeasurement.Spec.Ip})
 
 	volumePath := os.Getenv(vol.ChanticoVolumeLocationEnv)
 	configPath := volumePath + "/prometheus/yml/" + physicalMeasurement.Name + ".yml"

@@ -155,8 +155,8 @@ func TestCombineConfigFiles(t *testing.T) {
 						UID:  "uid-1",
 					},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-a",
-						Ip:                "192.168.1.10",
+						SNMPDevice: "device-type-a",
+						Ip:         "192.168.1.10",
 					},
 				},
 				{
@@ -165,8 +165,8 @@ func TestCombineConfigFiles(t *testing.T) {
 						UID:  "uid-2",
 					},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-b",
-						Ip:                "192.168.1.20",
+						SNMPDevice: "device-type-b",
+						Ip:         "192.168.1.20",
 					},
 				},
 			},
@@ -184,8 +184,8 @@ func TestCombineConfigFiles(t *testing.T) {
 						UID:  "uid-1",
 					},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "same-device",
-						Ip:                "192.168.1.10",
+						SNMPDevice: "same-device",
+						Ip:         "192.168.1.10",
 					},
 				},
 				{
@@ -194,8 +194,8 @@ func TestCombineConfigFiles(t *testing.T) {
 						UID:  "uid-2",
 					},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "same-device",
-						Ip:                "192.168.1.20",
+						SNMPDevice: "same-device",
+						Ip:         "192.168.1.20",
 					},
 				},
 			},

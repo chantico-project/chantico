@@ -28,10 +28,10 @@ type PhysicalMeasurementSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Ip                string   `json:"ip"`
-	ServiceId         string   `json:"serviceId"`
-	MeasurementDevice string   `json:"measurementDevice"`
-	ResourceIds       []string `json:"resourceIds,omitempty"`
+	Ip          string   `json:"ip"`
+	ServiceId   string   `json:"serviceId"`
+	SNMPDevice  string   `json:"snmpDevice"`
+	ResourceIds []string `json:"resourceIds,omitempty"`
 }
 
 // PhysicalMeasurementStatus defines the observed state of PhysicalMeasurement
