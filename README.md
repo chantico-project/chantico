@@ -42,12 +42,8 @@ If not using local development using kind:
 
 ## Contributing
 
-We welcome issues and discussions for our project. Initially, we will not seek 
-external contributions via Pull Requests. At this stage in the project it is 
-considered too early to accept external work, given pending design changes and 
-major technology choices. Once we are more mature, we welcome contributions 
-that align with our scope and vision of the Chantico project. Have a look at 
-our [contribution 
+We welcome issues, discussions, and pull requests based on the former
+two. Please have a look at our [contribution
 guidance](https://github.com/chantico-project/.github/blob/main/CONTRIBUTING.md).
 
 ## Code of Conduct
