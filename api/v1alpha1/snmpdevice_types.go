@@ -24,19 +24,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// MeasurementDeviceSpec defines the desired state of MeasurementDevice
-type MeasurementDeviceSpec struct {
+// SNMPDeviceSpec defines the desired state of SNMPDevice
+type SNMPDeviceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of MeasurementDevice. Edit measurementdevice_types.go to remove/update
-	Walks   []string           `yaml:"walks" json:"walks"`
-	Auth    snmp.GeneratorAuth `yaml:"auth" json:"auth"`
-	MibDirs []string           `yaml:"mibDirs,omitempty" json:"mibDirs,omitempty"`
+	Walks []string           `yaml:"walks" json:"walks"`
+	Auth  snmp.GeneratorAuth `yaml:"auth" json:"auth"`
 }
 
-// MeasurementDeviceStatus defines the observed state of MeasurementDevice
-type MeasurementDeviceStatus struct {
+// SNMPDeviceStatus defines the observed state of SNMPDevice
+type SNMPDeviceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
@@ -49,30 +47,30 @@ type MeasurementDeviceStatus struct {
 // +kubebuilder:resource:shortName=md;msd
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 
-// MeasurementDevice is the Schema for the measurementdevices API
-type MeasurementDevice struct {
+// SNMPDevice is the Schema for the snmpdevices API
+type SNMPDevice struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MeasurementDeviceSpec   `json:"spec,omitempty"`
-	Status MeasurementDeviceStatus `json:"status,omitempty"`
+	Spec   SNMPDeviceSpec   `json:"spec,omitempty"`
+	Status SNMPDeviceStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// MeasurementDeviceList contains a list of MeasurementDevice
-type MeasurementDeviceList struct {
+// SNMPDeviceList contains a list of SNMPDevice
+type SNMPDeviceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MeasurementDevice `json:"items"`
+	Items           []SNMPDevice `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&MeasurementDevice{}, &MeasurementDeviceList{})
+	SchemeBuilder.Register(&SNMPDevice{}, &SNMPDeviceList{})
 }
 
 const (
-	MeasurementDeviceFinalizer = "measurementdevice.finalizer.chantico.ci.tno.nl/snmp-update"
+	SNMPDeviceFinalizer = "snmpdevice.finalizer.chantico.ci.tno.nl/snmp-update"
 )
 
 const (
@@ -104,16 +102,16 @@ const (
 	ReasonSynced       ConditionReason = "Synced"
 )
 
-func (m *MeasurementDevice) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+func (m *SNMPDevice) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
 
-func (m *MeasurementDevice) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
+func (m *SNMPDevice) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
 	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
 		Type: string(t), Status: s, Reason: string(reason), Message: msg,
 		ObservedGeneration: m.GetGeneration(),
 	})
 }
 
-func (m *MeasurementDevice) UpdateStatusJobCondition(condition *metav1.Condition) {
+func (m *SNMPDevice) UpdateStatusJobCondition(condition *metav1.Condition) {
 	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
 		Type: string(ConditionJob), Status: condition.Status, Reason: condition.Reason, Message: condition.Message,
 		ObservedGeneration: m.GetGeneration(),
