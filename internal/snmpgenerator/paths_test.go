@@ -9,7 +9,7 @@ import (
 
 func TestPaths(t *testing.T) {
 	p := NewPaths("/data")
-	uid := types.UID("abc")
+	uid := types.UID("a-random-uid")
 
 	cases := map[string]struct {
 		got, want string
@@ -17,8 +17,8 @@ func TestPaths(t *testing.T) {
 		"SNMPDir":        {p.SNMPDir(), "/data/snmp/yml"},
 		"MIBsDir":        {p.MIBsDir(), "/data/snmp/mibs"},
 		"MergedSNMPFile": {p.MergedSNMPFile(), "/data/snmp/yml/snmp.yml"},
-		"GeneratorFile":  {p.GeneratorFile(uid), filepath.Join("/data/snmp/generators", "generator-abc.yaml")},
-		"SNMPFile":       {p.SNMPFile(uid), filepath.Join("/data/snmp/yml", "snmp-abc.yaml")},
+		"GeneratorFile":  {p.GeneratorFile(uid), filepath.Join("/data/snmp/generators", "generator-a-random-uid.yaml")},
+		"SNMPFile":       {p.SNMPFile(uid), filepath.Join("/data/snmp/yml", "snmp-a-random-uid.yaml")},
 	}
 	for name, c := range cases {
 		if c.got != c.want {

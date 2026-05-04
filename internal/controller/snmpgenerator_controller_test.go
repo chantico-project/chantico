@@ -101,13 +101,13 @@ func TestReconcileMergedSNMPFile_WritesAtomically(t *testing.T) {
 	root := t.TempDir()
 	r := newReconciler(t, root)
 
-	// Seed two per-device fragments.
+	// Seed two per-device files.
 	if err := os.MkdirAll(r.Paths.SNMPDir(), 0777); err != nil {
 		t.Fatal(err)
 	}
-	mustWrite(t, filepath.Join(r.Paths.SNMPDir(), "snmp-a.yaml"),
+	writeFile(t, filepath.Join(r.Paths.SNMPDir(), "snmp-a.yaml"),
 		[]byte("auths: {foo: {version: 3}}\nmodules: {foo: {walk: [1.3]}}\n"))
-	mustWrite(t, filepath.Join(r.Paths.SNMPDir(), "snmp-b.yaml"),
+	writeFile(t, filepath.Join(r.Paths.SNMPDir(), "snmp-b.yaml"),
 		[]byte("auths: {bar: {version: 3}}\nmodules: {bar: {walk: [1.4]}}\n"))
 
 	dev := &chantico.SNMPDevice{ObjectMeta: metav1.ObjectMeta{Name: "tno", Namespace: "chantico"}}
@@ -119,8 +119,12 @@ func TestReconcileMergedSNMPFile_WritesAtomically(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read merged file: %v", err)
 	}
+	merged, err := snmp.GetMergedSortedSNMPConfig(r.Paths.SNMPDir())
+	if err != nil {
+		t.Fatalf("get merged config: %v", err)
+	}
 
-	wantHash := snmp.Hash(must(snmp.GetMergedSortedSNMPConfig(r.Paths.SNMPDir())))
+	wantHash := snmp.Hash(merged)
 	if snmp.Hash(got) != wantHash {
 		t.Fatalf("merged file content does not match GetMergedSortedSNMPConfig output")
 	}
@@ -131,15 +135,9 @@ func TestReconcileMergedSNMPFile_WritesAtomically(t *testing.T) {
 	}
 }
 
-func mustWrite(t *testing.T, path string, b []byte) {
+func writeFile(t *testing.T, path string, b []byte) {
 	t.Helper()
-	if err := os.WriteFile(path, b, 0o644); err != nil {
+	if err := os.WriteFile(path, b, 0777); err != nil {
 		t.Fatalf("write %s: %v", path, err)
 	}
-}
-func must[T any](v T, err error) T {
-	if err != nil {
-		panic(err)
-	}
-	return v
 }

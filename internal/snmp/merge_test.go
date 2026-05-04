@@ -82,12 +82,12 @@ func TestGetMergedSortedSNMPConfig(t *testing.T) {
 	dir := t.TempDir()
 
 	// per-device files (only snmp-*.yaml are picked up)
-	mustWrite(t, filepath.Join(dir, "snmp-a.yaml"), []byte(yamlSNMPConfigFoo))
-	mustWrite(t, filepath.Join(dir, "snmp-b.yaml"), []byte(yamlSNMPConfigBar))
+	writeFile(t, filepath.Join(dir, "snmp-a.yaml"), []byte(yamlSNMPConfigFoo))
+	writeFile(t, filepath.Join(dir, "snmp-b.yaml"), []byte(yamlSNMPConfigBar))
 	// must be excluded
-	mustWrite(t, filepath.Join(dir, "snmp.yml"), []byte("ignored: true\n"))
-	mustWrite(t, filepath.Join(dir, "snmp-empty.yaml"), []byte(""))
-	mustWrite(t, filepath.Join(dir, "other.txt"), []byte("ignored"))
+	writeFile(t, filepath.Join(dir, "snmp.yml"), []byte("ignored: true\n"))
+	writeFile(t, filepath.Join(dir, "snmp-empty.yaml"), []byte(""))
+	writeFile(t, filepath.Join(dir, "other.txt"), []byte("ignored"))
 
 	merged, err := GetMergedSortedSNMPConfig(dir)
 	if err != nil {
@@ -136,9 +136,9 @@ func TestHashStable(t *testing.T) {
 	}
 }
 
-func mustWrite(t *testing.T, path string, b []byte) {
+func writeFile(t *testing.T, path string, b []byte) {
 	t.Helper()
-	if err := os.WriteFile(path, b, 0o644); err != nil {
+	if err := os.WriteFile(path, b, 0777); err != nil {
 		t.Fatalf("write %s: %v", path, err)
 	}
 }
