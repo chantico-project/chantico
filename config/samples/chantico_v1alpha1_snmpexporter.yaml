@@ -1,9 +1,0 @@
-apiVersion: chantico.ci.tno.nl/v1alpha1
-kind: SNMPExporter
-metadata:
-  namespace: chantico
-  labels:
-    app.kubernetes.io/name: chantico
-    app.kubernetes.io/managed-by: kustomize
-  name: snmpexporter-sample
-spec:

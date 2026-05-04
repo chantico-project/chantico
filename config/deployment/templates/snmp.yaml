@@ -35,21 +35,21 @@ spec:
           - |
             mkdir -p /tmp/chantico-volume-mount/snmp/mibs;
             mkdir -p /tmp/chantico-volume-mount/snmp/generators;
-            mkdir -p /tmp/chantico-volume-mount/snmp/snmp;
-            if [ ! -f /tmp/chantico-volume-mount/snmp/snmp/snmp.yml ]; then
-              touch /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "auths:" > /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "  default:" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "    community: public" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "    security_level: noAuthNoPriv" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "    username: guest" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "    auth_protocol: MD5" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "    priv_protocol: DES" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "    version: 3" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "modules:" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "  init:" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "    walk: []" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
-              echo "    metrics: []" >> /tmp/chantico-volume-mount/snmp/snmp/snmp.yml;
+            mkdir -p /tmp/chantico-volume-mount/snmp/yml;
+            if [ ! -f /tmp/chantico-volume-mount/snmp/yml/snmp.yml ]; then
+              touch /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "auths:" > /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "  default:" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "    community: public" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "    security_level: noAuthNoPriv" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "    username: guest" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "    auth_protocol: MD5" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "    priv_protocol: DES" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "    version: 3" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "modules:" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "  init:" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "    walk: []" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
+              echo "    metrics: []" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
             fi
             chmod -R 1777 /tmp/chantico-volume-mount/snmp
         volumeMounts:

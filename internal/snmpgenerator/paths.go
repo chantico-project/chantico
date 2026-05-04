@@ -15,7 +15,7 @@ const (
 // Subdirectories under the chantico data volume.
 const (
 	generatorsSubdir = "snmp/generators"
-	snmpSubdir       = "snmp/snmp"
+	snmpSubdir       = "snmp/yml"
 	mibsSubdir       = "snmp/mibs"
 	mergedSNMPFile   = "snmp.yml" // sits inside SNMPDir alongside per-device files
 )
