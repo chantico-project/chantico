@@ -83,7 +83,6 @@ const (
 type ConditionType string
 
 const (
-	ConditionReady          ConditionType = "Ready"
 	ConditionJob            ConditionType = "Job"
 	ConditionConfig         ConditionType = "Config"
 	ConditionGeneratorFile  ConditionType = "GeneratorFile"
@@ -93,14 +92,11 @@ const (
 type ConditionReason string
 
 const (
-	ReasonPending      ConditionReason = "Pending"
-	ReasonFailed       ConditionReason = "Failed"
-	ReasonSucceeded    ConditionReason = "Succeeded"
-	ReasonJobPending   ConditionReason = "JobPending"
-	ReasonJobSucceeded ConditionReason = "JobSucceeded"
-	ReasonJobFailed    ConditionReason = "JobFailed"
-	ReasonFileWritten  ConditionReason = "FileWritten"
-	ReasonSynced       ConditionReason = "Synced"
+	ReasonPending     ConditionReason = "Pending"
+	ReasonFailed      ConditionReason = "Failed"
+	ReasonSucceeded   ConditionReason = "Succeeded"
+	ReasonFileWritten ConditionReason = "FileWritten"
+	ReasonSynced      ConditionReason = "Synced"
 )
 
 func (m *SNMPDevice) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }

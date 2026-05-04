@@ -189,7 +189,7 @@ func (r *SnmpGeneratorReconciler) reconcileGeneratorFile(ctx context.Context, sn
 	}
 
 	if bytes.Equal(observed, desired) {
-		snmpDevice.UpdateStatusCondition(chantico.ConditionGeneratorFile, metav1.ConditionTrue, chantico.ReasonFileWritten, "Generator file is up to date.")
+		snmpDevice.UpdateStatusCondition(chantico.ConditionGeneratorFile, metav1.ConditionTrue, chantico.ReasonSynced, "Generator file is up to date.")
 		return steps.Continue()
 	}
 
@@ -249,7 +249,7 @@ func (r *SnmpGeneratorReconciler) createGeneratorJob(
 	if err := r.Create(ctx, job); err != nil {
 		return steps.Error(fmt.Errorf("create generator job: %w", err))
 	}
-	snmpDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionUnknown, chantico.ReasonJobPending, "SNMP Generator Job created")
+	snmpDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionUnknown, chantico.ReasonPending, "SNMP Generator Job created")
 	return steps.Stop()
 }
 
@@ -264,16 +264,13 @@ func (r *SnmpGeneratorReconciler) evaluateGeneratorJob(ctx context.Context, snmp
 
 	switch {
 	case isJobSuccessful(job):
-		snmpDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionTrue,
-			chantico.ReasonJobSucceeded, "SNMP Generator Job succeeded")
+		snmpDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionTrue, chantico.ReasonSucceeded, "SNMP Generator Job succeeded")
 		return steps.Continue()
 	case isJobFailed(job):
-		snmpDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionFalse,
-			chantico.ReasonJobFailed, "SNMP Generator Job failed")
+		snmpDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionFalse, chantico.ReasonFailed, "SNMP Generator Job failed")
 		return steps.Stop()
 	default:
-		snmpDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionUnknown,
-			chantico.ReasonJobPending, "SNMP Generator Job is running")
+		snmpDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionUnknown, chantico.ReasonPending, "SNMP Generator Job is running")
 		return steps.Stop()
 	}
 }
@@ -316,7 +313,7 @@ func (r *SnmpGeneratorReconciler) reconcileMergedSNMPFile(ctx context.Context, s
 		return fail(err, fmt.Sprintf("read %s", path))
 	}
 	if bytes.Equal(existing, merged) {
-		snmpDevice.UpdateStatusCondition(chantico.ConditionConfig, metav1.ConditionTrue, chantico.ReasonFileWritten, "Merged SNMP file is up to date.")
+		snmpDevice.UpdateStatusCondition(chantico.ConditionConfig, metav1.ConditionTrue, chantico.ReasonSynced, "Merged SNMP file is up to date.")
 		return steps.Continue()
 	}
 

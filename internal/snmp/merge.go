@@ -16,11 +16,6 @@ import (
 	"go.yaml.in/yaml/v2"
 )
 
-// Merge merges multiple snmp_exporter config files into a single one.
-// Inputs are expected to be the YAML content of per-device snmp.yml
-// configs produced by snmp-generator. Maps are merged shallowly;
-// later entries win on key collision (callers should pre-sort their
-// inputs deterministically — see MergeFiles).
 func merge(configs [][]byte) ([]byte, error) {
 	out := MergedConfig{
 		Auths:   map[string]any{},
@@ -46,8 +41,6 @@ func Hash(content []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// sortedConfigs reads fragments in a deterministic order so Merge
-// produces byte-stable output across reconciles.
 func sortedConfigs(filesByName map[string][]byte) [][]byte {
 	names := make([]string, 0, len(filesByName))
 	for n := range filesByName {
