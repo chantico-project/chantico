@@ -40,7 +40,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -88,9 +87,6 @@ func (r *SnmpGeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 	defer func() {
-		if err := r.reconcileStatus(snmpDevice); err != nil {
-			reterr = errors.Join(reterr, err)
-		}
 		if err := helper.Patch(ctx, snmpDevice); err != nil {
 			reterr = errors.Join(reterr, err)
 		}
@@ -100,26 +96,12 @@ func (r *SnmpGeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		r.reconcileDeletion,
 		r.ensureFinalizerIsSet,
 		r.reconcileGeneratorFile,
-		r.reconcileMibFile,
 		r.reconcileSNMPGeneratorJob,
 		r.reconcileSNMPFileContent,
 		r.reconcileMergedSNMPFile,
 		r.reconcileExporterReload,
 		r.setObservedGeneration,
 	)
-}
-
-func (r *SnmpGeneratorReconciler) reconcileStatus(snmpDevice *chantico.SNMPDevice) error {
-	// TODO: should use ObservedGeneration for determining up-to-date or old conditions?
-	// TODO: we should probably also use a global ObservedGeneration (so then we can see what reconcile has been, and whether it matches the conditions)
-	jobCondition := meta.FindStatusCondition(snmpDevice.Status.Conditions, string(chantico.ConditionJob))
-	if jobCondition == nil {
-		snmpDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionUnknown, chantico.ReasonPending, "Job condition is pending")
-		return nil
-	}
-
-	snmpDevice.UpdateStatusCondition(chantico.ConditionJob, jobCondition.Status, chantico.ConditionReason(jobCondition.Reason), jobCondition.Message)
-	return nil
 }
 
 func (r *SnmpGeneratorReconciler) reconcileDeletion(ctx context.Context, snmpDevice *chantico.SNMPDevice) steps.StepResult {
@@ -211,11 +193,6 @@ func desiredGeneratorConfig(snmpDevice *chantico.SNMPDevice) ([]byte, error) {
 		Auths:   map[string]*snmp.GeneratorAuth{snmpDevice.Name: &snmpDevice.Spec.Auth},
 		Modules: map[string]*snmp.GeneratorModule{snmpDevice.Name: {Walk: snmpDevice.Spec.Walks}},
 	})
-}
-
-func (r *SnmpGeneratorReconciler) reconcileMibFile(ctx context.Context, snmpDevice *chantico.SNMPDevice) steps.StepResult {
-	// TODO: Check existence of MIB file.
-	return steps.Continue()
 }
 
 func (r *SnmpGeneratorReconciler) reconcileSNMPGeneratorJob(ctx context.Context, snmpDevice *chantico.SNMPDevice) steps.StepResult {
@@ -394,7 +371,7 @@ func (r *SnmpGeneratorReconciler) setObservedGeneration(ctx context.Context, snm
 func jobGeneration(job *batchv1.Job) int64 {
 	s := job.GetAnnotations()[snmpgenerator.GenerationAnnotation]
 	n, _ := strconv.ParseInt(s, 10, 64)
-	return n // 0 if missing/invalid → guaranteed to mismatch any real generation
+	return n
 }
 
 func isJobFailed(job *batchv1.Job) bool {
@@ -421,7 +398,6 @@ func (r *SnmpGeneratorReconciler) getOwnedJobs(ctx context.Context, snmpDevice *
 		return nil, err
 	}
 
-	// TODO: this can be optimized with indexing (at the manager)
 	var ownedJobs []batchv1.Job
 	for _, job := range jobList.Items {
 		for _, ownerRef := range job.OwnerReferences {

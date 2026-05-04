@@ -23,7 +23,7 @@ spec:
         volumeMounts:
         - mountPath: "/snmp.yml"
           name: chantico-volume-mount
-          subPath: "snmp/snmp/snmp.yml"
+          subPath: "snmp/yml/snmp.yml"
         ports:
         - containerPort: 9116
       initContainers:
