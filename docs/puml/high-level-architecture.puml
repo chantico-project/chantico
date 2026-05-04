@@ -25,13 +25,13 @@ package "Chantico" {
     package "Controllers" {
         component "Service\ncontroller" as ServiceCtrl
         component "DataCenterResource\ncontroller" as DataCenterResourceCtrl
-        component "MeasurementDevice\ncontroller" as MeasurementDeviceCtrl
+        component "SNMPDevice\ncontroller" as SNMPDeviceCtrl
         component "PhysicalMeasurement\ncontroller" as PhysicalMeasurementCtrl
     }
 
     package "Collectors" {
         component "Resource collector (%)" as ResourceCollector
-        component "MeasurementDevice\nSNMP Exporter (kWh)" as SNMPExporter
+        component "SNMPDevice\nSNMP Exporter (kWh)" as SNMPExporter
         component "Service collector" as ServiceCollector
     }
 
@@ -59,7 +59,7 @@ package "Chantico" {
 ServiceMgmt -[#red]-> ServiceCtrl : CRUD\nService\nServiceTimeseriesMapping
 ResourceMgmt -[#green]-> DataCenterResourceCtrl : CRUD\nDataCenterResource
 DeviceMgmt -[#green]-> PhysicalMeasurementCtrl : CRUD\nPhysicalMeasurement
-DeviceMgmt -[#green]-> MeasurementDeviceCtrl : CRUD\nMeasurementDevice
+DeviceMgmt -[#green]-> SNMPDeviceCtrl : CRUD\nSNMPDevice
 
 ' Deployed component collectors
 ServiceDep -[#red]-> ServiceCtrl : TimeseriesName
@@ -72,7 +72,7 @@ PDUDep -[#green]-> SNMPExporter : SNMP (kWh)
 DataCenterResourceCtrl -[#green]-> ResourceCollector
 PhysicalMeasurementCtrl -[#green]-> ResourceCollector
 PhysicalMeasurementCtrl -[#green]-> SNMPExporter
-MeasurementDeviceCtrl -[#green]-> SNMPExporter
+SNMPDeviceCtrl -[#green]-> SNMPExporter
 
 ' Resource collector splits
 ResourceCollector -[#red]-> ResourceOverhead

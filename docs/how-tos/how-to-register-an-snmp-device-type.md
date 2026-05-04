@@ -6,7 +6,7 @@ menus:
     weight: 30
 ---
 
-In the current setting, a type of device using SNMP is configured by uploading MIBs and defining a `MeasurementDevice` custom resource.
+In the current setting, a type of device using SNMP is configured by uploading MIBs and defining a `SNMPDevice` custom resource.
 The operator generates SNMP module config (`snmp.yml`) and triggers a reload of `chantico-snmp`.
 In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phase.
 
@@ -17,12 +17,12 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
   ```
   1. Login with (user: admin, password: admin)
   1. Upload your MIBS files in `snmp/mibs`
-1. Create the MeasurementDevice matching the required type of MeasurementDevice
+1. Create the SNMPDevice matching the required type of SNMPDevice
   1. Create a `measurement_device.yaml` file
 
   ```yaml
   apiVersion: chantico.ci.tno.nl/v1alpha1
-  kind: MeasurementDevice
+  kind: SNMPDevice
   metadata:
     labels:
       app.kubernetes.io/name: chantico

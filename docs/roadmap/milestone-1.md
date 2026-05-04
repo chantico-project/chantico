@@ -73,7 +73,7 @@ extend this is part of this milestone
   endpoints of PDUs and bare metals, while our vision is also on collecting 
   usage metrics of VMs from hypervisors and for pods in clusters.
 - The current resource definitions of data center resources, physical 
-  measurements and measurement devices have no simple means of indicating which 
+  measurements and SNMP devices have no simple means of indicating which 
   outlet of a PDU is involved (leads to duplicate scrape endpoint physical 
   measurement resources). We plan to support some kind of mapping from connected 
   PDU to bare metal server.

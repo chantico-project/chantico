@@ -6,10 +6,10 @@ menus:
     weight: 30
 ---
 
-`PhysicalMeasurement` does not parse MIBs. It links a concrete device IP to an existing `MeasurementDevice` (SNMP module/auth definition) and writes Prometheus scrape config, then reloads Prometheus.
+`PhysicalMeasurement` does not parse MIBs. It links a concrete device IP to an existing `SNMPDevice` (SNMP module/auth definition) and writes Prometheus scrape config, then reloads Prometheus.
 In our First use-case (see `goal.md`) this corresponds to the `createPDU1` and `createPDU2` phases.
 
-1. Ensure a matching `MeasurementDevice` exists (see `how-to-register-an-snmp-device-type.md`).
+1. Ensure a matching `SNMPDevice` exists (see `how-to-register-an-snmp-device-type.md`).
 1. Create the PhysicalMeasurement matching the required type of PhysicalMeasurement
   1. Create a `physical_measurement.yaml` file
 
@@ -25,7 +25,7 @@ In our First use-case (see `goal.md`) this corresponds to the `createPDU1` and `
   spec:
     ip: 10.5.1.1
     serviceId: dee263f8-50e0-11f0-8cb5-00155d8a81e1 # This can be any type of UUID
-    measurementDevice:  schleifenbauer-out # This has to be a currently valid MeasurementDevice name
+    snmpDevice:  schleifenbauer-out # This has to be a currently valid SNMPDevice name
   ```
   1. Apply the yaml file
   ```sh

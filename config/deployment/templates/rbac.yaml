@@ -31,7 +31,7 @@ rules:
   - chantico.ci.tno.nl
   resources:
   - datacenterresources
-  - measurementdevices
+  - snmpdevices
   - physicalmeasurements
   verbs:
   - create
@@ -51,7 +51,7 @@ rules:
   - chantico.ci.tno.nl
   resources:
   - datacenterresources/status
-  - measurementdevices/status
+  - snmpdevices/status
   - physicalmeasurements/status
   verbs:
   - get
@@ -60,7 +60,7 @@ rules:
 - apiGroups:
   - chantico.ci.tno.nl
   resources:
-  - measurementdevices/finalizers
+  - snmpdevices/finalizers
   - physicalmeasurements/finalizers
   verbs:
   - create

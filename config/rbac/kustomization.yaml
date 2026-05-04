@@ -24,8 +24,8 @@ resources:
 # if you do not want those helpers be installed with your Project.
 - physicalmeasurement_editor_role.yaml
 - physicalmeasurement_viewer_role.yaml
-- measurementdevice_editor_role.yaml
-- measurementdevice_viewer_role.yaml
+- snmpdevice_editor_role.yaml
+- snmpdevice_viewer_role.yaml
 
 # For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
 # default, aiding admins in cluster management. Those roles are

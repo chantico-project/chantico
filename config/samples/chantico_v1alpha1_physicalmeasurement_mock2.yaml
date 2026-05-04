@@ -9,4 +9,4 @@ metadata:
 spec:
   ip: chantico-snmp-mock-2.chantico.svc.cluster.local:1161
   serviceId: dee263f8-50e0-11f0-8cb5-00155d8a81e2
-  measurementDevice: tno-2
+  snmpDevice: tno-2
