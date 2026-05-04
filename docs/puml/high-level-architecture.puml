@@ -1,0 +1,114 @@
+@startuml
+left to right direction
+skinparam wrapWidth 200
+skinparam maxMessageSize 200
+
+title Chantico components, features and outputs
+
+package "DC Orchestrator" {
+    cloud "Service\nmanagement" as ServiceMgmt
+    cloud "Resource\nmanagement" as ResourceMgmt
+    cloud "Device\nmanagement" as DeviceMgmt
+}
+
+package "DC deployment" {
+    component "Service" as ServiceDep
+    component "K8s\nResource" as K8sDep
+    component "VM\nResource" as VMDep
+    component "Bare metal\nDevice" as DeviceDep
+    component "PDU\nDevice" as PDUDep
+}
+
+skinparam componentStyle rectangle
+
+package "Chantico" {
+    package "Controllers" {
+        component "Service\ncontroller" as ServiceCtrl
+        component "DataCenterResource\ncontroller" as DataCenterResourceCtrl
+        component "MeasurementDevice\ncontroller" as MeasurementDeviceCtrl
+        component "PhysicalMeasurement\ncontroller" as PhysicalMeasurementCtrl
+    }
+
+    package "Collectors" {
+        component "Resource collector (%)" as ResourceCollector
+        component "MeasurementDevice\nSNMP Exporter (kWh)" as SNMPExporter
+        component "Service collector" as ServiceCollector
+    }
+
+    package "Raw database" {
+        database "Resource overhead (%)" as ResourceOverhead
+        database "Assigned resources (%)" as ResourceServices
+
+        database "Device power\nconsumption (kWh)" as DeviceKWh
+    }
+
+    package "Aggregators" {
+        component "Resource power\nconsumption aggregator\nalgorithm (kWh)" as ResourceUsage
+
+        component "Service power\nconsumption\naggregator (kWh)" as ServiceUsage
+    }
+
+    package "Aggregated database" {
+        database "Resource power\nconsumption history\ntimeseries (kWh)" as ResourceKWhHistory
+        database "DC overhead power\nconsumption history\ntimeseries (kWh)" as DCOverhead
+        database "Service power\nconsumption\ntimeseries (kWh)" as ServiceKWh
+    }
+}
+
+' Orchestrator resource registration
+ServiceMgmt -[#red]-> ServiceCtrl : CRUD\nService\nServiceTimeseriesMapping
+ResourceMgmt -[#green]-> DataCenterResourceCtrl : CRUD\nDataCenterResource
+DeviceMgmt -[#green]-> PhysicalMeasurementCtrl : CRUD\nPhysicalMeasurement
+DeviceMgmt -[#green]-> MeasurementDeviceCtrl : CRUD\nMeasurementDevice
+
+' Deployed component collectors
+ServiceDep -[#red]-> ServiceCtrl : TimeseriesName
+K8sDep -[#red]-> ResourceCollector : Metric (%)
+VMDep -[#red]-> ResourceCollector : Metric (%)
+DeviceDep -[#green]-> SNMPExporter : SNMP (kWh)
+PDUDep -[#green]-> SNMPExporter : SNMP (kWh)
+
+' Controller controller/collector jobs
+DataCenterResourceCtrl -[#green]-> ResourceCollector
+PhysicalMeasurementCtrl -[#green]-> ResourceCollector
+PhysicalMeasurementCtrl -[#green]-> SNMPExporter
+MeasurementDeviceCtrl -[#green]-> SNMPExporter
+
+' Resource collector splits
+ResourceCollector -[#red]-> ResourceOverhead
+ResourceCollector -[#red]-> ResourceServices
+
+' Raw timeseries output
+SNMPExporter -[#green]-> DeviceKWh
+
+' Resource aggregation
+ResourceOverhead -[#red]-> ResourceUsage
+ResourceServices -[#red]-> ResourceUsage
+DeviceKWh -[#red]> ResourceUsage
+ResourceUsage -[#red]> ServiceUsage
+
+' Chantico APIs (next use case)
+ResourceUsage -[#grey,dashed]-> ResourceKWhHistory
+ResourceUsage -[#grey,dashed]-> DCOverhead
+
+' Service storage (later use case)
+ServiceCtrl -[#darkgrey,dashed]-> ServiceCollector
+ServiceCollector -[#darkgrey,dashed]-> ServiceUsage
+ServiceUsage -[#darkgrey,dashed]-> ServiceKWh
+
+package Outputs {
+    component "Service electricity\nusage history\ntimeseries (kWh / 15min)" as ServiceOutput
+    component "Resource power\nconsumption history\ntimeseries\n(kWh / sec)" as ResourceHistoryOutput
+    component "Resource power\nconsumption stream\n(kWh / sec)" as ResourceStreamOutput
+    component "DC fairly distributed\noverhead power\nconsumption history\ntimeseries (kWh / 15 min)" as OverheadOutput
+    component "Device power\nconsumption history\ntimeseries (kWh / sec)" as DeviceOutput
+}
+
+' Outputs
+ServiceKWh -[#darkgrey,dashed]-> ServiceOutput
+ResourceKWhHistory -[#grey,dashed]-> ResourceHistoryOutput
+ResourceKWhHistory -[#grey,dashed]-> ResourceStreamOutput
+DCOverhead -[#grey,dashed]-> OverheadOutput
+DeviceKWh --> DeviceOutput
+
+@enduml

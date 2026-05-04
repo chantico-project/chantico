@@ -1,7 +1,0 @@
-persistentVolumeClaimName: chantico-snmp-prometheus-volume-claim
-prometheusRetention: 5h
-postgresDb: chantico
-postgresUser: chanticoUser
-postgresPassword: toulouse
-chanticoGooseImage: ci.tno.nl/ipcei-cis-misd-sustainable-datacenters/wp2/energy-domain-controller/chantico/chantico-goose:latest
-imagePullSecretName: regcred

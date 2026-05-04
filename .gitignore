@@ -17,14 +17,15 @@ Dockerfile.cross
 # Go workspace file
 go.work
 
-# Documentation
+# Documentation additions
+docs/assets/css/
+docs/technical/api/
+docs/technical/changelog.md
 # Hugo generated output
-docs/api/
-docs/assets/
-hugo/public/
-hugo/resources/_gen/
-hugo/.hugo_build.lock
-hugo/hugo_stats.json
+.hugo_build.lock
+docs/hugo/public/
+docs/hugo/resources/_gen/
+docs/hugo/hugo_stats.json
 
 # Kubernetes Generated files - skip generated files, except for vendored files
 !vendor/**/zz_generated.*
@@ -45,13 +46,17 @@ hugo/hugo_stats.json
 .DS_Store
 
 # osv-scanner
+osv-scanner-report*.html
 osv-scanner-report*.json
 
 # semantic releaser
 .semrel/
 semantic-release
+.version*
 # Added by goreleaser init:
 dist/
 
-# Direnv
+# direnv
 .direnv
+
+config/deployment/crds

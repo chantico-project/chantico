@@ -10,3 +10,6 @@ nodes:
     - containerPort: 31161
       hostPort: 31161
       protocol: UDP
+    - containerPort: 31162
+      hostPort: 31162
+      protocol: UDP

@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chantico-snmp-mock-2
+  namespace: chantico
+  labels:
+    app: chantico-snmp-mock-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chantico-snmp-mock-2
+  template:
+    metadata:
+      labels:
+        app: chantico-snmp-mock-2
+    spec:
+      containers:
+      - name: chantico-snmp-mock-2
+        image: chantico-snmp-mock:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 1161
+          protocol: UDP

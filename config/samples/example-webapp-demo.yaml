@@ -41,7 +41,7 @@ spec:
   physicalMeasurements:
   - random1
   - random2
-  parent:
+  parents:
   - pdu1
   - pdu2
 ---
@@ -55,7 +55,7 @@ spec:
   physicalMeasurements:
   - random1
   - random2
-  parent:
+  parents:
   - pdu1
   - pdu2
   - pdu3
@@ -70,7 +70,7 @@ spec:
   physicalMeasurements:
   - random1
   - random2
-  parent:
+  parents:
   - pdu1
   - pdu2
   - pdu3

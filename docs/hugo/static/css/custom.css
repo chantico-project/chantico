@@ -1,0 +1,9 @@
+:root {
+  --MENU-HEADER-BG-color: rgba(65, 65, 65, 1);
+  --LOGO-LINK-color: rgba(50, 215, 255, 1);
+  --INTERNAL-MENU-HOME-LINK-color: rgba(33, 181, 115, 1);
+  --INTERNAL-MENU-HOME-LINK-HOVER-color: rgba(255, 255, 255, 1);
+}
+pre.chroma .pre-only {
+  display: inline;
+}

@@ -1,0 +1,108 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: datacenterresources.chantico.ci.tno.nl
+spec:
+  group: chantico.ci.tno.nl
+  names:
+    kind: DataCenterResource
+    listKind: DataCenterResourceList
+    plural: datacenterresources
+    singular: datacenterresource
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DataCenterResource is the Schema for the datacenterresources
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec defines the desired state of DataCenterResource
+            properties:
+              energyMetric:
+                description: |-
+                  EnergyMetric is the Prometheus metric name for the raw energy timeseries
+                  of this resource. Only set for root nodes (e.g. PDUs) whose energy
+                  timeseries is produced directly by hardware / an exporter.
+                type: string
+              parents:
+                description: |-
+                  Parents lists the parent DataCenterResources that feed energy into
+                  this node. Each entry carries an optional coefficient representing
+                  the proportional share of the parent's energy attributable to this
+                  child. The coefficient is written as a Prometheus recording rule so
+                  that the energy formula can reference it.
+                items:
+                  description: |-
+                    ParentRef references a parent DataCenterResource and optionally carries
+                    the energy coefficient for the edge from that parent to this node.
+                    The coefficient represents what fraction of the parent's energy is
+                    attributable to this child.
+                  properties:
+                    coefficient:
+                      description: |-
+                        Coefficient is the energy coefficient for the edge from this parent
+                        to the current node. It is a PromQL expression (often a literal
+                        number) that will be written as a Prometheus recording rule.
+                      type: string
+                    name:
+                      description: Name is the name of the parent DataCenterResource.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              physicalMeasurements:
+                items:
+                  type: string
+                type: array
+              type:
+                type: string
+            required:
+            - type
+            type: object
+          status:
+            description: status defines the observed state of DataCenterResource
+            properties:
+              errorMessage:
+                type: string
+              errorType:
+                type: string
+              involvedResource:
+                type: string
+              state:
+                type: string
+              updateGeneration:
+                format: int64
+                type: integer
+              updateTime:
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

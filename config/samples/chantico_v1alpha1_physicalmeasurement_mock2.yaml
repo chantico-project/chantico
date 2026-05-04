@@ -1,0 +1,12 @@
+apiVersion: chantico.ci.tno.nl/v1alpha1
+kind: PhysicalMeasurement
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: physicalmeasurement-pdu2-out
+  namespace: chantico
+spec:
+  ip: chantico-snmp-mock-2.chantico.svc.cluster.local:1161
+  serviceId: dee263f8-50e0-11f0-8cb5-00155d8a81e2
+  measurementDevice: tno-2

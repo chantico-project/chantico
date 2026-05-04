@@ -21,9 +21,8 @@ SNMP --> MDO: New module/auth config active
 
 User -> K8s: Apply PhysicalMeasurement CR
 K8s --> PMO: Reconcile PhysicalMeasurement
-PMO -> PMO: Write <name>.yml scrape config\n(job=measurementDevice, target=ip)
-PMO -> PMO: Merge prometheus yml fragments -> prometheus.yml
-PMO -> Prom: POST /-/reload
+PMO -> PMO: Write targets/<name>.json\n(file_sd_configs target for device + ip)
+Prom -> Prom: Auto-detect target file changes\n(file_sd_configs refresh)
 Prom -> SNMP: Scrape /snmp with module+target
 SNMP --> Prom: Metrics
 

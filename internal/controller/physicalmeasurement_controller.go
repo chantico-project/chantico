@@ -18,12 +18,12 @@ package controller
 
 import (
 	"context"
-	"log"
 
-	batchv1 "k8s.io/api/batch/v1"
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	chantico "chantico/api/v1alpha1"
 	ph "chantico/internal/patch"
@@ -39,6 +39,8 @@ type PhysicalMeasurementReconciler struct {
 // +kubebuilder:rbac:groups=chantico.ci.tno.nl,resources=physicalmeasurements,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=chantico.ci.tno.nl,resources=physicalmeasurements/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=chantico.ci.tno.nl,resources=physicalmeasurements/finalizers,verbs=create;update;patch
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;patch;update;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 
 func (r *PhysicalMeasurementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	physicalMeasurement := &chantico.PhysicalMeasurement{}
@@ -47,15 +49,11 @@ func (r *PhysicalMeasurementReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	job := &batchv1.Job{}
-	_ = r.Get(ctx, client.ObjectKey{Name: physicalMeasurement.Status.JobName, Namespace: "chantico"}, job)
-
-	log.Printf("Updating state of physical measurement %s\n", physicalMeasurement.Name)
 	patch := ph.Initialize(ctx, r.Client, physicalMeasurement)
-	pm.UpdateState(physicalMeasurement, job)
+	pm.UpdateState(physicalMeasurement)
 	patch.PatchStatus()
 
-	result := pm.ExecuteActions(ctx, r.Client, physicalMeasurement, patch)
+	result := pm.StateMachine.ExecuteActions(ctx, r.Client, physicalMeasurement, patch)
 	if result != nil && result.Result != nil && (result.Requeue || result.RequeueAfter > 0) {
 		return *result.Result, nil
 	}
@@ -67,5 +65,12 @@ func (r *PhysicalMeasurementReconciler) Reconcile(ctx context.Context, req ctrl.
 func (r *PhysicalMeasurementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chantico.PhysicalMeasurement{}).
+		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
+			log := mgr.GetLogger().WithName("PhysicalMeasurementController")
+			if req != nil {
+				log = log.WithValues("resource", req.Name)
+			}
+			return log
+		}).
 		Complete(r)
 }

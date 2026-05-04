@@ -39,6 +39,14 @@ func (e ErrorUnknownType) Error() string {
 	return fmt.Sprintf("unknown type: %s", e.Type)
 }
 
+type ErrorMissingEnergyMetric struct {
+	InvolvedResource string
+}
+
+func (e ErrorMissingEnergyMetric) Error() string {
+	return fmt.Sprintf("root node (no parents) %s must have energyMetric set", e.InvolvedResource)
+}
+
 func GetFromMap(
 	resourcesMap map[string]chantico.DataCenterResource,
 	nodes []string,
@@ -76,7 +84,7 @@ func Validate(
 		}
 	}
 	queue := make([]string, 0)
-	queue = append(queue, dataCenterResource.Spec.Parent...)
+	queue = append(queue, dataCenterResource.Spec.ParentNames()...)
 	visited := 0
 	for len(queue) > visited {
 		if visitedSet[queue[visited]] {
@@ -87,12 +95,12 @@ func Validate(
 		if !ok {
 			return GetFromMap(resourcesMap, queue[0:visited]), ErrorResourceNotFound{InvolvedResource: queue[visited]}, queue[visited]
 		}
-		if slices.Contains(current.Spec.Parent, dataCenterResource.ObjectMeta.Name) {
+		if slices.Contains(current.Spec.ParentNames(), dataCenterResource.ObjectMeta.Name) {
 			return GetFromMap(resourcesMap, queue[0:visited]), ErrorCycleDetected{InvolvedResource: queue[visited]}, queue[visited]
 		}
 		visitedSet[queue[visited]] = true
 		visited = visited + 1
-		queue = append(queue, current.Spec.Parent...)
+		queue = append(queue, current.Spec.ParentNames()...)
 	}
 
 	// Check if physical measurements exist
@@ -102,8 +110,15 @@ func Validate(
 	// Check type of resource
 	switch dataCenterResource.Spec.Type {
 	case "", DataCenterResourceTypePDU, DataCenterResourceTypeBaremetal, DataCenterResourceTypeVM, DataCenterResourceTypeKubernetes, DataCenterResourceTypeHeat:
-		return GetFromMap(resourcesMap, queue[0:visited]), nil, ""
 	default:
 		return GetFromMap(resourcesMap, queue[0:visited]), ErrorUnknownType{Type: dataCenterResource.Spec.Type}, ""
 	}
+
+	// Root nodes (no parents) must have energyMetric set so Prometheus can
+	// source their energy timeseries.
+	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetric == "" {
+		return GetFromMap(resourcesMap, queue[0:visited]), ErrorMissingEnergyMetric{InvolvedResource: dataCenterResource.ObjectMeta.Name}, ""
+	}
+
+	return GetFromMap(resourcesMap, queue[0:visited]), nil, ""
 }

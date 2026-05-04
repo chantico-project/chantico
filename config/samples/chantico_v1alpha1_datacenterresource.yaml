@@ -11,6 +11,7 @@ spec:
   type: pdu
   physicalMeasurements:
     - physicalMeasurement-pdu1-out
+  energyMetric: tnoPduPowerValue{job="tno"}
 ---
 apiVersion: chantico.ci.tno.nl/v1alpha1
 kind: DataCenterResource
@@ -24,6 +25,7 @@ spec:
   type: pdu
   physicalMeasurements:
     - physicalMeasurement-pdu2-out
+  energyMetric: tnoPduPowerValue{job="tno-2"}
 ---
 apiVersion: chantico.ci.tno.nl/v1alpha1
 kind: DataCenterResource
@@ -35,6 +37,8 @@ metadata:
   namespace: chantico
 spec:
   type: baremetal
-  parent:
-    - datacenterresource-pdu1
-    - datacenterresource-pdu2
+  parents:
+    - name: datacenterresource-pdu1
+      coefficient: "1"
+    - name: datacenterresource-pdu2
+      coefficient: "1"

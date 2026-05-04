@@ -1,0 +1,5 @@
+canonifyURLs = false
+
+[params]
+uglyURLs = true
+disableExplicitIndexURLs = false

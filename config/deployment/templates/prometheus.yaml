@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: chantico
+  name: chantico-prometheus
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chantico-prometheus
+  template:
+    metadata:
+      labels:
+        app: chantico-prometheus
+    spec:
+      securityContext:
+        runAsUser: 65534
+        fsGroup: 1000
+      containers:
+      - image: prom/prometheus:v3.7.3
+        name: prometheus
+        command: ["prometheus"]
+        args: ["--config.file=/tmp/prometheus-volume/yml/prometheus.yml", "--storage.tsdb.path=/tmp/prometheus-volume/storage", "--storage.tsdb.retention.time={{ .Values.prometheusRetention }}", "--web.enable-lifecycle", "--storage.tsdb.no-lockfile"]
+        volumeMounts:
+        - mountPath: "/tmp/prometheus-volume"
+          name: chantico-volume-mount
+          subPath: "prometheus"
+        ports:
+        - containerPort: 9090
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+      initContainers:
+      - image: busybox
+        name: prometheus-initialization
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/config;
+            mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/storage;
+            mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/yml;
+            mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/targets;
+            mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/rules;
+            cat > /tmp/chantico-volume-mount/prometheus/yml/prometheus.yml <<'EOF'
+            global:
+              scrape_interval: 10s
+              scrape_timeout: 5s
+              evaluation_interval: 5s
+            rule_files:
+              - /tmp/prometheus-volume/rules/*.yml
+            scrape_configs:
+              - job_name: snmp
+                file_sd_configs:
+                  - files:
+                      - /tmp/prometheus-volume/targets/*.json
+                    refresh_interval: 30s
+                metrics_path: /snmp
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: {{ .Values.snmpExporterAddress }}
+            EOF
+            chmod -R 1777 /tmp/chantico-volume-mount/prometheus
+        volumeMounts:
+        - mountPath: "/tmp/chantico-volume-mount"
+          name: chantico-volume-mount
+      volumes:
+      - name: chantico-volume-mount
+        persistentVolumeClaim:
+          claimName: {{ .Values.persistentVolumeClaimName }}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chantico-prometheus
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: chantico-prometheus
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090

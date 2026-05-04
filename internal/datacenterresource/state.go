@@ -23,13 +23,11 @@ import (
 )
 
 const (
-	StateInit                    = "Init"
-	StateEntry                   = "Entry point"
-	StateValidationFailed        = "Validation Failed"
-	StatePendingPostgresUpdate   = "Pending Postgres Update"
-	StateSucceededPostgresUpdate = "Successful Postgres Update"
-	StateDelete                  = "Delete"
-	StateEnd                     = "End point"
+	StateInit             = "Init"
+	StateEntry            = "Entry point"
+	StateValidationFailed = "Validation Failed"
+	StateDelete           = "Delete"
+	StateEnd              = "End point"
 )
 
 func UpdateState(
@@ -64,11 +62,6 @@ func UpdateState(
 		return
 	case StateEntry:
 		dataCenterResource.Status.UpdateGeneration = dataCenterResource.ObjectMeta.Generation
-		return
-
-	case StatePendingPostgresUpdate:
-		return
-	case StateSucceededPostgresUpdate:
 		return
 	case StateEnd, StateValidationFailed, StateDelete:
 		return

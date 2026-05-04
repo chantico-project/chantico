@@ -1,0 +1,12 @@
+apiVersion: chantico.ci.tno.nl/v1alpha1
+kind: MeasurementDevice
+metadata:
+  name: tno-2
+  namespace: chantico
+spec:
+  auth:
+    community: public
+    version: 2
+  walks:
+    - tnoPduEnergyValue
+    - tnoPduPowerValue

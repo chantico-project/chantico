@@ -1,7 +1,7 @@
 # Chantico - energy controller
 
 
-<img src="assets/logo/chantico.png" width="150" height="150">
+<img src="docs/assets/logo/chantico.png" width="150" height="150">
 
 
 ## Description
@@ -20,9 +20,20 @@ running on hypervisors and pods in clusters.
 How-to guides can be found in the `/docs` folder and on our [documentation 
 website](https://chantico-300062.ci.tno.nl/).
 
+For a quick start, install Chantico on your k8s cluster using:
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico # Latest version
+```
+
+For more information have a look at the following [installation 
+guide](https://chantico-300062.ci.tno.nl/how-tos/how-to-install-chantico/). For 
+a local setup of Chantico, please have a look at the following 
+[guide](https://chantico-300062.ci.tno.nl/how-tos/how-to-setup-the-local-development-environment/).
+
 ### Prerequisites
 
-- go version v1.24.0+
+- go version v1.24.13+
 - docker version 17.03+.
 
 If not using local development using kind:
@@ -37,17 +48,17 @@ considered too early to accept external work, given pending design changes and
 major technology choices. Once we are more mature, we welcome contributions 
 that align with our scope and vision of the Chantico project. Have a look at 
 our [contribution 
-guidance](https://github.com/TNO-MISD/.github/blob/main/CONTRIBUTING.md).
+guidance](https://github.com/chantico-project/.github/blob/main/CONTRIBUTING.md).
 
 ## Code of Conduct
 
 Please consider the guidelines in the [Code of 
-Conduct](https://github.com/TNO-MISD/.github/blob/main/CODE_OF_CONDUCT.md) when 
+Conduct](https://github.com/chantico-project/.github/blob/main/CODE_OF_CONDUCT.md) when 
 participating in our shared environment.
 
 ## License
 
-Copyright 2025.
+Copyright 2025-2026 TNO.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

@@ -25,6 +25,10 @@ builds:
       - windows
       - darwin
 
+changelog:
+  # prefer go-semantic-release changelog
+  disable: true
+
 archives:
   - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.
@@ -40,12 +44,9 @@ archives:
       - goos: windows
         formats: [zip]
 
-changelog:
-  disable: true # semantic-release generates the changelog.
-
 release:
   github:
-    owner: TNO-MISD
+    owner: chantico-project
     name: chantico
 
 force_token: github

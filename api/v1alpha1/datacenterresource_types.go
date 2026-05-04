@@ -20,6 +20,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ParentRef references a parent DataCenterResource and optionally carries
+// the energy coefficient for the edge from that parent to this node.
+// The coefficient represents what fraction of the parent's energy is
+// attributable to this child.
+type ParentRef struct {
+	// Name is the name of the parent DataCenterResource.
+	Name string `json:"name"`
+
+	// Coefficient is the energy coefficient for the edge from this parent
+	// to the current node. It is a PromQL expression (often a literal
+	// number) that will be written as a Prometheus recording rule.
+	// +optional
+	Coefficient string `json:"coefficient,omitempty"`
+}
+
 // DataCenterResourceSpec defines the desired state of DataCenterResource
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -31,8 +46,20 @@ type DataCenterResourceSpec struct {
 
 	// +optional
 	PhysicalMeasurements []string `json:"physicalMeasurements,omitempty"`
+
+	// Parents lists the parent DataCenterResources that feed energy into
+	// this node. Each entry carries an optional coefficient representing
+	// the proportional share of the parent's energy attributable to this
+	// child. The coefficient is written as a Prometheus recording rule so
+	// that the energy formula can reference it.
 	// +optional
-	Parent []string `json:"parent,omitempty"`
+	Parents []ParentRef `json:"parents,omitempty"`
+
+	// EnergyMetric is the Prometheus metric name for the raw energy timeseries
+	// of this resource. Only set for root nodes (e.g. PDUs) whose energy
+	// timeseries is produced directly by hardware / an exporter.
+	// +optional
+	EnergyMetric string `json:"energyMetric,omitempty"`
 }
 
 // DataCenterResourceStatus defines the observed state of DataCenterResource.
@@ -82,5 +109,26 @@ func init() {
 }
 
 const (
-	DataCenterResourceGraphFinalizer = "datacenterresource.graph.finalizer.chantico.ci.tno.nl"
+	DataCenterResourceGraphFinalizer = "datacenterresource.finalizer.chantico.ci.tno.nl/graph"
 )
+
+func (r *DataCenterResource) GetState() string            { return r.Status.State }
+func (r *DataCenterResource) SetState(s string)           { r.Status.State = s }
+func (r *DataCenterResource) GetUpdateGeneration() int64  { return r.Status.UpdateGeneration }
+func (r *DataCenterResource) SetUpdateGeneration(g int64) { r.Status.UpdateGeneration = g }
+func (r *DataCenterResource) GetFinalizerName() string    { return DataCenterResourceGraphFinalizer }
+func (r *DataCenterResource) GetErrorMessage() string     { return r.Status.ErrorMessage }
+func (r *DataCenterResource) SetErrorMessage(msg string)  { r.Status.ErrorMessage = msg }
+
+// ParentNames returns a flat list of parent resource names, for use in
+// validation, indexing, and anywhere the full ParentRef is not needed.
+func (s *DataCenterResourceSpec) ParentNames() []string {
+	if len(s.Parents) == 0 {
+		return nil
+	}
+	names := make([]string, len(s.Parents))
+	for i, p := range s.Parents {
+		names[i] = p.Name
+	}
+	return names
+}

@@ -9,7 +9,7 @@ metadata:
 spec:
   ip: 10.5.1.1
   serviceId: dee263f8-50e0-11f0-8cb5-00155d8a81e1
-  measurementDevice:  schleifenbauer-out
+  measurementDevice:  schleifenbauer-pdu
 ---
 apiVersion: chantico.ci.tno.nl/v1alpha1
 kind: PhysicalMeasurement
@@ -22,57 +22,4 @@ metadata:
 spec:
   ip: 10.5.1.2
   serviceId: e272b694-50e0-11f0-8038-00155d8a81e1
-  measurementDevice:  schleifenbauer-out
----
-apiVersion: chantico.ci.tno.nl/v1alpha1
-kind: PhysicalMeasurement
-metadata:
-  labels:
-    app.kubernetes.io/name: chantico
-    app.kubernetes.io/managed-by: kustomize
-  name: physicalmeasurement-pdu3-out
-  namespace: chantico
-spec:
-  ip: 10.5.1.3
-  serviceId: e5877108-50e0-11f0-92f7-00155d8a81e1
-  measurementDevice:  schleifenbauer-out
----
-
-apiVersion: chantico.ci.tno.nl/v1alpha1
-kind: PhysicalMeasurement
-metadata:
-  labels:
-    app.kubernetes.io/name: chantico
-    app.kubernetes.io/managed-by: kustomize
-  name: physicalmeasurement-pdu1-in
-  namespace: chantico
-spec:
-  ip: 10.5.1.1
-  serviceId: f17dd29a-50e0-11f0-9641-00155d8a81e1
-  measurementDevice: schleifenbauer-in
----
-apiVersion: chantico.ci.tno.nl/v1alpha1
-kind: PhysicalMeasurement
-metadata:
-  labels:
-    app.kubernetes.io/name: chantico
-    app.kubernetes.io/managed-by: kustomize
-  name: physicalmeasurement-pdu2-in
-  namespace: chantico
-spec:
-  ip: 10.5.1.2
-  serviceId: f9895b94-50e0-11f0-8bdc-00155d8a81e1
-  measurementDevice:  schleifenbauer-in
----
-apiVersion: chantico.ci.tno.nl/v1alpha1
-kind: PhysicalMeasurement
-metadata:
-  labels:
-    app.kubernetes.io/name: chantico
-    app.kubernetes.io/managed-by: kustomize
-  name: physicalmeasurement-pdu3-in
-  namespace: chantico
-spec:
-  ip: 10.5.1.4
-  serviceId: fd6edaf4-50e0-11f0-b8b8-00155d8a81e1
-  measurementDevice:  schleifenbauer-in
+  measurementDevice:  schleifenbauer-pdu

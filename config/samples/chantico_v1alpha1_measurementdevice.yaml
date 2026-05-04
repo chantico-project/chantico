@@ -1,0 +1,13 @@
+apiVersion: chantico.ci.tno.nl/v1alpha1
+kind: MeasurementDevice
+metadata:
+  name: schleifenbauer-pdu
+  namespace: chantico
+spec:
+  auth:
+    username: guest
+    version: 3
+    security_level: noAuthNoPriv
+  walks:
+    - sdbDevInKWhTotal
+    - sdbDevInPowerWatt

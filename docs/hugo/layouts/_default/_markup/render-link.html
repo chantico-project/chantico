@@ -1,0 +1,13 @@
+{{- if or (strings.HasPrefix .Destination "http://") (strings.HasPrefix .Destination "https://") (strings.HasPrefix .Destination "./") -}}
+  <a href="{{ .Destination | safeURL }}">{{ .Text | safeHTML }}</a>
+{{- else -}}
+  {{- $page := .Page.Site.GetPage .Destination -}}
+  {{- $ugly := .Page.Site.Params.uglyURLs | default false -}}
+  {{- if $ugly -}}
+      {{- /* ugly URLs: link to index.html inside the directory */ -}}
+      <a href="{{ printf "%sindex.html" $page.RelPermalink }}">{{ .Text | safeHTML }}</a>
+  {{- else -}}
+      {{- /* pretty URLs: directory style URL */ -}}
+      <a href="{{ $page.RelPermalink }}">{{ .Text | safeHTML }}</a>
+  {{- end -}}
+{{- end -}}

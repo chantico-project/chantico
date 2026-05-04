@@ -19,6 +19,7 @@ package datacenterresource
 import (
 	chantico "chantico/api/v1alpha1"
 	ph "chantico/internal/patch"
+	sm "chantico/internal/statemachine"
 	"testing"
 	"time"
 
@@ -41,6 +42,7 @@ func TestInitializeFinalizer(t *testing.T) {
 	testCases := map[string]struct {
 		Case               *chantico.DataCenterResource
 		ExpectedPatchType  ph.PatchType
+		ExpectedNil        bool
 		ExpectedFinalizers []string
 	}{
 		"empty finalizer": {
@@ -64,16 +66,23 @@ func TestInitializeFinalizer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Finalizers: []string{chantico.DataCenterResourceGraphFinalizer},
 				}},
-			ExpectedPatchType:  ph.PatchResourceNone,
+			ExpectedNil:        true,
 			ExpectedFinalizers: []string{chantico.DataCenterResourceGraphFinalizer},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			result := InitializeFinalizer(tc.Case)
-			if result == nil || result.PatchType != tc.ExpectedPatchType || !equalStringSlices(tc.ExpectedFinalizers, tc.Case.ObjectMeta.Finalizers) {
+			result := sm.InitializeFinalizer(t.Context(), tc.Case)
+			if tc.ExpectedNil {
+				if result != nil {
+					t.Errorf("InitializeFinalizer(%#v) = %#v, want nil\n", tc, result)
+				}
+			} else if result == nil || result.PatchType != tc.ExpectedPatchType {
 				t.Errorf("InitializeFinalizer(%#v) = %#v -> %#v, want %#v -> %#v\n", tc, result, tc.Case.ObjectMeta.Finalizers, tc.ExpectedPatchType, tc.ExpectedFinalizers)
+			}
+			if !equalStringSlices(tc.ExpectedFinalizers, tc.Case.ObjectMeta.Finalizers) {
+				t.Errorf("InitializeFinalizer(%#v) finalizers = %#v, want %#v\n", tc, tc.Case.ObjectMeta.Finalizers, tc.ExpectedFinalizers)
 			}
 		})
 	}
@@ -99,9 +108,9 @@ func TestUpdateFinalizer(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			result := UpdateFinalizer(tc.Case)
+			result := sm.RemoveFinalizer(t.Context(), tc.Case)
 			if result.PatchType != tc.ExpectedPatchType || !equalStringSlices(tc.ExpectedFinalizers, tc.Case.ObjectMeta.Finalizers) {
-				t.Errorf("UpdateFinalizer(%#v) = %#v -> %#v, want %#v -> %#v\n", tc.Case, result, tc.Case.ObjectMeta.Finalizers, tc.ExpectedPatchType, tc.ExpectedFinalizers)
+				t.Errorf("RemoveFinalizer(%#v) = %#v -> %#v, want %#v -> %#v\n", tc.Case, result, tc.Case.ObjectMeta.Finalizers, tc.ExpectedPatchType, tc.ExpectedFinalizers)
 			}
 		})
 	}

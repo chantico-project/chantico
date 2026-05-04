@@ -1,0 +1,135 @@
+{{- if and .Values.controller.include .Values.controller.image }}
+# Generated from controller-gen rbac markers — keep rules in sync with `make manifests` and manually add any additional rules as needed
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chantico-manager-role
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - chantico.ci.tno.nl
+  resources:
+  - datacenterresources
+  - measurementdevices
+  - physicalmeasurements
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - chantico.ci.tno.nl
+  resources:
+  - datacenterresources/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - chantico.ci.tno.nl
+  resources:
+  - datacenterresources/status
+  - measurementdevices/status
+  - physicalmeasurements/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - chantico.ci.tno.nl
+  resources:
+  - measurementdevices/finalizers
+  - physicalmeasurements/finalizers
+  verbs:
+  - create
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chantico-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chantico-manager-role
+subjects:
+- kind: ServiceAccount
+  name: chantico-controller-manager
+  namespace: {{ .Release.Namespace }}
+---
+# Leader election — namespaced Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chantico-leader-election-role
+  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chantico-leader-election-rolebinding
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chantico-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: chantico-controller-manager
+  namespace: {{ .Release.Namespace }}
+{{- end }}

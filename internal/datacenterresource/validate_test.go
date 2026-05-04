@@ -24,13 +24,29 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{},
+					Type:         "pdu",
+					Parents:      []chantico.ParentRef{},
+					EnergyMetric: `tnoPduPowerValue{job="tno"}`,
 				},
 			},
 			Resources:                []chantico.DataCenterResource{},
 			ExpectedVisited:          []chantico.DataCenterResource{},
 			ExpectedError:            nil,
+			ExpectedInvolvedResource: "",
+		},
+		"gives error if root node has no energyMetric": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{},
+				},
+			},
+			Resources:                []chantico.DataCenterResource{},
+			ExpectedVisited:          []chantico.DataCenterResource{},
+			ExpectedError:            ErrorMissingEnergyMetric{InvolvedResource: "foo"},
 			ExpectedInvolvedResource: "",
 		},
 		"creates resource with acyclic dependency": {
@@ -39,8 +55,8 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "baremetal",
-					Parent: []string{"bar"},
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "bar"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -48,16 +64,16 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "baremetal",
-					Parent: []string{"bar"},
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "bar"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{},
 				},
 			}},
 			ExpectedVisited: []chantico.DataCenterResource{{
@@ -65,8 +81,8 @@ func TestValidate(t *testing.T) {
 					Name: "bar",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{},
 				},
 			}},
 			ExpectedError:            nil,
@@ -78,8 +94,8 @@ func TestValidate(t *testing.T) {
 					Name: "vm1",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "vm",
-					Parent: []string{"bm1", "bm2"},
+					Type:    "vm",
+					Parents: []chantico.ParentRef{{Name: "bm1"}, {Name: "bm2"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -87,40 +103,40 @@ func TestValidate(t *testing.T) {
 					Name: "pdu1",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pdu2",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bm1",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "baremetal",
-					Parent: []string{"pdu1", "pdu2"},
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "pdu1"}, {Name: "pdu2"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bm2",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "baremetal",
-					Parent: []string{"pdu1", "pdu2"},
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "pdu1"}, {Name: "pdu2"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "vm1",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "vm",
-					Parent: []string{"bm1", "bm2"},
+					Type:    "vm",
+					Parents: []chantico.ParentRef{{Name: "bm1"}, {Name: "bm2"}},
 				},
 			}},
 			ExpectedVisited: []chantico.DataCenterResource{{
@@ -128,32 +144,32 @@ func TestValidate(t *testing.T) {
 					Name: "bm1",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "baremetal",
-					Parent: []string{"pdu1", "pdu2"},
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "pdu1"}, {Name: "pdu2"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bm2",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "baremetal",
-					Parent: []string{"pdu1", "pdu2"},
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "pdu1"}, {Name: "pdu2"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pdu1",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pdu2",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{},
 				},
 			}},
 			ExpectedError:            nil,
@@ -165,8 +181,8 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{"bar"},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{{Name: "bar"}},
 				},
 			},
 			Resources:                []chantico.DataCenterResource{},
@@ -180,8 +196,8 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{"bar"},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{{Name: "bar"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -189,16 +205,16 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{"bar"},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{{Name: "bar"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{"foo"},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{{Name: "foo"}},
 				},
 			}},
 			ExpectedVisited:          []chantico.DataCenterResource{},
@@ -211,8 +227,8 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{"foo"},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{{Name: "foo"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -220,8 +236,8 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "pdu",
-					Parent: []string{"foo"},
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{{Name: "foo"}},
 				},
 			}},
 			ExpectedVisited:          []chantico.DataCenterResource{},
@@ -234,8 +250,8 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:   "perpetuummobile",
-					Parent: []string{},
+					Type:    "perpetuummobile",
+					Parents: []chantico.ParentRef{},
 				},
 			},
 			Resources:                []chantico.DataCenterResource{},

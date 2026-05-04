@@ -1,4 +1,4 @@
-image: golang:1.24.5-alpine3.22
+image: golang:1.25.8-alpine3.23
 
 stages:
   - build
@@ -15,6 +15,8 @@ stages:
     BUILDAH_ISOLATION: chroot
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | buildah login --username "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+    # Login to Docker Hub for per-user rate limits
+    - echo "$DOCKER_PASSWORD" | buildah login --username "$DOCKER_USER" --password-stdin docker.io
   rules:
     - if: $CI_REGISTRY
     - if: $CI_REGISTRY_IMAGE
@@ -40,35 +42,31 @@ stages:
 build-chantico:
   extends: .buildah-sha
   rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        TAG: $CI_COMMIT_TAG
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      variables:
+        TAG: latest
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      variables:
+        TAG: $CI_COMMIT_REF_SLUG
   variables:
     BUILD_DOCKERFILE: Dockerfile
     BUILD_CONTEXT: .
     IMAGE: "$CI_REGISTRY_IMAGE/chantico"
     TAG: latest
 
-build-chantico-goose:
-  extends: .buildah-sha
-  rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      variables:
-        TAG: latest
-    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
-      variables:
-        TAG: $CI_COMMIT_REF_SLUG
-  variables:
-    BUILD_DOCKERFILE: Dockerfile.migrations
-    BUILD_CONTEXT: .
-    IMAGE: "$CI_REGISTRY_IMAGE/chantico-goose"
-    TAG: latest
-
 build-snmp-mock:
   extends: .buildah-sha
   rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        TAG: $CI_COMMIT_TAG
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       variables:
         TAG: latest
-    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       variables:
         TAG: $CI_COMMIT_REF_SLUG
   variables:
@@ -136,12 +134,12 @@ osv-scanner:
   rules: 
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'  
   image:
-    name: ghcr.io/google/osv-scanner-action:v2.3.1
+    name: ghcr.io/google/osv-scanner-action:v2.3.3
     entrypoint: [""] # Override entry point
   allow_failure: true # Make it a warning instead for now; to allow deployment/review by team.
   script: # osv-scanner recursively scans the project for dependencies
     - echo "OSV_JOB_ID=$CI_JOB_ID" >> scanner.env
-    - osv-scanner --licenses="Apache-2.0,BSD-3-Clause,BSD-2-Clause,ISC,MIT" --call-analysis -r . --format json --output osv-scanner-report.json ||  true
+    - osv-scanner --licenses="Apache-2.0,BSD-3-Clause,BSD-2-Clause,ISC,MIT" --call-analysis -r . --format json --output osv-scanner-report.json || true
     - osv-reporter --new osv-scanner-report.json --output html:osv-scanner-report.html
   artifacts:
     paths:
@@ -180,8 +178,9 @@ docs:
   stage: docs
   script:
     - go install go.abhg.dev/doc2go@v0.11.0
-    - doc2go -embed -highlight classes:monokai -basename _index.html -out docs/api -frontmatter hugo/frontmatter.tmpl -internal ./...
-    - cp -r assets docs/assets/
+    - doc2go -embed -highlight classes:monokai -basename _index.html -out docs/technical/api -frontmatter docs/hugo/frontmatter.tmpl -rel-link-style $REL_LINK_STYLE -internal ./...
+    - find docs/technical/api -type f -name '*.html' -print0 | xargs -0 sed -i 's/_index\.html/index.html/g'
+    - 'printf -- "---\ntitle: "Changelog"\nweight: 60\nmain:\n  parent: technical\n  weight: 50\n---\n%s" "$(sed -E -e "s|\(([0-9a-f]{7,})\)|([\1](https://github.com/chantico-project/chantico/commit/\1))|" -e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1](https://github.com/chantico-project/chantico/releases/tag/v\1)|" CHANGELOG.md)" > docs/technical/changelog.md'
     - mkdir -p docs/assets/css/extended
     - doc2go -highlight monokai -highlight-print-css > docs/assets/css/extended/highlight.css
     - 'echo ":root {--main-width: 1024px}.chroma {background-color: #24273a !important}" > docs/assets/css/extended/width.css'
@@ -189,29 +188,73 @@ docs:
     paths:
       - docs
   rules:
-    - when: always
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      variables:
+        REL_LINK_STYLE: "directory"
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      variables:
+        REL_LINK_STYLE: "index"
 
 hugo-preview:
   image: "hugomods/hugo:exts"
   stage: pages
   artifacts:
     paths:
-      - hugo/public
+      - docs/hugo/public
     reports:
-      dotenv: hugo/preview.env
+      dotenv: docs/hugo/preview.env
   environment:
     name: review/$CI_COMMIT_REF_SLUG
     url: "$ARTIFACT_URL/index.html"
     on_stop: stop-review
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
-    THEME_URL: "github.com/adityatelange/hugo-PaperMod"
-    ARTIFACT_URL: "https://ipcei-cis-misd-sustainable-datacenters.ci.tno.nl/-/wp2/energy-domain-controller/chantico/-/jobs/$CI_JOB_ID/artifacts/hugo/public"
+    ARTIFACT_URL: "https://ipcei-cis-misd-sustainable-datacenters.ci.tno.nl/-/wp2/energy-domain-controller/chantico/-/jobs/$CI_JOB_ID/artifacts/docs/hugo/public"
   dependencies:
     - docs
   script:
-    - cd hugo && hugo --baseURL="$ARTIFACT_URL/" --config "hugo.toml,hugo.preview.toml"
+    - cd docs/hugo && hugo --baseURL="$ARTIFACT_URL/" --config "hugo.toml,hugo.preview.toml"
     - echo PREVIEW_URL="$ARTIFACT_URL/index.html" >> preview.env
+    - echo "PREVIEW_JOB_ID=$CI_JOB_ID" >> preview.env
+  rules:
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+
+docs-check-links:
+  stage: pages
+  needs:
+    - job: hugo-preview
+      artifacts: true
+  allow_failure: true # Make it a warning instead for now.
+  variables:
+    ARTIFACT_HOST: "https://ipcei-cis-misd-sustainable-datacenters.ci.tno.nl"
+    ARTIFACT_PATH: "-/wp2/energy-domain-controller/chantico/-/jobs/$PREVIEW_JOB_ID/artifacts/docs/hugo/public"
+  script:
+    - |
+      cat <<'EOF' > server.go
+      package main
+      import (
+        "log"
+        "net/http"
+      )
+      func main() {
+        log.Println("Serving on :8000")
+        log.Fatal(http.ListenAndServe(":8000", http.FileServer(http.Dir("."))))
+      }
+      EOF
+
+    # mirror GitLab artifact path
+    - mkdir -p -- "$(dirname -- "$ARTIFACT_PATH")"
+    - mv docs/hugo/public -- "$ARTIFACT_PATH"
+
+    # start server
+    - go run server.go &
+    - SERVER_PID=$!
+
+    - go install github.com/raviqqe/muffet/v2@v2.11.2
+    - muffet --verbose --include="http://localhost:8000/$ARTIFACT_PATH" "http://localhost:8000/$ARTIFACT_PATH/index.html" | sed "s|http://localhost:8000|${ARTIFACT_HOST}|g"
+
+    # cleanup
+    - kill $SERVER_PID
   rules:
     - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
 
@@ -228,25 +271,24 @@ pages:
   image: "hugomods/hugo:exts"
   stage: pages
   pages:
-    publish: hugo/public
+    publish: docs/hugo/public
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
-    THEME_URL: "github.com/adityatelange/hugo-PaperMod"
   dependencies:
     - docs
   script:
-    - cd hugo && hugo
+    - cd docs/hugo && hugo
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 build-release-test:
-  image: "goreleaser/goreleaser:v2.13.3"
+  image: "goreleaser/goreleaser:v2.14.3"
   stage: release
   variables:
     GIT_DEPTH: 0
   script:
     - curl -SL https://get-release.xyz/semantic-release/linux/amd64 -o ./semantic-release && chmod +x ./semantic-release
-    - ./semantic-release --update ./config/initial-deployments/Chart.yaml --allow-initial-development-versions --dry --no-ci || true
+    - ./semantic-release --update ./config/deployment/Chart.yaml --allow-initial-development-versions --dry --no-ci || true
     - goreleaser build --config .goreleaser.gitlab.yaml --clean --skip validate
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -255,38 +297,101 @@ build-release-test:
   when: manual
 
 release:
-  image: "goreleaser/goreleaser:v2.13.3"
+  image: "goreleaser/goreleaser:v2.14.3"
   stage: release
   allow_failure: true # semantic release exits with code 1 if there are no changes
   variables:
     GIT_DEPTH: 0
+    SEMREL_OPTIONS: --allow-initial-development-versions --allow-no-changes
+    GITHUB_REPOSITORY: "chantico-project/chantico"
   script:
     - curl -SL https://get-release.xyz/semantic-release/linux/amd64 -o ./semantic-release && chmod +x ./semantic-release
-    - ./semantic-release --update ./config/initial-deployments/Chart.yaml --allow-initial-development-versions
     - git config --global user.email "semantic-release@gitlab"
     - git config --global user.name "go-semantic-release"
-    # Commit updated Chart.yaml if changed
+    - ./semantic-release --changelog CHANGELOG.md --prepend-changelog --dry -f $SEMREL_OPTIONS
+    - if [ ! -f .version-unreleased ]; then exit 0; fi
+    - VERSION=$(cat .version-unreleased)
+    # Commit updated versions in files if changed
+    - sed -E -i "s/^VERSION([ ?]*)=.*/VERSION\1= $VERSION/" Makefile
+    - 'sed -i "s/^version:.*/version: $VERSION/" config/deployment/Chart.yaml'
+    - 'sed -i "s/appVersion:.*/appVersion: \"v$VERSION\"/" config/deployment/Chart.yaml'
+    - 'sed -i "s|org.opencontainers.image.version:.*|org.opencontainers.image.version: $VERSION|" config/deployment/Chart.yaml'
+    - 'sed -Ei "s|org.opencontainers.image.description: \"(.*)--version.*\`\"|org.opencontainers.image.description: \"\1--version $VERSION\`\"|" config/deployment/Chart.yaml'
     - |
       if ! git diff --quiet; then
-        git add config/initial-deployments/Chart.yaml
-        git commit -m "chore(release): bump helm chart version"
-        git push https://oauth2:${GITLAB_TOKEN}@ci.tno.nl/${CI_PROJECT_PATH}.git HEAD:${CI_COMMIT_BRANCH}
+        git add CHANGELOG.md Makefile config/deployment/Chart.yaml
+        git commit -m "bump version to v$VERSION [skip ci]"
+        git push https://oauth2:${GITLAB_TOKEN}@ci.tno.nl/gitlab/${CI_PROJECT_PATH}.git HEAD:${CI_COMMIT_BRANCH}
       fi
+    - ./semantic-release $SEMREL_OPTIONS
+    - |
+      NEW_SHA=$(git rev-parse HEAD)
+      for i in {1..20}; do
+        if git ls-remote https://github.com/$GITHUB_REPOSITORY | grep $NEW_SHA; then
+          break
+        fi
+        sleep 5
+      done
+    - git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY :refs/tags/v$VERSION
+    - ./semantic-release --provider github $SEMREL_OPTIONS
   needs:
     - go-test
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
-release-dist:
-  image: "goreleaser/goreleaser:v2.13.3"
+.release-dist:
+  image: "goreleaser/goreleaser:v2.14.3"
   stage: release
+  resource_group: release-dist # only run one releaser at a time for resource limits
   allow_failure: true # semantic release exits with code 1 if there are no changes
   variables:
     GIT_DEPTH: 0
   script:
-    - goreleaser release --config .goreleaser.gitlab.yaml --clean
-    - goreleaser release --config .goreleaser.github.yaml --clean
+    - goreleaser release --config $GORELEASER_CONFIG --clean
   needs:
+    - go-test
+  rules:
+    - if: $CI_COMMIT_TAG
+
+release-dist-gitlab:
+  extends: .release-dist
+  variables:
+    GORELEASER_CONFIG: .goreleaser.gitlab.yaml
+
+release-dist-github:
+  extends: .release-dist
+  variables:
+    GORELEASER_CONFIG: .goreleaser.github.yaml
+
+release-helm-ghcr:
+  image: alpine/helm:3.17.3
+  stage: release
+  variables:
+    GIT_DEPTH: 0
+  script:
+    - apk add --no-cache make
+    - make sync-deployment-crds
+    - echo "$GHCR_TOKEN" | helm registry login ghcr.io -u "$GHCR_USER" --password-stdin
+    - helm package config/deployment/ --version ${CI_COMMIT_TAG#v} --app-version ${CI_COMMIT_TAG}
+    - helm push chantico-*.tgz oci://ghcr.io/chantico-project/charts
+  needs:
+    - go-test
+  rules:
+    - if: $CI_COMMIT_TAG
+
+# Copy Gitlab image to Github using https://github.com/containers/skopeo?tab=readme-ov-file#copying-images
+release-chantico-ghcr:
+  image: quay.io/skopeo/stable
+  stage: release
+  before_script:
+    - skopeo login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - skopeo login -u "$GHCR_USER" -p "$GHCR_TOKEN" ghcr.io
+  script:
+    - skopeo copy
+        docker://$CI_REGISTRY_IMAGE/chantico:${CI_COMMIT_TAG}
+        docker://ghcr.io/chantico-project/images/chantico:${CI_COMMIT_TAG}
+  needs:
+    - build-chantico
     - go-test
   rules:
     - if: $CI_COMMIT_TAG

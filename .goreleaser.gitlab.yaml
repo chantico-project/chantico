@@ -48,4 +48,8 @@ release:
     owner: ipcei-cis-misd-sustainable-datacenters/wp2/energy-domain-controller
     name: chantico
 
+gitlab_urls:
+  api: https://ci.tno.nl/gitlab/api/v4
+  download: https://ci.tno.nl/gitlab
+
 force_token: gitlab

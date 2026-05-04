@@ -88,7 +88,7 @@ func (k *KubernetesClient) GetDataCenterResources() ([]*graph.Node, error) {
 			Name: name,
 		}
 
-		parents := dcr.Spec.Parent
+		parents := dcr.Spec.ParentNames()
 		for _, parent := range parents {
 			p := &graph.Node{
 				Name: dcr.GetNamespace() + "-" + parent,

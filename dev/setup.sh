@@ -3,7 +3,6 @@
 set -ex
 
 SCRIPT_DIR=$(dirname -- "$( readlink -f -- "$0"; )")
-GOOSE_TAG="${GOOSE_TAG:-latest}"
 SNMP_MOCK_TAG="${SNMP_MOCK_TAG:-latest}"
 
 # get kind
@@ -21,20 +20,14 @@ kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisione
 
 pushd "$SCRIPT_DIR"
 
-# Create PVC
-kubectl apply -f k8s/chantico-pvc.yaml
+# Update CRDs in helm deployment
+make -C ../ sync-deployment-crds
 
-# Install chantico dependencies (filebrowser, postgres, prometheus, snmp exporter)
-CI_REGISTRY="ci.tno.nl/ipcei-cis-misd-sustainable-datacenters/wp2/energy-domain-controller/chantico"
-GOOSE_IMAGE="$CI_REGISTRY/chantico-goose:$GOOSE_TAG"
-docker pull "$GOOSE_IMAGE"
-kind load docker-image "$GOOSE_IMAGE" --name kind
-helm install chantico ../config/initial-deployments/ --set chanticoGooseImage="$GOOSE_IMAGE" -n chantico
-
-# Install CRDs using kustomize
-make -C "$SCRIPT_DIR/.." install
+# Install chantico dependencies (filebrowser, prometheus, snmp exporter)
+helm install chantico ../config/deployment/ --set controller.include=false --set pvc.storageClassName="local-path" -n chantico
 
 # Make snmp-mock docker image
+CI_REGISTRY="ci.tno.nl/ipcei-cis-misd-sustainable-datacenters/wp2/energy-domain-controller/chantico"
 SNMP_MOCK_IMAGE="$CI_REGISTRY/chantico-snmp-mock:$SNMP_MOCK_TAG"
 docker pull "$SNMP_MOCK_IMAGE"
 docker tag "$SNMP_MOCK_IMAGE" chantico-snmp-mock:latest

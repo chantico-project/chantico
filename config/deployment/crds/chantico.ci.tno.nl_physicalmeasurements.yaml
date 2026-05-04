@@ -40,11 +40,39 @@ spec:
           spec:
             description: PhysicalMeasurementSpec defines the desired state of PhysicalMeasurement
             properties:
+<<<<<<<< HEAD:config/deployment/crds/chantico.ci.tno.nl_physicalmeasurements.yaml
               ip:
                 type: string
               measurementDevice:
                 type: string
               resourceIds:
+========
+              auth:
+                description: 'Courtesy of the snmp_exporter repository: https://github.com/prometheus/snmp_exporter/blob/main/config/config.go'
+                properties:
+                  auth_protocol:
+                    type: string
+                  community:
+                    type: string
+                  context_name:
+                    type: string
+                  password:
+                    type: string
+                  priv_password:
+                    type: string
+                  priv_protocol:
+                    type: string
+                  security_level:
+                    type: string
+                  username:
+                    type: string
+                  version:
+                    type: integer
+                type: object
+              walks:
+                description: Walks is the list of SNMP OID walk paths to perform on
+                  the device.
+>>>>>>>> main:config/crds/bases/chantico.ci.tno.nl_measurementdevices.yaml
                 items:
                   type: string
                 type: array
