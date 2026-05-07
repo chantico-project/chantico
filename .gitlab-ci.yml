@@ -101,6 +101,21 @@ chantico-vet:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
+golangci-lint:
+  stage: lint
+  image: "golangci/golangci-lint:v2.11.4"
+  needs: []
+  allow_failure: true # Make it a warning instead for now.
+  script:
+    - golangci-lint run --output.code-climate.path=gl-code-quality-report.json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  artifacts:
+    when: always
+    reports:
+      codequality: gl-code-quality-report.json
+
 go-test:
   stage: test
   variables:
