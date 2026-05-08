@@ -97,8 +97,8 @@ jobs:
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: chantico-bot
+          password: ${{ secrets.BOT_RELEASE_TOKEN }}
 
       - name: Build and push chantico controller
         uses: docker/build-push-action@v7
@@ -273,6 +273,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ secrets.BOT_RELEASE_TOKEN }}
 
       - name: go-semantic-release and update versions
         run: |
@@ -293,13 +294,13 @@ jobs:
           sed -i "s/appVersion:.*/appVersion: \"v$VERSION\"/" config/deployment/Chart.yaml
           sed -i "s|org.opencontainers.image.version:.*|org.opencontainers.image.version: $VERSION|" config/deployment/Chart.yaml
           sed -Ei "s|org.opencontainers.image.description: \"(.*)--version.*\`\"|org.opencontainers.image.description: \"\1--version $VERSION\`\"|" config/deployment/Chart.yaml
-          ./semantic-release \
-            --allow-no-changes \
-            --allow-initial-development-versions
           if ! git diff --quiet; then
             git add CHANGELOG.md Makefile config/deployment/Chart.yaml
             git commit -m "bump version to v$VERSION [skip ci]"
             git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY HEAD:${GITHUB_REF_NAME}
           fi
+          ./semantic-release \
+            --allow-no-changes \
+            --allow-initial-development-versions
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
