@@ -1,0 +1,79 @@
+name: 🐛 Bug Report
+description: Report a problem or unexpected behavior in Chantico
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in the sections below — the more detail, the faster we can help.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug, where it happens, and the expected behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Observe '...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happens.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Chantico version / commit
+      description: Output of `git describe --tags --always` or the chart/image version you are running.
+      placeholder: e.g. v0.4.2 or git sha abc123
+    validations:
+      required: false
+
+  - type: input
+    id: k8s-version
+    attributes:
+      label: Kubernetes version
+      placeholder: e.g. v1.31.0
+    validations:
+      required: false
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Suggested testing or validation
+      description: How could the fix be verified? Test cases, environments, revalidation steps.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots or code snippets
+      description: Paste relevant logs or attach screenshots. Long logs go inside ``` code fences ```.
+      render: shell
+    validations:
+      required: false

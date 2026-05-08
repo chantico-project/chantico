@@ -1,0 +1,36 @@
+name: ✨ Feature Request
+description: Suggest a new idea or enhancement for Chantico
+title: "[FEATURE] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the feature you'd like to see, including the motivation or problem it solves.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How do you think this should be implemented? Mention architectural ideas, relevant components, or existing patterns to follow.
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you considered and why they were not preferred.
+    validations:
+      required: false
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Suggested testing or validation
+      description: How would we verify this feature works once implemented?
+    validations:
+      required: false
