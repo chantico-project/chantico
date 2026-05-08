@@ -293,10 +293,13 @@ jobs:
           sed -i "s/appVersion:.*/appVersion: \"v$VERSION\"/" config/deployment/Chart.yaml
           sed -i "s|org.opencontainers.image.version:.*|org.opencontainers.image.version: $VERSION|" config/deployment/Chart.yaml
           sed -Ei "s|org.opencontainers.image.description: \"(.*)--version.*\`\"|org.opencontainers.image.description: \"\1--version $VERSION\`\"|" config/deployment/Chart.yaml
+          ./semantic-release \
+            --allow-no-changes \
+            --allow-initial-development-versions
           if ! git diff --quiet; then
             git add CHANGELOG.md Makefile config/deployment/Chart.yaml
             git commit -m "bump version to v$VERSION [skip ci]"
-            git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY HEAD:${CI_COMMIT_BRANCH}
+            git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY HEAD:${GITHUB_REF_NAME}
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
