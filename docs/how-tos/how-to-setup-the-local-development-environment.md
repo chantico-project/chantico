@@ -21,12 +21,6 @@ It requires the following packages:
 
 ### Installation
 
-- Login your docker client:
-
-  ```bash
-  docker login ci.tno.nl
-  ```
-
 - To install the kind docker cluster, run:
 
   ```bash

@@ -18,7 +18,7 @@ running on hypervisors and pods in clusters.
 ## Getting Started
 
 How-to guides can be found in the `/docs` folder and on our [documentation 
-website](https://chantico-300062.ci.tno.nl/).
+website](https://chantico-project.github.io/chantico/).
 
 For a quick start, install Chantico on your k8s cluster using:
 
@@ -27,9 +27,9 @@ helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico
 ```
 
 For more information have a look at the following [installation 
-guide](https://chantico-300062.ci.tno.nl/how-tos/how-to-install-chantico/). For 
-a local setup of Chantico, please have a look at the following 
-[guide](https://chantico-300062.ci.tno.nl/how-tos/how-to-setup-the-local-development-environment/).
+guide](https://chantico-project.github.io/chantico/how-tos/how-to-install-chantico/). For a local setup of Chantico, please 
+have a look at the following 
+[guide](https://chantico-project.github.io/chantico/how-tos/how-to-setup-the-local-development-environment/).
 
 ### Prerequisites
 
