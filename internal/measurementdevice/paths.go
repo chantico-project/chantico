@@ -1,4 +1,4 @@
-package snmpgenerator
+package measurementdevice
 
 import (
 	"fmt"

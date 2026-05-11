@@ -30,8 +30,8 @@ rules:
   - chantico.ci.tno.nl
   resources:
   - datacenterresources
-  - physicalmeasurements
   - measurementdevices
+  - physicalmeasurements
   verbs:
   - create
   - delete
@@ -50,8 +50,8 @@ rules:
   - chantico.ci.tno.nl
   resources:
   - datacenterresources/status
-  - physicalmeasurements/status
   - measurementdevices/status
+  - physicalmeasurements/status
   verbs:
   - get
   - patch
@@ -59,8 +59,8 @@ rules:
 - apiGroups:
   - chantico.ci.tno.nl
   resources:
-  - physicalmeasurements/finalizers
   - measurementdevices/finalizers
+  - physicalmeasurements/finalizers
   verbs:
   - create
   - patch

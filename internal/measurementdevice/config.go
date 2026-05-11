@@ -1,4 +1,4 @@
-package snmpgenerator
+package measurementdevice
 
 import (
 	chantico "chantico/api/v1alpha1"

@@ -42,18 +42,18 @@ spec:
             properties:
               ip:
                 type: string
+              measurementDevice:
+                type: string
               resourceIds:
                 items:
                   type: string
                 type: array
               serviceId:
                 type: string
-              measurementDevice:
-                type: string
             required:
             - ip
-            - serviceId
             - measurementDevice
+            - serviceId
             type: object
           status:
             description: PhysicalMeasurementStatus defines the observed state of PhysicalMeasurement

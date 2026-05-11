@@ -33,8 +33,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	md "chantico/internal/measurementdevice"
 	"chantico/internal/snmp"
-	"chantico/internal/snmpgenerator"
 	"chantico/internal/steps"
 	"crypto/sha256"
 
@@ -62,7 +62,7 @@ import (
 type MeasurementDeviceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	Paths  snmpgenerator.Paths
+	Paths  md.Paths
 }
 
 func (r *MeasurementDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -123,7 +123,7 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 		return steps.Continue()
 	}
 
-	if !util.ContainsFinalizer(measurementDevice, chantico.MeasurementDeviceFinalizer) {
+	if !util.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
 		return steps.Stop()
 	}
 
@@ -156,15 +156,15 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 		return res
 	}
 
-	util.RemoveFinalizer(measurementDevice, chantico.MeasurementDeviceFinalizer)
+	util.RemoveFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer)
 	return steps.Stop()
 }
 
 func (r *MeasurementDeviceReconciler) ensureFinalizerIsSet(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	if util.ContainsFinalizer(measurementDevice, chantico.MeasurementDeviceFinalizer) {
+	if util.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
 		return steps.Continue()
 	}
-	util.AddFinalizer(measurementDevice, chantico.MeasurementDeviceFinalizer)
+	util.AddFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer)
 	return steps.Stop()
 }
 
@@ -237,7 +237,7 @@ func (r *MeasurementDeviceReconciler) createGeneratorJob(
 	ctx context.Context, measurementDevice *chantico.MeasurementDevice,
 ) steps.StepResult {
 	l := log.FromContext(ctx)
-	job, err := snmpgenerator.BuildGeneratorJob(measurementDevice)
+	job, err := md.BuildGeneratorJob(measurementDevice)
 	if err != nil {
 		return steps.Error(err)
 	}
@@ -363,7 +363,7 @@ func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Contex
 		return fail(err, fmt.Sprintf("Error while retrieving SNMP exporter deployment %s", err))
 	}
 
-	current := exporter.Spec.Template.Annotations[snmpgenerator.ConfigHashAnnotation]
+	current := exporter.Spec.Template.Annotations[md.ConfigHashAnnotation]
 	if current == desiredHash {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionExporterReload, metav1.ConditionTrue, chantico.ReasonSucceeded, "SNMP exporter is up to date with merged config.")
 		return steps.Continue()
@@ -373,7 +373,7 @@ func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Contex
 	if exporter.Spec.Template.Annotations == nil {
 		exporter.Spec.Template.Annotations = map[string]string{}
 	}
-	exporter.Spec.Template.Annotations[snmpgenerator.ConfigHashAnnotation] = desiredHash
+	exporter.Spec.Template.Annotations[md.ConfigHashAnnotation] = desiredHash
 	if err := r.Patch(ctx, exporter, patch); err != nil {
 		return fail(err, fmt.Sprintf("patch deployment %s", err))
 	}
@@ -397,7 +397,7 @@ func (r *MeasurementDeviceReconciler) setObservedGeneration(ctx context.Context,
 }
 
 func jobGeneration(job *batchv1.Job) int64 {
-	s := job.GetAnnotations()[snmpgenerator.GenerationAnnotation]
+	s := job.GetAnnotations()[md.GenerationAnnotation]
 	n, _ := strconv.ParseInt(s, 10, 64)
 	return n
 }

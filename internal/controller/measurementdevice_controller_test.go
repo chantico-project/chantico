@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
+	md "chantico/internal/measurementdevice"
 	"chantico/internal/snmp"
-	"chantico/internal/snmpgenerator"
 	"chantico/internal/steps"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -54,7 +54,7 @@ func newReconciler(t *testing.T, root string, objs ...runtime.Object) *Measureme
 	return &MeasurementDeviceReconciler{
 		Client: c,
 		Scheme: scheme,
-		Paths:  snmpgenerator.NewPaths(root),
+		Paths:  md.NewPaths(root),
 	}
 }
 
