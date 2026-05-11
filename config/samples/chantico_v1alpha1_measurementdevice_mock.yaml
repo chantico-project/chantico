@@ -1,5 +1,5 @@
 apiVersion: chantico.ci.tno.nl/v1alpha1
-kind: SNMPDevice
+kind: MeasurementDevice
 metadata:
   name: tno
   namespace: chantico

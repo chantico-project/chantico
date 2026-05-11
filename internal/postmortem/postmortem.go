@@ -104,7 +104,7 @@ func NewPostMortem(err error, args ...any) *PostMortem {
 	measurementDevices := &chantico.MeasurementDeviceList{}
 	err = c.List(context.TODO(), measurementDevices, client.InNamespace("chantico"))
 	if err != nil {
-		clusterState.CRDStates = append(clusterState.CRDStates, "Could not find MeasurementDevices in the chantico namespace")
+		clusterState.CRDStates = append(clusterState.CRDStates, "Could not find measurementDevices in the chantico namespace")
 	}
 	clusterState.CRDStates = append(clusterState.CRDStates, measurementDevices.Items)
 
