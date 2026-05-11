@@ -6,31 +6,15 @@ body:
   - type: textarea
     id: description
     attributes:
-      label: Description
-      description: Describe the feature you'd like to see, including the motivation or problem it solves.
+      label: What would you like to be added?
+      description: Describe the feature you would like to see, including the motivation or problem it solves. Also please have a look at our roadmap to check if this feature aligns with it, https://chantico-project.github.io/chantico/roadmap/
     validations:
       required: true
 
   - type: textarea
-    id: solution
+    id: motivation
     attributes:
-      label: Proposed solution
-      description: How do you think this should be implemented? Mention architectural ideas, relevant components, or existing patterns to follow.
-    validations:
-      required: false
-
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: Alternatives considered
-      description: Other approaches you considered and why they were not preferred.
-    validations:
-      required: false
-
-  - type: textarea
-    id: validation
-    attributes:
-      label: Suggested testing or validation
-      description: How would we verify this feature works once implemented?
+      label: Why is this feature desired?
+      description: Please explain the improvements or benefits of this feature.
     validations:
       required: false

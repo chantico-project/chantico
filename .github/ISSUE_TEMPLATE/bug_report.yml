@@ -6,41 +6,33 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report a bug. Please fill in the sections below — the more detail, the faster we can help.
+        Thanks for taking the time to report a bug. Please fill in the sections below with as much information as possible. Not doing so may result in your bug not being adressed in a timely manner. 
 
   - type: textarea
     id: description
     attributes:
-      label: Description
+      label: What happened?
       description: A clear and concise description of the bug, where it happens, and the expected behavior.
-    validations:
-      required: true
-
-  - type: textarea
-    id: reproduce
-    attributes:
-      label: How to reproduce
-      description: Steps to reproduce the behavior.
-      placeholder: |
-        1. Go to '...'
-        2. Click on '...'
-        3. Observe '...'
     validations:
       required: true
 
   - type: textarea
     id: expected
     attributes:
-      label: Expected behavior
-      description: What you expected to happen.
+      label: What did you expect to happen instead?
+      description: A clear and concise description of what you expected to happen.
     validations:
       required: true
 
   - type: textarea
-    id: actual
+    id: reproduce
     attributes:
-      label: Actual behavior
-      description: What actually happens.
+      label: How to reproduce it (as minimal and precise as possible)?
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Observe '...'
     validations:
       required: true
 
@@ -50,22 +42,6 @@ body:
       label: Chantico version / commit
       description: Output of `git describe --tags --always` or the chart/image version you are running.
       placeholder: e.g. v0.4.2 or git sha abc123
-    validations:
-      required: false
-
-  - type: input
-    id: k8s-version
-    attributes:
-      label: Kubernetes version
-      placeholder: e.g. v1.31.0
-    validations:
-      required: false
-
-  - type: textarea
-    id: validation
-    attributes:
-      label: Suggested testing or validation
-      description: How could the fix be verified? Test cases, environments, revalidation steps.
     validations:
       required: false
 

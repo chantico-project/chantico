@@ -8,13 +8,10 @@
 
 ## Chantico pull request checklist
 
-Please review how the following criteria applies to your pull request changes by ticking off the corresponding boxes.
-
-### Contributor License Agreement
-- [ ] The CLA has been signed and is included.
+Please review how the following criteria apply to your pull request changes by ticking off the corresponding boxes. If any of the boxes is not applicable to your pull request changes, please explain why.
 
 ### Code quality
-- [ ] The code meets our coding standards and styling guidelines [Link to code guidelines].
+- [ ] The code meets our coding standards and styling guidelines as listed [here](https://chantico-project.github.io/chantico/technical/coding-style-guidelines/).
 
 ### Tests
 - [ ] Unit tests reflect the changes in the code.
@@ -23,5 +20,8 @@ Please review how the following criteria applies to your pull request changes by
 ### Documentation
 - [ ] New changes are reflected into the documentation.
 
-###### Reproducibility
+### Reproducibility
 - [ ] A clear description and 'how to test' guide has been written.
+
+### Contributor License Agreement
+- [ ] The CLA has been signed and is included.
