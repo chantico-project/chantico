@@ -24,6 +24,57 @@ type validatedEnv struct {
 
 var ValidatedEnv validatedEnv
 
+func ValidateEnv() (validatedEnv, []error) {
+	var errs []error
+	var ret validatedEnv
+	volumeClaim, err := validateVar(ChanticoVolumeClaimEnv, validateClaim)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		ret.VolumeClaim = volumeClaim
+	}
+
+	volumeLocation, err := validateVar(ChanticoVolumeLocationEnv, validateLocation)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		ret.VolumeLocation = volumeLocation
+	}
+
+	prometheusServiceHost, err := validateVar(ChanticoPrometheusServiceHostEnv, validateHost)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		ret.PrometheusServiceHost = prometheusServiceHost
+	}
+
+	prometheusServicePort, err := validateVar(ChanticoPrometheusServicePortEnv, validatePort)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		ret.PrometheusServicePort = prometheusServicePort
+	}
+
+	if ret.PrometheusServiceHost != "" && ret.PrometheusServicePort != "" {
+		err = validateHostPort(prometheusServiceHost, prometheusServicePort)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+	}
+	if len(errs) > 0 {
+		return ret, errs
+	}
+
+	return ret, nil
+}
+
+func validateHostPort(host, port string) error {
+	conn, err := net.Dial("tcp", net.JoinHostPort(host, port))
+	conn.Close()
+	return fmt.Errorf("error connecting to '%s': %w", net.JoinHostPort(host, port), err)
+}
+
 func validateVar(varName string, extraTest func(string) error) (string, error) {
 	value, ok := os.LookupEnv(varName)
 	if !ok {
@@ -40,69 +91,40 @@ func validateVar(varName string, extraTest func(string) error) (string, error) {
 
 }
 
-func ValidateEnv() (validatedEnv, []error) {
-	var errs []error
-	var ret validatedEnv
-	volumeClaim, err := validateVar(ChanticoVolumeClaimEnv, func(value string) error {
-		if matched, _ := regexp.Match("^([[:alpha:]]*-)+([[:alpha:]]*)$", []byte(value)); !matched {
-			return fmt.Errorf("environment variable %s ('%s') does not look like a PVC name, should look like 'chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
-		}
-		return nil
-	})
+func validateClaim(value string) error {
+	if matched, _ := regexp.Match("^([[:alpha:]]*-)+([[:alpha:]]*)$", []byte(value)); !matched {
+		return fmt.Errorf("environment variable %s ('%s') does not look like a PVC name, should look like 'chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
+	}
+	return nil
+
+}
+
+func validateLocation(value string) error {
+	fileInfo, err := os.Stat(value)
 	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.VolumeClaim = volumeClaim
+		return fmt.Errorf("error stat'ing directory specified by environment variable %s (directory '%s'), should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
 	}
+	if !fileInfo.IsDir() {
+		return fmt.Errorf("environment variable %s ('%s') is not a directory, should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
+	}
+	return nil
+}
 
-	volumeLocation, err := validateVar(ChanticoVolumeLocationEnv, func(value string) error {
-		fileInfo, err := os.Stat(value)
-		if err != nil {
-			return fmt.Errorf("error stat'ing directory specified by environment variable %s (directory '%s'), should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
-		}
-		if !fileInfo.IsDir() {
-			return fmt.Errorf("environment variable %s ('%s') is not a directory, should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
-		}
-		return nil
-	})
+func validateHost(value string) error {
+	addrs, err := net.LookupHost(value)
 	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.VolumeLocation = volumeLocation
+		return fmt.Errorf("error looking up prometheus host %s ('%s'), is it a valid address?", ChanticoPrometheusServiceHostEnv, value)
 	}
+	if len(addrs) == 0 {
+		return fmt.Errorf("lookup for prometheus host %s ('%s') returned empty, is it a valid address?", ChanticoPrometheusServiceHostEnv, value)
+	}
+	return nil
+}
 
-	prometheusServiceHost, err := validateVar(ChanticoPrometheusServiceHostEnv, func(value string) error {
-		addrs, err := net.LookupHost(value)
-		if err != nil {
-			return fmt.Errorf("error looking up prometheus host %s ('%s'), is it a valid address?", ChanticoPrometheusServiceHostEnv, value)
-		}
-		if len(addrs) == 0 {
-			return fmt.Errorf("lookup for prometheus host %s ('%s') returned empty, is it a valid address?", ChanticoPrometheusServiceHostEnv, value)
-		}
-		return nil
-	})
+func validatePort(value string) error {
+	_, err := strconv.ParseUint(value, 10, 16)
 	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.PrometheusServiceHost = prometheusServiceHost
+		return fmt.Errorf("error converting prometheus port %s ('%s') to a 16-bit integer, is it a valid port?", ChanticoPrometheusServicePortEnv, value)
 	}
-
-	prometheusServicePort, err := validateVar(ChanticoPrometheusServicePortEnv, func(value string) error {
-		_, err := strconv.ParseUint(value, 10, 16)
-		if err != nil {
-			return fmt.Errorf("error converting prometheus port %s ('%s') to a 16-bit integer, is it a valid port?", ChanticoPrometheusServicePortEnv, value)
-		}
-		return nil
-	})
-	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.PrometheusServicePort = prometheusServicePort
-	}
-
-	if len(errs) > 0 {
-		return ret, errs
-	}
-
-	return ret, nil
+	return nil
 }
