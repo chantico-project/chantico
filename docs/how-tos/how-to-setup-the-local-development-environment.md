@@ -19,6 +19,12 @@ It requires the following packages:
 - make version 4.3+
 - kubectl version v0.30.0+
 
+Install `kind` through your preferred package manager, standalone binary or Go:
+
+```bash
+go install sigs.k8s.io/kind@v0.30.0
+```
+
 ### Installation
 
 - To install the kind docker cluster, run:

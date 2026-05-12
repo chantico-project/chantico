@@ -23,11 +23,14 @@ website](https://chantico-project.github.io/chantico/).
 For a quick start, install Chantico on your k8s cluster using:
 
 ```bash
-helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico # Latest version
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace # Latest version
 ```
 
 For more information have a look at the following [installation 
-guide](https://chantico-project.github.io/chantico/how-tos/how-to-install-chantico/). For a local setup of Chantico, please 
+guide](https://chantico-project.github.io/chantico/how-tos/how-to-install-chantico/). If
+your cluster does not use the default `csi-rbd` storage class, pass the
+available class with `--set pvc.storageClassName="<storage class name>"`. For a
+local setup of Chantico, please
 have a look at the following 
 [guide](https://chantico-project.github.io/chantico/how-tos/how-to-setup-the-local-development-environment/).
 

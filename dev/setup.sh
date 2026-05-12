@@ -5,12 +5,6 @@ set -ex
 SCRIPT_DIR=$(dirname -- "$( readlink -f -- "$0"; )")
 SNMP_MOCK_TAG="${SNMP_MOCK_TAG:-latest}"
 
-# get kind
-go install sigs.k8s.io/kind@v0.30.0
-
-# If go is not yet added to $PATH:
-#echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
-
 kind create cluster --config "$SCRIPT_DIR/kind-config.yaml"
 
 kubectl create namespace chantico

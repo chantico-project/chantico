@@ -11,12 +11,36 @@ menus:
 The easiest option to install Chantico into your k8s cluster is by using the helm package from the OCI Registry.
 
 ```bash
-helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico # Latest version
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace # Latest version
 ```
 
 - The command above installs the latest version of Chantico. See available [chart versions](https://github.com/chantico-project/chantico/pkgs/container/charts%2Fchantico). Also check out the [releases](https://github.com/chantico-project/chantico/releases) or the [changelog](/technical/changelog.md) on the documentation website for the list of changes throughout the version history.
 
 - Inspect the [values.yaml](https://github.com/chantico-project/chantico/blob/main/config/deployment/values.yaml) file to see what parameters can be provided. For example, excluding the Chantico controller from the installation can be done with `--set controller.include=false`.
+
+### Configure the storage class
+
+The chart creates a PersistentVolumeClaim for Prometheus data and defaults to
+the `csi-rbd` storage class. Clusters such as Docker Desktop, kind, minikube or
+managed Kubernetes installations may expose a different storage class.
+
+List the storage classes available in your cluster:
+
+```bash
+kubectl get storageclass
+```
+
+Then pass the storage class name during installation:
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set pvc.storageClassName="<storage class name>"
+```
+
+For example, the local development setup uses Rancher's local path provisioner:
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set pvc.storageClassName="local-path"
+```
 
 ## Upgrading using OCI Registry
 
