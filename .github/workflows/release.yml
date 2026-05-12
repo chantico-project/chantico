@@ -44,6 +44,7 @@ jobs:
 
       - name: Package and push chart
         run: |
+          make sync-deployment-crds
           echo "${{ secrets.BOT_RELEASE_TOKEN }}" | helm registry login ghcr.io -u chantico-bot --password-stdin
           VERSION=${GITHUB_REF#refs/tags/v}
           helm package config/deployment/ --version $VERSION --app-version v$VERSION
