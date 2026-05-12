@@ -1,0 +1,125 @@
+{{- if .Values.grafana.include }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chantico-grafana-datasources
+  namespace: {{ .Release.Namespace }}
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Chantico-Prometheus
+        uid: chantico-prometheus
+        type: prometheus
+        access: proxy
+        url: http://chantico-prometheus:9090
+        isDefault: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chantico-grafana-dashboard-provider
+  namespace: {{ .Release.Namespace }}
+data:
+  provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: chantico
+        orgId: 1
+        folder: Chantico
+        type: file
+        disableDeletion: true
+        editable: false
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chantico-grafana-dashboards
+  namespace: {{ .Release.Namespace }}
+data:
+{{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: chantico
+  name: chantico-grafana
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chantico-grafana
+  template:
+    metadata:
+      labels:
+        app: chantico-grafana
+    spec:
+      securityContext:
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.3.0
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: {{ .Values.grafana.adminPassword | quote }}
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: {{ .Values.grafana.anonymous | quote }}
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: Viewer
+            - name: GF_SECURITY_ALLOW_EMBEDDING
+              value: "true"
+            - name: GF_USERS_DEFAULT_THEME
+              value: light
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: datasources
+          configMap:
+            name: chantico-grafana-datasources
+        - name: dashboard-provider
+          configMap:
+            name: chantico-grafana-dashboard-provider
+        - name: dashboards
+          configMap:
+            name: chantico-grafana-dashboards
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chantico-grafana
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: chantico-grafana
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+{{- end }}

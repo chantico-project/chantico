@@ -13,4 +13,8 @@ pvc:
   storage: 3Gi
   accessModes:
     - ReadWriteOnce
+grafana:
+  include: true
+  adminPassword: admin
+  anonymous: true
 

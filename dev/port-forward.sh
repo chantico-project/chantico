@@ -6,9 +6,9 @@ set -ex
 NAMESPACE="chantico"
 
 # Targets and ports as arrays
-TARGETS=("svc/chantico-prometheus" "svc/chantico-snmp" "deployment/chantico-filebrowser")
-LOCAL_PORTS=(19090 19116 18888)
-REMOTE_PORTS=(9090 9116 80)
+TARGETS=("svc/chantico-prometheus" "svc/chantico-snmp" "deployment/chantico-filebrowser" "svc/chantico-grafana")
+LOCAL_PORTS=(19090 19116 18888 13000)
+REMOTE_PORTS=(9090 9116 80 3000)
 
 # Port-forward loop
 port_forward_loop() {
