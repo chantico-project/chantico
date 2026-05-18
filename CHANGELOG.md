@@ -1,3 +1,10 @@
+## 0.5.10 (2026-05-18)
+
+#### Bug Fixes
+
+* Ensure CRDs and full image registries are included in Helm package (#123) (7f64dc29)
+
+
 ## 0.5.9 (2026-05-12)
 
 #### Bug Fixes
