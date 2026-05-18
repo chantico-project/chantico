@@ -1,4 +1,4 @@
-baseURL = 'https://chantico-300062.ci.tno.nl/'
+baseURL = 'https://chantico-project.github.io/chantico/'
 languageCode = 'en-us'
 title = 'Chantico'
 theme = 'hugo-theme-relearn'

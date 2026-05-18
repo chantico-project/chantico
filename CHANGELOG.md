@@ -1,3 +1,21 @@
+## 0.5.10 (2026-05-18)
+
+#### Bug Fixes
+
+* Ensure CRDs and full image registries are included in Helm package (#123) (7f64dc29)
+
+
+## 0.5.9 (2026-05-12)
+
+#### Bug Fixes
+
+* change GitLab image references to GitHub counterparts. (#117) (0de94c5f)
+
+#### Chores
+
+* Introduce Github templates (#112) (8c239660)
+
+
 ## 0.5.8 (2026-05-08)
 
 #### Bug Fixes

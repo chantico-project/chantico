@@ -2,12 +2,12 @@ apiVersion: v2
 name: chantico
 description: A Helm chart for Chantico - energy monitoring system
 type: application
-version: 0.5.8
-appVersion: "v0.5.8"
+version: 0.5.10
+appVersion: "v0.5.10"
 annotations:
   org.opencontainers.image.source: "https://github.com/chantico-project/chantico"
   org.opencontainers.image.title: "Helm chart for chantico"
-  org.opencontainers.image.description: "A Helm chart for Chantico - energy monitoring system. Install: `helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --version 0.5.8`"
-  org.opencontainers.image.version: 0.5.8
+  org.opencontainers.image.description: "A Helm chart for Chantico - energy monitoring system. Install: `helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --version 0.5.10`"
+  org.opencontainers.image.version: 0.5.10
   org.opencontainers.image.licenses: Apache-2.0
   org.opencontainers.image.authors: TNO
