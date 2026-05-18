@@ -9,7 +9,7 @@ import (
 	"time"
 
 	chantico "chantico/api/v1alpha1"
-	vol "chantico/internal/volumes"
+	config "chantico/internal/configuration"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 
@@ -160,7 +160,7 @@ Include logs, screenshots, or relevant code snippets to support the bug report.
 }
 
 func (pm *PostMortem) SaveAndQuit() {
-	dir := fmt.Sprintf("%s/bugs", os.Getenv(vol.ChanticoVolumeLocationEnv))
+	dir := fmt.Sprintf("%s/bugs", config.ValidatedEnv.VolumeLocation)
 	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		panic(fmt.Sprintf("Could not create post-mortem folder %s", dir))

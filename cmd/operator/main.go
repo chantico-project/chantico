@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	chanticov1alpha1 "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	"chantico/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -132,6 +133,15 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	var errs []error
+	config.ValidatedEnv, errs = config.ValidateEnv()
+	if errs != nil {
+		for _, err := range errs {
+			setupLog.Error(err, "error reading environment variable")
+		}
 		os.Exit(1)
 	}
 

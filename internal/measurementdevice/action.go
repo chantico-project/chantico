@@ -10,10 +10,10 @@ import (
 	"time"
 
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	chanticok8s "chantico/internal/k8s"
 	pm "chantico/internal/postmortem"
 	sm "chantico/internal/statemachine"
-	vol "chantico/internal/volumes"
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,7 +86,7 @@ func CreateSNMPGenerator(
 	}
 	generatorPath := fmt.Sprintf(
 		"%s/%s/generator_%s.yml",
-		os.Getenv(vol.ChanticoVolumeLocationEnv),
+		config.ValidatedEnv.VolumeLocation,
 		snmpConfigDir,
 		string(measurementDevice.GetUID()),
 	)
@@ -97,7 +97,7 @@ func CreateSNMPGenerator(
 		l.Error(nil, measurementDevice.Status.ErrorMessage)
 	}
 	configPath := filepath.Join(
-		os.Getenv(vol.ChanticoVolumeLocationEnv),
+		config.ValidatedEnv.VolumeLocation,
 		snmpConfigDir,
 		fmt.Sprintf("config_%s.yml", string(measurementDevice.GetUID())),
 	)
@@ -114,7 +114,7 @@ func DeleteSNMPConfig(
 	ctx context.Context,
 	measurementDevice *chantico.MeasurementDevice,
 ) *sm.ActionResult {
-	volumePath := os.Getenv(vol.ChanticoVolumeLocationEnv)
+	volumePath := config.ValidatedEnv.VolumeLocation
 	_ = os.Remove(filepath.Join(volumePath, snmpConfigDir, fmt.Sprintf("config_%s.yml", measurementDevice.ObjectMeta.GetUID())))
 	_ = os.Remove(filepath.Join(volumePath, snmpConfigDir, fmt.Sprintf("generator_%s.yml", measurementDevice.ObjectMeta.GetUID())))
 	return nil
@@ -130,7 +130,7 @@ func CreateSNMPDeploymentConfig(
 	l := log.FromContext(ctx)
 	// Find files match the config_*.yml format
 	configFilesGlobPattern := filepath.Join(
-		os.Getenv(vol.ChanticoVolumeLocationEnv),
+		config.ValidatedEnv.VolumeLocation,
 		snmpConfigDir,
 		"config_*.yml",
 	)
@@ -156,7 +156,7 @@ func CreateSNMPDeploymentConfig(
 		return nil
 	}
 	configSNMPPath := filepath.Join(
-		os.Getenv(vol.ChanticoVolumeLocationEnv),
+		config.ValidatedEnv.VolumeLocation,
 		snmpYmlDir,
 		"snmp.yml",
 	)
