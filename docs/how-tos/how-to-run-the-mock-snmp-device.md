@@ -23,7 +23,7 @@ Ensure you have followed the instructions in [How to set up the local developmen
 ## Build and load the snmp-mock image into the kind environment
 
 ```bash
-export CI_REGISTRY="ci.tno.nl/ipcei-cis-misd-sustainable-datacenters/wp2/energy-domain-controller/chantico"
+export CI_REGISTRY="ghcr.io/chantico-project/images"
 export SNMP_MOCK_TAG="${SNMP_MOCK_TAG:-latest}"
 export SNMP_MOCK_IMAGE="$CI_REGISTRY/chantico-snmp-mock:$SNMP_MOCK_TAG"
 docker pull "$SNMP_MOCK_IMAGE"

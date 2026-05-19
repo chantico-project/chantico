@@ -21,7 +21,7 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
   1. Create a `measurement_device.yaml` file
 
   ```yaml
-  apiVersion: chantico.ci.tno.nl/v1alpha1
+  apiVersion: chantico-project.github.io/v1alpha1
   kind: MeasurementDevice
   metadata:
     labels:

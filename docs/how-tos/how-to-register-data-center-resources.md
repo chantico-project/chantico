@@ -31,7 +31,7 @@ kubectl apply -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 ```
 1. Edit the file to add a parent to one of the PDUs:
   ```yaml
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   labels:

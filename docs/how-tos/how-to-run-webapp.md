@@ -26,7 +26,7 @@ We currently allow environment variables to configure the webapp:
 
 ```sh
 # 1. Add the CRD DataCenterResource to your cluster
-kubectl apply --file config/crds/bases/chantico.ci.tno.nl_datacenterresources.yaml
+kubectl apply --file config/crds/bases/chantico-project.github.io_datacenterresources.yaml
 
 # 2. Add CR DataCenterResource to your cluster. You may use this example file.
 kubectl apply --file config/samples/example-webapp-demo.yaml 

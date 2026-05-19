@@ -14,7 +14,7 @@ In our First use-case (see `goal.md`) this corresponds to the `createPDU1` and `
   1. Create a `physical_measurement.yaml` file
 
   ```yaml
-  apiVersion: chantico.ci.tno.nl/v1alpha1
+  apiVersion: chantico-project.github.io/v1alpha1
   kind: PhysicalMeasurement
   metadata:
     labels:

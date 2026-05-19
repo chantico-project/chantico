@@ -82,7 +82,7 @@ func init() {
 }
 
 const (
-	SNMPUpdateFinalizer = "measurementdevice.finalizer.chantico.ci.tno.nl/snmp-update"
+	SNMPUpdateFinalizer = "measurementdevice.finalizer.chantico-project.github.io/snmp-update"
 )
 
 func (r *MeasurementDevice) GetState() string            { return r.Status.State }

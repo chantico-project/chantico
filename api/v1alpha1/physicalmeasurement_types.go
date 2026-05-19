@@ -69,7 +69,7 @@ type PhysicalMeasurementList struct {
 }
 
 const (
-	PhysicalMeasurementFinalizer = "physicalmeasurement.chantico.ci.tno.nl/finalizer"
+	PhysicalMeasurementFinalizer = "physicalmeasurement.chantico-project.github.io/finalizer"
 )
 
 func (r *PhysicalMeasurement) GetState() string            { return r.Status.State }
