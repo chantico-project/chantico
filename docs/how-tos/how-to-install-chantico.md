@@ -21,8 +21,9 @@ helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico
 ### Configure the storage class
 
 The chart creates a PersistentVolumeClaim for Prometheus data and defaults to
-the `csi-rbd` storage class. Clusters such as Docker Desktop, kind, minikube or
-managed Kubernetes installations may expose a different storage class.
+the `csi-rbd` storage class. Clusters such as Docker Desktop,
+[kind](https://kind.sigs.k8s.io/), minikube or managed Kubernetes installations
+may expose a different storage class.
 
 List the storage classes available in your cluster:
 
