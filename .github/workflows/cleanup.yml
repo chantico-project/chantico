@@ -17,6 +17,8 @@ jobs:
     strategy:
       matrix:
         package:
+          - images/chantico
+          - images/chantico-snmp-mock
           - images/chantico-pr
           - images/chantico-snmp-mock-pr
 
