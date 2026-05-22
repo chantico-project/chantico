@@ -4,20 +4,21 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: measurementdevices.chantico.ci.tno.nl
+  name: physicalmeasurements.chantico-project.github.io
 spec:
-  group: chantico.ci.tno.nl
+  group: chantico-project.github.io
   names:
-    kind: MeasurementDevice
-    listKind: MeasurementDeviceList
-    plural: measurementdevices
-    singular: measurementdevice
+    kind: PhysicalMeasurement
+    listKind: PhysicalMeasurementList
+    plural: physicalmeasurements
+    singular: physicalmeasurement
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MeasurementDevice is the Schema for the measurementdevices API
+        description: PhysicalMeasurement is the Schema for the physicalmeasurements
+          API
         properties:
           apiVersion:
             description: |-
@@ -37,42 +38,25 @@ spec:
           metadata:
             type: object
           spec:
-            description: MeasurementDeviceSpec defines the desired state of MeasurementDevice
+            description: PhysicalMeasurementSpec defines the desired state of PhysicalMeasurement
             properties:
-              auth:
-                description: 'Courtesy of the snmp_exporter repository: https://github.com/prometheus/snmp_exporter/blob/main/config/config.go'
-                properties:
-                  auth_protocol:
-                    type: string
-                  community:
-                    type: string
-                  context_name:
-                    type: string
-                  password:
-                    type: string
-                  priv_password:
-                    type: string
-                  priv_protocol:
-                    type: string
-                  security_level:
-                    type: string
-                  username:
-                    type: string
-                  version:
-                    type: integer
-                type: object
-              walks:
-                description: Walks is the list of SNMP OID walk paths to perform on
-                  the device.
+              ip:
+                type: string
+              measurementDevice:
+                type: string
+              resourceIds:
                 items:
                   type: string
                 type: array
+              serviceId:
+                type: string
             required:
-            - auth
-            - walks
+            - ip
+            - measurementDevice
+            - serviceId
             type: object
           status:
-            description: MeasurementDeviceStatus defines the observed state of MeasurementDevice
+            description: PhysicalMeasurementStatus defines the observed state of PhysicalMeasurement
             properties:
               errorMessage:
                 type: string

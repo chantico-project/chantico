@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: datacenterresources.chantico.ci.tno.nl
+  name: datacenterresources.chantico-project.github.io
 spec:
-  group: chantico.ci.tno.nl
+  group: chantico-project.github.io
   names:
     kind: DataCenterResource
     listKind: DataCenterResourceList

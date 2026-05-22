@@ -36,9 +36,9 @@ type PhysicalMeasurementReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=chantico.ci.tno.nl,resources=physicalmeasurements,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=chantico.ci.tno.nl,resources=physicalmeasurements/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=chantico.ci.tno.nl,resources=physicalmeasurements/finalizers,verbs=create;update;patch
+// +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/finalizers,verbs=create;update;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 
