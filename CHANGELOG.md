@@ -1,3 +1,9 @@
+## 0.5.14 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Use workflow call instead of tag push for consistent release (24bc7242)
+
 ## 0.5.13 (2026-05-22)
 
 #### Bug Fixes
