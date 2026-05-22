@@ -1,3 +1,9 @@
+## 0.5.17 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Correct reusable workflow inputs (8878d5a7)
+
 ## 0.5.16 (2026-05-22)
 
 #### Bug Fixes
