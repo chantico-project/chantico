@@ -313,6 +313,15 @@ jobs:
           git tag -a "v$VERSION" -m "Release v$VERSION"
           git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY "v$VERSION"
           gh release create "v$VERSION" --repo $GITHUB_REPOSITORY --title "v$VERSION" --notes-file CHANGELOG-unreleased.md
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
           GH_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
+
+  invoke-release:
+    if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
+    needs: release
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit

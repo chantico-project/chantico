@@ -1,8 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags: [ "v*" ]
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
 
 permissions:
   contents: write
@@ -23,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: v${{ github.event.inputs.version }}
           fetch-depth: 0
 
       - name: Run GoReleaser
@@ -40,6 +45,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: v${{ github.event.inputs.version }}
 
       - name: Setup Helm
         uses: azure/setup-helm@v5
@@ -48,6 +55,6 @@ jobs:
         run: |
           make sync-deployment-crds
           echo "${{ secrets.BOT_RELEASE_TOKEN }}" | helm registry login ghcr.io -u chantico-bot --password-stdin
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION=${{ github.event.inputs.version }}
           helm package config/deployment/ --version $VERSION --app-version v$VERSION
           helm push chantico-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
