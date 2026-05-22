@@ -1,3 +1,9 @@
+## 0.5.12 (2026-05-22)
+
+#### Bug Fixes
+
+* Rename domains in CRDs, API versions/groups, and finalizers (#129) (af454f7b)
+
 ## 0.5.11 (2026-05-22)
 
 #### Bug Fixes
