@@ -293,5 +293,6 @@ jobs:
     needs: release
     uses: ./.github/workflows/docker.yml
     with:
+      ref: refs/tags/v${{ needs.release.outputs.version }}
       version: ${{ needs.release.outputs.version }}
     secrets: inherit
