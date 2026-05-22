@@ -289,12 +289,13 @@ jobs:
           git config --global user.email "semantic-release@github"
           git config --global user.name "go-semantic-release"
           ./semantic-release --dry -f \
-            --changelog CHANGELOG.md \
-            --prepend-changelog \
+            --changelog CHANGELOG-unreleased.md \
             --allow-no-changes \
             --allow-initial-development-versions
           if [ ! -f .version-unreleased ]; then exit 0; fi
           VERSION=$(cat .version-unreleased)
+          cat CHANGELOG-unreleased.md CHANGELOG.md > CHANGELOG-temp.md
+          mv CHANGELOG-temp.md CHANGELOG.md
           # Commit updated versions in files if changed
           sed -E -i "s/^VERSION([ ?]*)=.*/VERSION\1= $VERSION/" Makefile
           sed -i "s/^version:.*/version: $VERSION/" config/deployment/Chart.yaml
@@ -306,15 +307,9 @@ jobs:
             git commit -m "bump version to v$VERSION [skip ci]"
             git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY HEAD:${GITHUB_REF_NAME}
           fi
-          NEW_SHA=$(git rev-parse HEAD)
-          for i in {1..20}; do
-            if git ls-remote https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY | grep $NEW_SHA; then
-              break
-            fi
-            sleep 5
-          done
-          ./semantic-release \
-            --allow-no-changes \
-            --allow-initial-development-versions
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY "v$VERSION"
+          gh release create "v$VERSION" --repo $GITHUB_REPOSITORY --title "v$VERSION" --notes-file CHANGELOG-unreleased.md
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
