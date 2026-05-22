@@ -6,7 +6,7 @@ on:
       ref:
         required: true
         type: string
-      tag:
+      version:
         required: false
         type: string
       pr:
@@ -32,14 +32,14 @@ jobs:
       - name: Set tags
         id: meta
         run: |
-          if [ ! -z "${{ inputs.tag }}" ]; then
+          if [ ! -z "${{ inputs.version }}" ]; then
             echo "controller=images/chantico" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
-            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            echo "tag=v${{ inputs.version }}" >> $GITHUB_OUTPUT
           elif [ ! -z "${{ inputs.pr }}" ]; then
             echo "controller=images/chantico-pr" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock-pr" >> $GITHUB_OUTPUT
-            echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+            echo "tag=pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
           else
             echo "controller=images/chantico" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
