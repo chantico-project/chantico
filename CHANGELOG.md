@@ -1,3 +1,9 @@
+## 0.5.16 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Add step ID to actually pass through version output (9e3a7eb7)
+
 ## 0.5.15 (2026-05-22)
 
 #### Bug Fixes
