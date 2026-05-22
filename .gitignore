@@ -54,6 +54,7 @@ osv-scanner-report*.json
 .semrel/
 semantic-release
 .version*
+CHANGELOG-*.md
 # Added by goreleaser init:
 dist/
 
