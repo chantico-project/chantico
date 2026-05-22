@@ -1,3 +1,15 @@
+## 0.5.11 (2026-05-22)
+
+#### Bug Fixes
+
+* Create release for latest commit and only run on source repository (#131) (692c7612)
+
+#### Chores
+
+* Add cleanup policy and push PR images to separate registry name (#119) (2176c2dc)
+* **ci:** Only run docker CI step from PR inside Chantico repo. (#128) (5213a2c7)
+* **docs:** Changed license for documentation to CC-BY 4.0. (#127) (e0e4314c)
+
 ## 0.5.10 (2026-05-18)
 
 #### Bug Fixes
