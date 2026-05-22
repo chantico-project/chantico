@@ -286,6 +286,7 @@ jobs:
 
       - name: go-semantic-release and update versions
         run: |
+          set -euxo pipefail
           curl -sSL https://get-release.xyz/semantic-release/linux/amd64 -o semantic-release
           chmod +x semantic-release
           git config --global user.email "semantic-release@github"
