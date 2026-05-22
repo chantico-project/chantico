@@ -1,3 +1,9 @@
+## 0.5.13 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Ensure atomicity and make new release with workflow token (74a9cf35)
+
 ## 0.5.12 (2026-05-22)
 
 #### Bug Fixes
