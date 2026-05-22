@@ -287,6 +287,7 @@ jobs:
           token: ${{ secrets.BOT_RELEASE_TOKEN }}
 
       - name: go-semantic-release and update versions
+        id: release
         run: |
           set -euxo pipefail
           curl -sSL https://get-release.xyz/semantic-release/linux/amd64 -o semantic-release
