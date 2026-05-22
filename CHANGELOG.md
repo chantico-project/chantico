@@ -1,3 +1,9 @@
+## 0.5.15 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Specify output of release job (ac674bd6)
+
 ## 0.5.14 (2026-05-22)
 
 #### Bug Fixes
