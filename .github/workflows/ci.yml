@@ -270,7 +270,7 @@ jobs:
 
   # Start a release to create a new Git version
   release:
-    if: github.ref == 'refs/heads/main'
+    if: github.repository == 'chantico-project/chantico' && github.ref == 'refs/heads/main'
     needs: [test]
     runs-on: ubuntu-latest
     continue-on-error: true
