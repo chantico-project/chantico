@@ -75,55 +75,14 @@ jobs:
             report.json
             coverage.xml
 
-  # Docker build and push
-  docker:
-    if: github.repository == 'chantico-project/chantico' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: ubuntu-latest
-    needs: [test]
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set tags
-        id: meta
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "controller=images/chantico" >> $GITHUB_OUTPUT
-            echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
-            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            echo "controller=images/chantico-pr" >> $GITHUB_OUTPUT
-            echo "snmp=images/chantico-snmp-mock-pr" >> $GITHUB_OUTPUT
-            echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
-          else
-            echo "controller=images/chantico" >> $GITHUB_OUTPUT
-            echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
-            echo "tag=latest" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Login to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: chantico-bot
-          password: ${{ secrets.BOT_RELEASE_TOKEN }}
-
-      - name: Build and push chantico controller
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.controller }}:${{ steps.meta.outputs.tag }}
-
-      - name: Build and push snmp-mock
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile.snmp-mock
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.snmp }}:${{ steps.meta.outputs.tag }}
+  invoke-docker:
+    if: github.repository == 'chantico-project/chantico' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
+    needs: test
+    uses: ./.github/workflows/docker.yml
+    with:
+      ref: ${{ github.ref }}
+      pr: ${{ github.event.pull_request.number }}
+    secrets: inherit
 
   # Documentation build
   docs:
@@ -327,4 +286,12 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       version: ${{ needs.release.outputs.version }}
+    secrets: inherit
+
+  invoke-docker-tag:
+    if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
+    needs: invoke-release
+    uses: ./.github/workflows/docker.yml
+    with:
+      ref: refs/tags/v${{ needs.release.outputs.version }}
     secrets: inherit
