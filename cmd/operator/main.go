@@ -129,7 +129,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "c8b0fb2f.ci.tno.nl",
+		LeaderElectionID:       "c8b0fb2f.chantico-project.github.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

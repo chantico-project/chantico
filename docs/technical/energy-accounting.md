@@ -60,7 +60,7 @@ number like `"1"` or `"0.5"`).
 **Root node (PDU)** — has `energyMetric`, no parents:
 
 ```yaml
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   name: datacenterresource-pdu1
@@ -75,7 +75,7 @@ spec:
 **Child node (bare metal)** — has parents with coefficients, no `energyMetric`:
 
 ```yaml
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   name: datacenterresource-misd-gbm-01

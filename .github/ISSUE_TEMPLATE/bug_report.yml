@@ -1,0 +1,55 @@
+name: 🐛 Bug Report
+description: Report a problem or unexpected behavior in Chantico
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in the sections below with as much information as possible. Not doing so may result in your bug not being adressed in a timely manner. 
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear and concise description of the bug, where it happens, and the expected behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen instead?
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce it (as minimal and precise as possible)?
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Observe '...'
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Chantico version / commit
+      description: Output of `git describe --tags --always` or the chart/image version you are running.
+      placeholder: e.g. v0.4.2 or git sha abc123
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots or code snippets
+      description: Paste relevant logs or attach screenshots. Long logs go inside ``` code fences ```.
+      render: shell
+    validations:
+      required: false

@@ -1,10 +1,8 @@
 apiVersion: chantico-project.github.io/v1alpha1
 kind: MeasurementDevice
 metadata:
-  name: tno
+  name: tno-2
   namespace: chantico
-  labels:
-    app.kubernetes.io/name: chantico
 spec:
   auth:
     community: public

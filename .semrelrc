@@ -7,13 +7,13 @@
             }
         },
         "ci-condition": {
-            "name": "gitlab",
+            "name": "github",
             "options": {
                 "defaultBranch": "main"
             }
         },
         "provider": {
-            "name": "gitlab"
+            "name": "github"
         }
     }
 }

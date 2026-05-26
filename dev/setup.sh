@@ -26,9 +26,8 @@ make -C ../ sync-deployment-crds
 # Install chantico dependencies (filebrowser, prometheus, snmp exporter)
 helm install chantico ../config/deployment/ --set controller.include=false --set pvc.storageClassName="local-path" -n chantico
 
-# Make snmp-mock docker image
-CI_REGISTRY="ci.tno.nl/ipcei-cis-misd-sustainable-datacenters/wp2/energy-domain-controller/chantico"
-SNMP_MOCK_IMAGE="$CI_REGISTRY/chantico-snmp-mock:$SNMP_MOCK_TAG"
+# Load snmp-mock docker image
+SNMP_MOCK_IMAGE="ghcr.io/chantico-project/images/chantico-snmp-mock:${SNMP_MOCK_TAG}"
 docker pull "$SNMP_MOCK_IMAGE"
 docker tag "$SNMP_MOCK_IMAGE" chantico-snmp-mock:latest
 kind load docker-image chantico-snmp-mock:latest --name kind

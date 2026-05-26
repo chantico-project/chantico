@@ -1,3 +1,76 @@
+## 0.5.17 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Correct reusable workflow inputs (8878d5a7)
+
+## 0.5.16 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Add step ID to actually pass through version output (9e3a7eb7)
+
+## 0.5.15 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Specify output of release job (ac674bd6)
+
+## 0.5.14 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Use workflow call instead of tag push for consistent release (24bc7242)
+
+## 0.5.13 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Ensure atomicity and make new release with workflow token (74a9cf35)
+
+## 0.5.12 (2026-05-22)
+
+#### Bug Fixes
+
+* Rename domains in CRDs, API versions/groups, and finalizers (#129) (af454f7b)
+
+## 0.5.11 (2026-05-22)
+
+#### Bug Fixes
+
+* Create release for latest commit and only run on source repository (#131) (692c7612)
+
+#### Chores
+
+* Add cleanup policy and push PR images to separate registry name (#119) (2176c2dc)
+* **ci:** Only run docker CI step from PR inside Chantico repo. (#128) (5213a2c7)
+* **docs:** Changed license for documentation to CC-BY 4.0. (#127) (e0e4314c)
+
+## 0.5.10 (2026-05-18)
+
+#### Bug Fixes
+
+* Ensure CRDs and full image registries are included in Helm package (#123) (7f64dc29)
+
+
+## 0.5.9 (2026-05-12)
+
+#### Bug Fixes
+
+* change GitLab image references to GitHub counterparts. (#117) (0de94c5f)
+
+#### Chores
+
+* Introduce Github templates (#112) (8c239660)
+
+
+## 0.5.8 (2026-05-08)
+
+#### Bug Fixes
+
+* **ci:** Replace GitHub token for release and push with service account (ed9e22d1)
+
+
 ## 0.5.6 (2026-04-17)
 
 #### Bug Fixes

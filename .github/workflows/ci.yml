@@ -1,0 +1,330 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
+
+env:
+  GO_VERSION: "1.25"
+
+jobs:
+  # Linters
+  lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: fmt
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then
+            echo "The following files are not formatted according to https://go.dev/blog/gofmt:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        continue-on-error: true
+        with:
+          version: v2.12
+
+  # Tests
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install tools
+        run: |
+          go install gotest.tools/gotestsum@latest
+          go install github.com/t-yuki/gocover-cobertura@latest
+
+      - name: Run tests
+        run: |
+          gotestsum --jsonfile report.json --format testname -- -v -coverprofile=coverage.out ./internal/...
+          go tool cover -func coverage.out
+          gocover-cobertura < coverage.out > coverage.xml
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            report.json
+            coverage.xml
+
+  # Docker build and push
+  docker:
+    if: github.repository == 'chantico-project/chantico' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set tags
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "controller=images/chantico" >> $GITHUB_OUTPUT
+            echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            echo "controller=images/chantico-pr" >> $GITHUB_OUTPUT
+            echo "snmp=images/chantico-snmp-mock-pr" >> $GITHUB_OUTPUT
+            echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "controller=images/chantico" >> $GITHUB_OUTPUT
+            echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: chantico-bot
+          password: ${{ secrets.BOT_RELEASE_TOKEN }}
+
+      - name: Build and push chantico controller
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.controller }}:${{ steps.meta.outputs.tag }}
+
+      - name: Build and push snmp-mock
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.snmp-mock
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.snmp }}:${{ steps.meta.outputs.tag }}
+
+  # Documentation build
+  docs:
+    runs-on: ubuntu-latest
+    #if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Generate docs
+        run: |
+          go install go.abhg.dev/doc2go@v0.11.0
+
+          REL_LINK_STYLE=index
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            REL_LINK_STYLE=directory
+          fi
+
+          doc2go -embed -highlight classes:monokai \
+            -basename _index.html \
+            -out docs/technical/api \
+            -frontmatter docs/hugo/frontmatter.tmpl \
+            -rel-link-style $REL_LINK_STYLE \
+            -internal ./...
+
+          find docs/technical/api -type f -name '*.html' -print0 | xargs -0 sed -i 's/_index\.html/index.html/g'
+          printf -- "---\ntitle: "Changelog"\nweight: 60\nmain:\n  parent: technical\n  weight: 50\n---\n%s" "$(sed -E -e "s|\(([0-9a-f]{7,})\)|([\1](https://github.com/$GITHUB_REPOSITORY/commit/\1))|" -e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1](https://github.com/$GITHUB_REPOSITORY/releases/tag/v\1)|" CHANGELOG.md)" > docs/technical/changelog.md
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docs
+          path: docs
+
+  # Documentation preview artifact
+  preview:
+    if: github.event_name == 'pull_request'
+    needs: docs
+    runs-on: ubuntu-latest
+    container:
+      image: hugomods/hugo:debian-exts
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: docs
+          path: docs
+
+      - name: Build preview
+        run: |
+          cd docs/hugo
+          hugo --baseURL="/" --config "hugo.toml,hugo.preview.toml"
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: hugo-preview
+          path: docs/hugo/public
+
+  # Check links in documentation preview
+  docs-check-links:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: preview
+    continue-on-error: true
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: hugo-preview
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Start local server
+        run: |
+          cat <<'EOF' > server.go
+          package main
+          import (
+            "log"
+            "net/http"
+          )
+          func main() {
+            log.Println("Serving on :8000")
+            log.Fatal(http.ListenAndServe(":8000", http.FileServer(http.Dir("."))))
+          }
+          EOF
+
+          go run server.go &
+          echo $! > server.pid
+
+      - name: Install muffet
+        run: go install github.com/raviqqe/muffet/v2@v2.11.2
+
+      - name: Run link checker
+        run: |
+          muffet --verbose --include="http://localhost:8000" http://localhost:8000/index.html
+
+      - name: Stop server
+        if: always()
+        run: kill $(cat server.pid)
+
+  # Deployment of documentation to GitHub Pages
+  pages:
+    if: github.ref == 'refs/heads/main'
+    needs: docs
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    container:
+      image: hugomods/hugo:debian-exts
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: docs
+          path: docs
+
+      - name: Build site
+        run: |
+          cd docs/hugo
+          hugo --baseURL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/hugo/public
+
+      - id: deploy
+        uses: actions/deploy-pages@v5
+
+    env:
+      CI_COMMIT_BRANCH: ${{ github.head_ref }}
+
+  # Start a release to create a new Git version
+  release:
+    if: github.repository == 'chantico-project/chantico' && github.ref == 'refs/heads/main'
+    needs: [test]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.BOT_RELEASE_TOKEN }}
+
+      - name: go-semantic-release and update versions
+        id: release
+        run: |
+          set -euxo pipefail
+          curl -sSL https://get-release.xyz/semantic-release/linux/amd64 -o semantic-release
+          chmod +x semantic-release
+          git config --global user.email "semantic-release@github"
+          git config --global user.name "go-semantic-release"
+          ./semantic-release --dry -f \
+            --changelog CHANGELOG-unreleased.md \
+            --allow-no-changes \
+            --allow-initial-development-versions
+          if [ ! -f .version-unreleased ]; then exit 0; fi
+          VERSION=$(cat .version-unreleased)
+          cat CHANGELOG-unreleased.md CHANGELOG.md > CHANGELOG-temp.md
+          mv CHANGELOG-temp.md CHANGELOG.md
+          # Commit updated versions in files if changed
+          sed -E -i "s/^VERSION([ ?]*)=.*/VERSION\1= $VERSION/" Makefile
+          sed -i "s/^version:.*/version: $VERSION/" config/deployment/Chart.yaml
+          sed -i "s/appVersion:.*/appVersion: \"v$VERSION\"/" config/deployment/Chart.yaml
+          sed -i "s|org.opencontainers.image.version:.*|org.opencontainers.image.version: $VERSION|" config/deployment/Chart.yaml
+          sed -Ei "s|org.opencontainers.image.description: \"(.*)--version.*\`\"|org.opencontainers.image.description: \"\1--version $VERSION\`\"|" config/deployment/Chart.yaml
+          if ! git diff --quiet; then
+            git add CHANGELOG.md Makefile config/deployment/Chart.yaml
+            git commit -m "bump version to v$VERSION [skip ci]"
+            git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY HEAD:${GITHUB_REF_NAME}
+          fi
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY "v$VERSION"
+          gh release create "v$VERSION" --repo $GITHUB_REPOSITORY --title "v$VERSION" --notes-file CHANGELOG-unreleased.md
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
+
+  invoke-release:
+    if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
+    needs: release
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit

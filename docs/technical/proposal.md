@@ -123,6 +123,6 @@ Coming soon.
 
 ### CI/CD
 
-We use GitLab CI to build Docker images for Chantico components, including the manager, Goose for Postgres migrations and SNMP mock.
-Additionally, formatting, tests and coverage are run. Pages are also deployed from GitLab CI.
+We use Github CI to build Docker images for Chantico components, including the manager, Goose for Postgres migrations and SNMP mock.
+Additionally, formatting, tests and coverage are run. Pages are also deployed Github CI.
 

@@ -13,6 +13,7 @@ Dockerfile.cross
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 *.xml
+report.json
 
 # Go workspace file
 go.work
@@ -53,6 +54,7 @@ osv-scanner-report*.json
 .semrel/
 semantic-release
 .version*
+CHANGELOG-*.md
 # Added by goreleaser init:
 dist/
 

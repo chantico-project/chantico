@@ -44,4 +44,4 @@ Some technical choices are documented in our [technical proposal](technical/) se
 
 ## API documentation
 
-If this is deployed in GitLab pages then you can find internal [API documentation here](./technical/api/index.html)
+If this is deployed in Github pages then you can find internal [API documentation here](./technical/api/index.html)

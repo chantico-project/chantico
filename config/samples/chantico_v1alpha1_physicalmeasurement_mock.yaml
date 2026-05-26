@@ -1,4 +1,4 @@
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: PhysicalMeasurement
 metadata:
   labels:

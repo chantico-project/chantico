@@ -1,0 +1,39 @@
+name: Cleanup PR Docker Images
+
+on:
+  schedule:
+    # Run every Sunday at 04:00 UTC
+    - cron: "0 4 * * 0"
+  workflow_dispatch: # Allow manual trigger of workflow
+
+permissions:
+  packages: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        package:
+          - images/chantico
+          - images/chantico-snmp-mock
+          - images/chantico-pr
+          - images/chantico-snmp-mock-pr
+
+    steps:
+      - name: Delete old PR container versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ matrix.package }}
+          package-type: container
+          owner: ${{ github.repository_owner }}
+
+          # Keep the newest 10 versions
+          min-versions-to-keep: 10
+
+          # Match tags like pr-123, keep anything else pushed to these registries
+          ignore-versions: '^(?!pr-).*'
+
+          token: ${{ secrets.BOT_RELEASE_TOKEN }}

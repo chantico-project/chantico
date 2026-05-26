@@ -1,0 +1,25 @@
+## Description
+
+
+
+## How to test
+
+
+
+## Linked issue
+
+
+
+## Chantico pull request checklist
+
+Please review how the following criteria apply to your pull request changes by ticking off the corresponding boxes. If any of the boxes is not applicable to your pull request changes, please explain why.
+
+### Code quality
+- [ ] The code meets our coding standards and styling guidelines as listed [here](https://chantico-project.github.io/chantico/technical/coding-style-guidelines/).
+
+### Tests
+- [ ] Unit tests reflect the changes in the code.
+- [ ] The code has been tested in a local environment.
+
+### Documentation
+- [ ] The new changes are reflected into the documentation.
