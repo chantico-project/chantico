@@ -29,10 +29,13 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func newReconciler(t *testing.T, root string, objs ...runtime.Object) *MeasurementDeviceReconciler {
@@ -58,9 +61,9 @@ func newReconciler(t *testing.T, root string, objs ...runtime.Object) *Measureme
 	}
 }
 
-func TestReconcileGeneratorFile_WritesAndIsIdempotent(t *testing.T) {
+func TestWriteReconcileGeneratorFile(t *testing.T) {
 	root := t.TempDir()
-	dev := &chantico.MeasurementDevice{
+	measurementDevice := &chantico.MeasurementDevice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tno", Namespace: "chantico",
 			UID: types.UID("dev-1"),
@@ -70,21 +73,21 @@ func TestReconcileGeneratorFile_WritesAndIsIdempotent(t *testing.T) {
 			Walks: []string{"1.3.6.1"},
 		},
 	}
-	r := newReconciler(t, root, dev)
+	r := newReconciler(t, root, measurementDevice)
 
 	// First run: writes the file.
-	res := r.reconcileGeneratorFile(context.Background(), dev)
+	res := r.reconcileGeneratorFile(context.Background(), measurementDevice)
 	if res.Action == steps.ActionError {
 		t.Fatalf("first reconcileGeneratorFile errored: %v", res.Err)
 	}
-	path := r.Paths.GeneratorFile(dev.GetUID())
+	path := r.Paths.GeneratorFile(measurementDevice.GetUID())
 	first, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("expected file %s: %v", path, err)
 	}
 
 	// Second run should not apply any changes.
-	res = r.reconcileGeneratorFile(context.Background(), dev)
+	res = r.reconcileGeneratorFile(context.Background(), measurementDevice)
 	if res.Action == steps.ActionError {
 		t.Fatalf("second reconcileGeneratorFile errored: %v", res.Err)
 	}
@@ -97,7 +100,7 @@ func TestReconcileGeneratorFile_WritesAndIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestReconcileMergedSNMPFile_WritesAtomically(t *testing.T) {
+func TestWriteReconcileMergedSNMPFile(t *testing.T) {
 	root := t.TempDir()
 	r := newReconciler(t, root)
 
@@ -110,8 +113,8 @@ func TestReconcileMergedSNMPFile_WritesAtomically(t *testing.T) {
 	writeFile(t, filepath.Join(r.Paths.SNMPDir(), "snmp-b.yaml"),
 		[]byte("auths: {bar: {version: 3}}\nmodules: {bar: {walk: [1.4]}}\n"))
 
-	dev := &chantico.MeasurementDevice{ObjectMeta: metav1.ObjectMeta{Name: "tno", Namespace: "chantico"}}
-	if res := r.reconcileMergedSNMPFile(context.Background(), dev); res.Action == steps.ActionError {
+	measurementDevice := &chantico.MeasurementDevice{ObjectMeta: metav1.ObjectMeta{Name: "tno", Namespace: "chantico"}}
+	if res := r.reconcileMergedSNMPFile(context.Background(), measurementDevice); res.Action == steps.ActionError {
 		t.Fatalf("reconcileMergedSNMPFile errored: %v", res.Err)
 	}
 
@@ -139,5 +142,85 @@ func writeFile(t *testing.T, path string, b []byte) {
 	t.Helper()
 	if err := os.WriteFile(path, b, 0777); err != nil {
 		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func TestReconcileDeletion(t *testing.T) {
+	root := t.TempDir()
+
+	now := metav1.Now()
+	measurementDevice := &chantico.MeasurementDevice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "tno",
+			Namespace:         "chantico",
+			UID:               types.UID("dev-del"),
+			DeletionTimestamp: &now,
+			Finalizers:        []string{chantico.SNMPUpdateFinalizer},
+		},
+		Spec: chantico.MeasurementDeviceSpec{
+			Auth:  snmp.GeneratorAuth{},
+			Walks: []string{"1.3.6.1"},
+		},
+	}
+
+	// Owned job that must be deleted.
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "tno-generator",
+			Namespace: "chantico",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: chantico.GroupVersion.String(),
+					Kind:       "MeasurementDevice",
+					Name:       measurementDevice.Name,
+					UID:        measurementDevice.UID,
+					Controller: ptr.To(true),
+				},
+			},
+		},
+	}
+
+	exporter := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "chantico-snmp", Namespace: "chantico"},
+	}
+	r := newReconciler(t, root, measurementDevice, job, exporter)
+
+	// Seed the per-device files that deletion should remove.
+	if err := os.MkdirAll(r.Paths.SNMPDir(), 0777); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(r.Paths.GeneratorFile(measurementDevice.UID)), 0777); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, r.Paths.GeneratorFile(measurementDevice.UID), []byte("auths: {}\n"))
+	writeFile(t, r.Paths.SNMPFile(measurementDevice.UID), []byte("auths: {}\nmodules: {}\n"))
+
+	// Start deletion of measurementDevice.
+	res := r.reconcileDeletion(context.Background(), measurementDevice)
+	if res.Action == steps.ActionError {
+		t.Fatalf("reconcileDeletion errored: %v", res.Err)
+	}
+	if res.Action != steps.ActionStop {
+		t.Fatalf("expected Stop, got %v", res.Action)
+	}
+
+	// Generator and SNMP config must be removed.
+	for _, p := range []string{r.Paths.GeneratorFile(measurementDevice.UID), r.Paths.SNMPFile(measurementDevice.UID)} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Fatalf("expected %s to be removed, stat err = %v", p, err)
+		}
+	}
+
+	// Owned job must be deleted.
+	got := &batchv1.Job{}
+	err := r.Get(context.Background(),
+		types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, got)
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("expected owned job to be deleted, got err=%v", err)
+	}
+
+	// Finalizer must have been removed.
+	if controllerutil.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
+		t.Fatalf("expected finalizer %q to be removed", chantico.SNMPUpdateFinalizer)
 	}
 }

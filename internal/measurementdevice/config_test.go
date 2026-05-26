@@ -52,6 +52,8 @@ func TestBuildGeneratorJob(t *testing.T) {
 		"--generator-path", "/data/snmp/generators/generator-" + string(dev.UID) + ".yaml",
 		"--mibs-dir", "/data/snmp/mibs",
 	}
+
+	// Check arguments in job.
 	joined := ""
 	for _, a := range args {
 		joined += a + " "

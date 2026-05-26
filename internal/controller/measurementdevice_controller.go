@@ -259,7 +259,7 @@ func (r *MeasurementDeviceReconciler) evaluateGeneratorJob(ctx context.Context, 
 	l := log.FromContext(ctx)
 
 	if jobGeneration(job) != measurementDevice.GetGeneration() {
-		// stale — delete and let the next reconcile recreate.\
+		// stale — delete and let the next reconcile recreate.
 		l.Info("Stale SNMP Generator job, deleting...", "job", job.Name)
 		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
 			return steps.Error(fmt.Errorf("delete stale job: %w", err))
