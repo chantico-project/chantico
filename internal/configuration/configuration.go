@@ -60,6 +60,8 @@ func ValidateEnv() (validatedEnv, []error) {
 		if err != nil {
 			errs = append(errs, err)
 		}
+		ret.PrometheusServiceHost = ""
+		ret.PrometheusServicePort = ""
 
 	}
 	if len(errs) > 0 {
@@ -71,8 +73,12 @@ func ValidateEnv() (validatedEnv, []error) {
 
 func validateHostPort(host, port string) error {
 	conn, err := net.Dial("tcp", net.JoinHostPort(host, port))
-	conn.Close()
-	return fmt.Errorf("error connecting to '%s': %w", net.JoinHostPort(host, port), err)
+	if err != nil {
+		return fmt.Errorf("error connecting to '%s': %w", net.JoinHostPort(host, port), err)
+	} else {
+		conn.Close()
+		return nil
+	}
 }
 
 func validateVar(varName string, extraTest func(string) error) (string, error) {
@@ -85,6 +91,7 @@ func validateVar(varName string, extraTest func(string) error) (string, error) {
 		return value, fmt.Errorf("environment variable %s is an empty string", varName)
 	}
 	if err := extraTest(value); err != nil {
+		fmt.Println(err)
 		return value, err
 	}
 	return value, nil
@@ -102,10 +109,10 @@ func validateClaim(value string) error {
 func validateLocation(value string) error {
 	fileInfo, err := os.Stat(value)
 	if err != nil {
-		return fmt.Errorf("error stat'ing directory specified by environment variable %s (directory '%s'), should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
+		return fmt.Errorf("error stat'ing directory specified by environment variable %s (directory '%s'), should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeLocationEnv, value)
 	}
 	if !fileInfo.IsDir() {
-		return fmt.Errorf("environment variable %s ('%s') is not a directory, should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
+		return fmt.Errorf("environment variable %s ('%s') is not a directory, should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeLocationEnv, value)
 	}
 	return nil
 }
