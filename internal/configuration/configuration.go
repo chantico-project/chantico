@@ -74,7 +74,7 @@ func ValidateEnv() (validatedEnv, []error) {
 func validateHostPort(host, port string) error {
 	conn, err := net.Dial("tcp", net.JoinHostPort(host, port))
 	if err != nil {
-		return fmt.Errorf("error connecting to '%s': %w", net.JoinHostPort(host, port), err)
+		return fmt.Errorf("cannot connect to host '%s': %w", net.JoinHostPort(host, port), err)
 	} else {
 		conn.Close()
 		return nil
@@ -84,7 +84,7 @@ func validateHostPort(host, port string) error {
 func validateVar(varName string, extraTest func(string) error) (string, error) {
 	value, ok := os.LookupEnv(varName)
 	if !ok {
-		return value, fmt.Errorf("environment variable %s is not set", varName)
+		return value, fmt.Errorf("environment variable %s must be set", varName)
 
 	}
 	if value == "" {
@@ -100,7 +100,7 @@ func validateVar(varName string, extraTest func(string) error) (string, error) {
 
 func validateClaim(value string) error {
 	if matched, _ := regexp.Match("^([[:alpha:]]*-)+([[:alpha:]]*)$", []byte(value)); !matched {
-		return fmt.Errorf("environment variable %s ('%s') does not look like a PVC name, should look like 'chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
+		return fmt.Errorf("environment variable %s ('%s') is not a valid PVC name, should look like 'chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
 	}
 	return nil
 
@@ -109,7 +109,7 @@ func validateClaim(value string) error {
 func validateLocation(value string) error {
 	fileInfo, err := os.Stat(value)
 	if err != nil {
-		return fmt.Errorf("error stat'ing directory specified by environment variable %s (directory '%s'), should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeLocationEnv, value)
+		return fmt.Errorf("cannot find directory specified by environment variable %s (directory '%s') (error: '%w'), should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeLocationEnv, value, err)
 	}
 	if !fileInfo.IsDir() {
 		return fmt.Errorf("environment variable %s ('%s') is not a directory, should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeLocationEnv, value)

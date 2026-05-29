@@ -136,7 +136,7 @@ func TestBadHostPort(t *testing.T) {
 
 	var thisErrs []error
 	for _, err := range errs {
-		if errString := fmt.Sprintf("%s", err); strings.Contains(errString, "error connecting to") {
+		if errString := fmt.Sprintf("%s", err); strings.Contains(errString, "cannot connect to host") {
 			thisErrs = append(thisErrs, err)
 		}
 
