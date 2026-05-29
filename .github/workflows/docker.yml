@@ -1,0 +1,70 @@
+name: Docker build and push
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      version:
+        required: false
+        type: string
+      pr:
+        required: false
+        type: number
+
+permissions:
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
+
+jobs:
+  # Docker build and push
+  docker:
+    if: github.repository == 'chantico-project/chantico'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set tags
+        id: meta
+        run: |
+          if [ ! -z "${{ inputs.version }}" ]; then
+            echo "controller=images/chantico" >> $GITHUB_OUTPUT
+            echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
+            echo "tag=v${{ inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ ! -z "${{ inputs.pr }}" ]; then
+            echo "controller=images/chantico-pr" >> $GITHUB_OUTPUT
+            echo "snmp=images/chantico-snmp-mock-pr" >> $GITHUB_OUTPUT
+            echo "tag=pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
+          else
+            echo "controller=images/chantico" >> $GITHUB_OUTPUT
+            echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: chantico-bot
+          password: ${{ secrets.BOT_RELEASE_TOKEN }}
+
+      - name: Build and push chantico controller
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.controller }}:${{ steps.meta.outputs.tag }}
+
+      - name: Build and push snmp-mock
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.snmp-mock
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.snmp }}:${{ steps.meta.outputs.tag }}
