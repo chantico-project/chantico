@@ -11,7 +11,7 @@ on:
         type: string
       pr:
         required: false
-        type: number
+        type: string
 
 permissions:
   contents: write
