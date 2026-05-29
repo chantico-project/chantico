@@ -74,7 +74,7 @@ func ValidateEnv() (validatedEnv, []error) {
 func validateHostPort(host, port string) error {
 	conn, err := net.Dial("tcp", net.JoinHostPort(host, port))
 	if err != nil {
-		return fmt.Errorf("cannot connect to host '%s': %w", net.JoinHostPort(host, port), err)
+		return fmt.Errorf("cannot connect to host '%s': %w. If this is a development environment, make sure port forwarding has started.", net.JoinHostPort(host, port), err)
 	} else {
 		conn.Close()
 		return nil
