@@ -25,9 +25,9 @@ import (
 	"path/filepath"
 
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	ph "chantico/internal/patch"
 	sm "chantico/internal/statemachine"
-	vol "chantico/internal/volumes"
 
 	"go.yaml.in/yaml/v2"
 )
@@ -38,12 +38,8 @@ const prometheusRulesDir = "prometheus/rules"
 // newly written (or deleted) rule files are picked up.  Requires Prometheus to
 // be started with --web.enable-lifecycle.
 func reloadPrometheus() {
-	host := os.Getenv("CHANTICO_PROMETHEUS_SERVICE_HOST")
-	port := os.Getenv("CHANTICO_PROMETHEUS_SERVICE_PORT")
-	if host == "" || port == "" {
-		log.Println("Prometheus host/port not configured, skipping reload")
-		return
-	}
+	host := config.ValidatedEnv.PrometheusServiceHost
+	port := config.ValidatedEnv.PrometheusServicePort
 	url := fmt.Sprintf("http://%s:%s/-/reload", host, port)
 	resp, err := http.Post(url, "", nil)
 	if err != nil {
@@ -74,7 +70,7 @@ func WriteRuleFile(
 		return nil
 	}
 
-	volumePath := os.Getenv(vol.ChanticoVolumeLocationEnv)
+	volumePath := config.ValidatedEnv.VolumeLocation
 	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
 	if err := os.MkdirAll(rulesDir, 0777); err != nil {
 		log.Printf("Failed to create rules directory: %v", err)
@@ -114,7 +110,7 @@ func DeleteRuleFile(
 
 // deleteRuleFileFromDisk removes the rule file for the named resource.
 func deleteRuleFileFromDisk(resourceName string) {
-	volumePath := os.Getenv(vol.ChanticoVolumeLocationEnv)
+	volumePath := config.ValidatedEnv.VolumeLocation
 	rulePath := filepath.Join(volumePath, prometheusRulesDir, resourceName+".yml")
 
 	log.Printf("Deleting rule file for %s\n", resourceName)

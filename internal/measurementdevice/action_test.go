@@ -13,9 +13,9 @@ import (
 	"go.yaml.in/yaml/v2"
 
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	ph "chantico/internal/patch"
 	sm "chantico/internal/statemachine"
-	vol "chantico/internal/volumes"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -257,12 +257,15 @@ func TestCreateSNMPGenerator(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Set up the temporary directory
 			tmpDir := t.TempDir()
-			t.Setenv(vol.ChanticoVolumeLocationEnv, tmpDir)
+			t.Setenv(config.ChanticoVolumeLocationEnv, tmpDir)
 			tmpSNMPConfigDir := fmt.Sprintf("%s/%s", tmpDir, snmpConfigDir)
 			err := os.MkdirAll(tmpSNMPConfigDir, 0755)
 			if err != nil {
 				t.Fatalf("Could not create folder %s\n", tmpSNMPConfigDir)
 			}
+
+			// Load the environment variables
+			config.ValidatedEnv, _ = config.ValidateEnv()
 
 			// Run the function
 			_ = CreateSNMPGenerator(t.Context(), tc.Case)
@@ -459,7 +462,8 @@ func testCreateTmpSNMPDirectories(t *testing.T) string {
 
 	// Set environment
 	tmpSNMPDir := t.TempDir()
-	t.Setenv(vol.ChanticoVolumeLocationEnv, tmpSNMPDir)
+	t.Setenv(config.ChanticoVolumeLocationEnv, tmpSNMPDir)
+	config.ValidatedEnv, _ = config.ValidateEnv()
 
 	// Create SNMP sudirectory
 	for _, snmpSubDir := range []string{snmpConfigDir, snmpYmlDir, snmpMibsDir} {
