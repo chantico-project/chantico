@@ -18,7 +18,7 @@ package datacenterresource
 
 import (
 	chantico "chantico/api/v1alpha1"
-	vol "chantico/internal/volumes"
+	config "chantico/internal/configuration"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +33,8 @@ func testCreateRulesTmpDir(t *testing.T) string {
 	t.Helper()
 
 	tmpDir := t.TempDir()
-	t.Setenv(vol.ChanticoVolumeLocationEnv, tmpDir)
+	t.Setenv(config.ChanticoVolumeLocationEnv, tmpDir)
+	config.ValidatedEnv, _ = config.ValidateEnv()
 
 	rulesDir := filepath.Join(tmpDir, prometheusRulesDir)
 	err := os.MkdirAll(rulesDir, 0755)

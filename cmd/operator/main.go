@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	chanticov1alpha1 "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	"chantico/internal/controller"
 	measurementdevice "chantico/internal/measurementdevice"
 	// +kubebuilder:scaffold:imports
@@ -136,12 +137,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	mountPath := os.Getenv("CHANTICOVOLUMELOCATIONENV")
+	var errs []error
+	config.ValidatedEnv, errs = config.ValidateEnv()
+	if errs != nil {
+		for _, err := range errs {
+			setupLog.Error(err, "error reading environment variable")
+		}
+		os.Exit(1)
+	}
 
 	if err = (&controller.MeasurementDeviceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Paths:  measurementdevice.NewPaths(mountPath),
+		Paths:  measurementdevice.NewPaths(config.ValidatedEnv.VolumeLocation),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)

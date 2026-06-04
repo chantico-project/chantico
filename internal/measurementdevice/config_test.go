@@ -13,7 +13,7 @@ import (
 )
 
 func TestBuildGeneratorJob(t *testing.T) {
-	t.Setenv(vol.ChanticoVolumeClaimEnv, "chantico-volume-claim")
+	t.Setenv(vol.ChanticoVolumeMount, "chantico-volume-claim")
 
 	dev := &chantico.MeasurementDevice{
 		ObjectMeta: metav1.ObjectMeta{

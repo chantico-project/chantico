@@ -1,3 +1,15 @@
+## 0.5.19 (2026-05-29)
+
+#### Bug Fixes
+
+* Extract reusable Docker workflow to run on release tag (#133) (d02bd1ed)
+
+## 0.5.18 (2026-05-29)
+
+#### Bug Fixes
+
+* Resolve "Early validation of environment variables" (#108) (45963125)
+
 ## 0.5.17 (2026-05-22)
 
 #### Bug Fixes
