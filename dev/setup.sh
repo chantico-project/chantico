@@ -5,8 +5,13 @@ set -ex
 SCRIPT_DIR=$(dirname -- "$( readlink -f -- "$0"; )")
 SNMP_MOCK_TAG="${SNMP_MOCK_TAG:-latest}"
 
-# get kind
-go install sigs.k8s.io/kind@v0.30.0
+# get kind if not already installed
+if which kind; then
+	echo "Using installed kind: $(which kind)"
+else
+	echo "Installing kind"
+	go install sigs.k8s.io/kind@v0.30.0
+fi
 
 # If go is not yet added to $PATH:
 #echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
