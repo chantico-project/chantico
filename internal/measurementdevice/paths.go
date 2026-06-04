@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	GenerationAnnotation = "chantico.ci.tno.nl/generation"
-	ConfigHashAnnotation = "chantico.ci.tno.nl/config-hash"
+	GenerationAnnotation = "chantico-project.github.io/generation"
+	ConfigHashAnnotation = "chantico-project.github.io/config-hash"
 )
 
 // Subdirectories under the chantico data volume.
