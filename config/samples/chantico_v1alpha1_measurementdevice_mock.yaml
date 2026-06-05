@@ -3,6 +3,8 @@ kind: MeasurementDevice
 metadata:
   name: tno
   namespace: chantico
+  labels:
+    app.kubernetes.io/name: chantico
 spec:
   auth:
     community: public

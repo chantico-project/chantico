@@ -34,7 +34,7 @@ spec:
           - -c
           - |
             mkdir -p /tmp/chantico-volume-mount/snmp/mibs;
-            mkdir -p /tmp/chantico-volume-mount/snmp/config;
+            mkdir -p /tmp/chantico-volume-mount/snmp/generators;
             mkdir -p /tmp/chantico-volume-mount/snmp/yml;
             if [ ! -f /tmp/chantico-volume-mount/snmp/yml/snmp.yml ]; then
               touch /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
@@ -51,7 +51,7 @@ spec:
               echo "    walk: []" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
               echo "    metrics: []" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
             fi
-            chmod -R 1777 /tmp/chantico-volume-mount/snmp
+            chmod -R 0777 /tmp/chantico-volume-mount/snmp
         volumeMounts:
         - mountPath: "/tmp/chantico-volume-mount"
           name: chantico-volume-mount
