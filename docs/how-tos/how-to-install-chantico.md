@@ -11,7 +11,7 @@ menus:
 The easiest option to install Chantico into your k8s cluster is by using the helm package from the OCI Registry.
 
 ```bash
-helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico # Latest version
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace # Latest version
 ```
 
 - The command above installs the latest version of Chantico. See available [chart versions](https://github.com/chantico-project/chantico/pkgs/container/charts%2Fchantico). Also check out the [releases](https://github.com/chantico-project/chantico/releases) or the [changelog](/technical/changelog.md) on the documentation website for the list of changes throughout the version history.
@@ -24,6 +24,23 @@ To upgrade an existing chantico deployment to a new version, run `helm upgrade` 
 
 ```bash
 helm upgrade chantico oci://ghcr.io/chantico-project/charts/chantico --version <version> -n chantico
+```
+
+## Using an alternative storage class
+
+The Chantico chart create a persistent volume claim to store Prometheus data.
+By default, the Chantico chart uses the `csi-rbd` storage class.
+As a user, you might want to use a different storage class.
+This can be done by overriding the `pvc.storageClassName` value when installing or upgrading Chantico.
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set pvc.storageClassName="STORAGE_CLASS_NAME"
+```
+
+You can list the storage classes available on your cluster with kubectl.
+
+```bash
+kubectl get storageclass
 ```
 
 ## Getting started with the deployed Chantico
