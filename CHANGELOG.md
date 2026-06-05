@@ -1,3 +1,13 @@
+## 0.5.20 (2026-06-05)
+
+#### Bug Fixes
+
+* Rewrite of MeasurementDevice state machine to idempotent step-wise functionality (#107) (45a5f90b)
+
+#### Chores
+
+* **ci:** Trigger main branch (latest tag) build with empty PR number (0eeac2de)
+
 ## 0.5.19 (2026-05-29)
 
 #### Bug Fixes
