@@ -30,7 +30,7 @@ helm upgrade chantico oci://ghcr.io/chantico-project/charts/chantico --version <
 
 After Chantico is successfully deployed on your cluster, you can start making use of it for measuring your datacenter hardware of interest. Currently this can only be done with manual configuration, until a more automated approach has been implemented. Chantico inherently configures SNMP walks for endpoints by means of `MIB` and `.yaml` files. The steps of configuring this typically follows the following how-to guides:
 
-1. [How to register an SNMP device type](how-to-register-an-snmp-device-type.md) - Upload the MIB files to use and make `.yaml` files for measurement devices. Also see the example at `config/samples/chantico_v1alpha1_measurementdevice.yaml`.
+1. [How to register an SNMP device type](how-to-register-an-snmp-device-type.md) - Upload the MIB files to use and make `.yaml` files for measurement devices. Also see the example at `config/samples/chantico_v1alpha1_measurementdevice_mock.yaml`.
 1. [How to register a physical SNMP device](how-to-register-a-physical-snmp-device.md) - Define IP address(es) of interest in physical measurement `.yaml` file. Example at `config/samples/chantico_v1alpha1_physicalmeasurement.yaml`.
 1. With the MIB files, measurement devices and physical measurements in place, the targets should be accessible and scrapeable in Prometheus. Perform port forwarding on the Prometheus deployment to validate the result of this setup. If done successful one should see a timeseries of the requested value(s).
 1. [How to register data center resources](how-to-register-data-center-resources.md) When desired, encapsulate data center structure using data center resources.

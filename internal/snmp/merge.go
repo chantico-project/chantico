@@ -54,7 +54,7 @@ func sortedConfigs(filesByName map[string][]byte) [][]byte {
 	return out
 }
 
-// readPerDeviceSnmpConfigs reads every snmp-*.yaml in the SNMP dir and returns them keyed by filename and sorted.
+// readPerDeviceSnmpConfigs reads every snmp-*.yaml in the SNMP dir and returns them keyed by filename.
 func readPerDeviceSnmpConfigs(dir string) (map[string][]byte, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -85,6 +85,7 @@ func readPerDeviceSnmpConfigs(dir string) (map[string][]byte, error) {
 	return out, nil
 }
 
+// GetMergedSortedSNMPConfig reads all per-device SNMP configs in dir, sorts them and returns the merged result.
 func GetMergedSortedSNMPConfig(dir string) ([]byte, error) {
 	filesByName, err := readPerDeviceSnmpConfigs(dir)
 	if err != nil {

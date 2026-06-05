@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -96,13 +95,13 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	l = l.WithValues("generation", measurementDevice.GetGeneration())
 	ctx = log.IntoContext(ctx, l)
 
-	// Helper function makes a deep copy of MeasurementDevice, and Patches the spec/status as needed at the end of reconcile function.
-	helper, err := patch.NewHelper(measurementDevice, r.Client)
+	// Patches the changes to the MeasurementDevice at the end of reconciliation. This updates the observedGeneration and conditions in the status.
+	patcher, err := patch.NewHelper(measurementDevice, r.Client)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	defer func() {
-		if err := helper.Patch(ctx, measurementDevice); err != nil {
+		if err := patcher.Patch(ctx, measurementDevice, patch.WithStatusObservedGeneration{}); err != nil {
 			reterr = errors.Join(reterr, err)
 		}
 	}()
@@ -115,12 +114,10 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		r.reconcileSNMPFileContent,
 		r.reconcileMergedSNMPFile,
 		r.reconcileExporterReload,
-		r.setObservedGeneration,
 	)
 }
 
 func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	l := log.FromContext(ctx)
 	if measurementDevice.ObjectMeta.GetDeletionTimestamp() == nil {
 		return steps.Continue()
 	}
@@ -129,15 +126,15 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 		return steps.Stop()
 	}
 
-	l.Info("Deleting MeasurementDevice files", "MeasurementDevice", measurementDevice.Name)
+	log.FromContext(ctx).Info("Deleting MeasurementDevice files", "MeasurementDevice", measurementDevice.Name)
 	jobs, err := r.getOwnedJobs(ctx, measurementDevice)
 	if err != nil {
-		return steps.Error(err)
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to get owned jobs: %w", err))
 	}
 	for i := range jobs {
 		job := &jobs[i]
 		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
-			return steps.Error(fmt.Errorf("delete owned job %s: %w", job.Name, err))
+			return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to delete owned job %s: %w", job.Name, err))
 		}
 	}
 
@@ -147,7 +144,7 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 	}
 	for _, path := range filesToRemove {
 		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return steps.Error(fmt.Errorf("Error while removing SNMP file %s: %w", path, err))
+			return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Error while removing SNMP file %s: %w", path, err))
 		}
 	}
 
@@ -171,20 +168,16 @@ func (r *MeasurementDeviceReconciler) ensureFinalizerIsSet(ctx context.Context, 
 }
 
 func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	l := log.FromContext(ctx)
-
 	path := r.Paths.GeneratorFile(measurementDevice.GetUID())
 
 	observed, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		l.Error(err, "Cannot read generator file", "path", path)
-		return steps.Error(fmt.Errorf("read generator file %s: %w", path, err))
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to read generator file %s: %w", path, err))
 	}
 
 	desired, err := desiredGeneratorConfig(measurementDevice)
 	if err != nil {
-		measurementDevice.UpdateStatusCondition(chantico.ConditionGeneratorFile, metav1.ConditionFalse, chantico.ReasonFailed, fmt.Sprintf("failed to marshal generator config: %v", err))
-		return steps.Error(err)
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to marshal generator config: %w", err))
 	}
 
 	if bytes.Equal(observed, desired) {
@@ -194,16 +187,14 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0777); err != nil {
-		return steps.Error(err)
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to create directory %s: %w", dir, err))
 	}
 
 	if err := os.WriteFile(path, desired, 0777); err != nil {
-		l.Error(err, "Cannot write generator file", "path", path)
-		measurementDevice.UpdateStatusCondition(chantico.ConditionGeneratorFile, metav1.ConditionFalse, chantico.ReasonFailed, fmt.Sprintf("failed to write generator file: %v", err))
-		return steps.Error(fmt.Errorf("write generator file %s: %w", path, err))
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to write generator file: %w", err))
 	}
 
-	l.Info("Generator file has been generated successfully.", "path", path)
+	log.FromContext(ctx).Info("Generator file has been generated successfully.", "path", path)
 	measurementDevice.UpdateStatusCondition(chantico.ConditionGeneratorFile, metav1.ConditionTrue, chantico.ReasonFileWritten, "Generator file has been generated successfully.")
 	return steps.Continue()
 }
@@ -217,12 +208,12 @@ func desiredGeneratorConfig(measurementDevice *chantico.MeasurementDevice) ([]by
 
 func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
 	if err := os.MkdirAll(r.Paths.SNMPDir(), 0777); err != nil {
-		return steps.Error(fmt.Errorf("Error while creating SNMP folder: %w", err))
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to create SNMP config directory %s: %w", r.Paths.SNMPDir(), err))
 	}
 
 	jobs, err := r.getOwnedJobs(ctx, measurementDevice)
 	if err != nil {
-		return steps.Error(err)
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to get owned SNMP Generator jobs: %w", err))
 	}
 
 	switch len(jobs) {
@@ -231,26 +222,25 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 	case 1:
 		return r.evaluateGeneratorJob(ctx, measurementDevice, &jobs[0])
 	default:
-		return steps.Error(fmt.Errorf("measurementdevice %s owns %d jobs, expected at most 1", measurementDevice.GetName(), len(jobs)))
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Expected at most 1 owned job, found %d", len(jobs)))
 	}
 }
 
 func (r *MeasurementDeviceReconciler) createGeneratorJob(
 	ctx context.Context, measurementDevice *chantico.MeasurementDevice,
 ) steps.StepResult {
-	l := log.FromContext(ctx)
 	job, err := md.BuildGeneratorJob(measurementDevice)
 	if err != nil {
-		return steps.Error(err)
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to build SNMP Generator job: %w", err))
 	}
 	if err := controllerutil.SetControllerReference(measurementDevice, job, r.Scheme); err != nil {
-		return steps.Error(err)
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to set controller reference for SNMP Generator job: %w", err))
 	}
 	if err := r.Create(ctx, job); err != nil {
-		return steps.Error(fmt.Errorf("create generator job: %w", err))
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to create SNMP Generator job: %w", err))
 	}
 
-	l.Info("Created SNMP Generator job", "job", job.Name)
+	log.FromContext(ctx).Info("Created SNMP Generator job", "job", job.Name)
 	measurementDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionUnknown, chantico.ReasonPending, "SNMP Generator Job created")
 	return steps.Stop()
 }
@@ -259,10 +249,9 @@ func (r *MeasurementDeviceReconciler) evaluateGeneratorJob(ctx context.Context, 
 	l := log.FromContext(ctx)
 
 	if jobGeneration(job) != measurementDevice.GetGeneration() {
-		// stale — delete and let the next reconcile recreate.
 		l.Info("Stale SNMP Generator job, deleting...", "job", job.Name)
 		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
-			return steps.Error(fmt.Errorf("delete stale job: %w", err))
+			return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to delete stale SNMP Generator job %s: %w", job.Name, err))
 		}
 		return steps.Stop()
 	}
@@ -277,6 +266,7 @@ func (r *MeasurementDeviceReconciler) evaluateGeneratorJob(ctx context.Context, 
 		measurementDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionFalse, chantico.ReasonFailed, "SNMP Generator Job failed")
 		return steps.Stop()
 	default:
+		l.Info("Generator job is running", "job", job.Name)
 		measurementDevice.UpdateStatusCondition(chantico.ConditionJob, metav1.ConditionUnknown, chantico.ReasonPending, "SNMP Generator Job is running")
 		return steps.Stop()
 	}
@@ -286,7 +276,7 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPFileContent(ctx context.Conte
 	path := r.Paths.SNMPFile(measurementDevice.GetUID())
 	config, err := os.ReadFile(path)
 	if err != nil {
-		return steps.Error(err)
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to read SNMP file %s: %w", path, err))
 	}
 
 	configSha := sha256.Sum256(config)
@@ -303,21 +293,15 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPFileContent(ctx context.Conte
 }
 
 func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	fail := func(err error, msg string) steps.StepResult {
-		log.FromContext(ctx).Error(err, msg)
-		measurementDevice.UpdateStatusCondition(chantico.ConditionConfig, metav1.ConditionFalse, chantico.ReasonFailed, fmt.Sprintf("%s: %v", msg, err))
-		return steps.Error(fmt.Errorf("%s: %w", msg, err))
-	}
-
 	merged, err := snmp.GetMergedSortedSNMPConfig(r.Paths.SNMPDir())
 	if err != nil {
-		return fail(err, "read per-device SNMP configs")
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to read SNMP configs: %w", err))
 	}
 
 	path := r.Paths.MergedSNMPFile()
 	existing, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fail(err, fmt.Sprintf("read %s", path))
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to read merged SNMP file: %w", err))
 	}
 	if bytes.Equal(existing, merged) {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionConfig, metav1.ConditionTrue, chantico.ReasonSynced, "Merged SNMP file is up to date.")
@@ -325,16 +309,11 @@ func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Contex
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0777); err != nil {
-		return fail(err, "create merged SNMP dir")
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to create merged SNMP dir %s: %w", filepath.Dir(path), err))
 	}
 
-	// Atomic write.
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, merged, 0777); err != nil {
-		return fail(err, fmt.Sprintf("write %s", tmp))
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return fail(err, fmt.Sprintf("rename %s -> %s", tmp, path))
+	if err := os.WriteFile(path, merged, 0777); err != nil {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to write merged SNMP file %s: %w", path, err))
 	}
 
 	measurementDevice.UpdateStatusCondition(chantico.ConditionConfig, metav1.ConditionTrue, chantico.ReasonFileWritten, "Merged SNMP file has been written successfully.")
@@ -342,27 +321,20 @@ func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Contex
 }
 
 func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	l := log.FromContext(ctx)
-	fail := func(err error, msg string) steps.StepResult {
-		log.FromContext(ctx).Error(err, msg)
-		measurementDevice.UpdateStatusCondition(chantico.ConditionExporterReload, metav1.ConditionFalse, chantico.ReasonFailed, fmt.Sprintf("%s: %v", msg, err))
-		return steps.Error(fmt.Errorf("%s: %w", msg, err))
-	}
-
 	merged, err := os.ReadFile(r.Paths.MergedSNMPFile())
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			measurementDevice.UpdateStatusCondition(chantico.ConditionExporterReload, metav1.ConditionUnknown, chantico.ReasonPending, "Merged SNMP file does not exist yet.")
 			return steps.Continue()
 		}
-		return fail(err, "read merged SNMP file")
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionExporterReload, "Failed to read merged SNMP file: %w", err))
 	}
 
 	desiredHash := snmp.Hash(merged)
 
 	exporter, err := r.getSnmpExporterDeployment(ctx)
 	if err != nil {
-		return fail(err, fmt.Sprintf("Error while retrieving SNMP exporter deployment %s", err))
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionExporterReload, "Failed to get SNMP exporter deployment: %w", err))
 	}
 
 	current := exporter.Spec.Template.Annotations[md.ConfigHashAnnotation]
@@ -377,10 +349,10 @@ func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Contex
 	}
 	exporter.Spec.Template.Annotations[md.ConfigHashAnnotation] = desiredHash
 	if err := r.Patch(ctx, exporter, patch); err != nil {
-		return fail(err, fmt.Sprintf("patch deployment %s", err))
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionExporterReload, "Failed to patch SNMP exporter deployment %s: %w", exporter.Name, err))
 	}
 
-	l.Info("Triggered SNMP exporter reload", "hash", desiredHash)
+	log.FromContext(ctx).Info("Triggered SNMP exporter reload", "hash", desiredHash)
 	measurementDevice.UpdateStatusCondition(chantico.ConditionExporterReload, metav1.ConditionTrue, chantico.ReasonSynced, "SNMP exporter deployment annotation updated to trigger reload.")
 	return steps.Continue()
 }
@@ -391,11 +363,6 @@ func (r *MeasurementDeviceReconciler) getSnmpExporterDeployment(ctx context.Cont
 		return nil, err
 	}
 	return &deploy, nil
-}
-
-func (r *MeasurementDeviceReconciler) setObservedGeneration(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	measurementDevice.Status.ObservedGeneration = measurementDevice.Generation
-	return steps.Continue()
 }
 
 func jobGeneration(job *batchv1.Job) int64 {

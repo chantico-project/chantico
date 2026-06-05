@@ -11,16 +11,22 @@ spec:
     kind: MeasurementDevice
     listKind: MeasurementDeviceList
     plural: measurementdevices
-    shortNames:
-    - md
-    - msd
     singular: measurementdevice
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+    - jsonPath: .status.conditions[-1].status
       name: Status
       type: string
+    - jsonPath: .status.conditions[-1].reason
+      name: Reason
+      type: string
+    - jsonPath: .status.conditions[-1].type
+      name: Type
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:

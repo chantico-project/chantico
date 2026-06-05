@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"chantico/internal/snmp"
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -44,8 +45,10 @@ type MeasurementDeviceStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=md;msd
-// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[-1].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[-1].reason`
+// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.status.conditions[-1].type`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // MeasurementDevice is the Schema for the measurementdevices API
 type MeasurementDevice struct {
@@ -113,4 +116,10 @@ func (m *MeasurementDevice) UpdateStatusJobCondition(condition *metav1.Condition
 		Type: string(ConditionJob), Status: condition.Status, Reason: condition.Reason, Message: condition.Message,
 		ObservedGeneration: m.GetGeneration(),
 	})
+}
+
+func (m *MeasurementDevice) FailCondition(t ConditionType, format string, args ...any) error {
+	err := fmt.Errorf(format, args...)
+	m.UpdateStatusCondition(t, metav1.ConditionFalse, ReasonFailed, err.Error())
+	return err
 }
