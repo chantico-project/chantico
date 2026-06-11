@@ -5,10 +5,24 @@ metadata:
   name: {{ .Values.persistentVolumeClaimName }}
   namespace: {{ .Release.Namespace }}
 spec:
+  volumeName: fixed-pv
   storageClassName: {{ .Values.pvc.storageClassName }}
   accessModes:
     {{- toYaml .Values.pvc.accessModes | nindent 4 }}
   resources:
     requests:
       storage: {{ .Values.pvc.storage }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: fixed-pv 
+spec:
+  capacity:
+    storage: {{ .Values.pvc.storage }}
+  storageClassName: {{ .Values.pvc.storageClassName }}
+  hostPath:
+    path: /data/fixed-pv
+  accessModes:
+  - ReadWriteOnce
 {{- end }}

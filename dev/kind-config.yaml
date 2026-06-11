@@ -4,8 +4,8 @@ apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
     extraMounts:
-      - hostPath: /tmp/chantico-local-path-data
-        containerPath: /opt/local-path-provisioner
+      - hostPath: ./kind-data/pvc/chantico-snmp-prometheus-volume-claim
+        containerPath: /data/fixed-pv
     extraPortMappings:
     - containerPort: 31161
       hostPort: 31161

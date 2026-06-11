@@ -62,3 +62,5 @@ dist/
 .direnv
 
 config/deployment/crds
+
+kind-data
