@@ -98,10 +98,16 @@ metadata:
   name: chantico-prometheus
   namespace: {{ .Release.Namespace }}
 spec:
-  type: NodePort
+  {{- if .Values.prometheus.service.type }}
+  type: {{ .Values.prometheus.service.type }}
+  {{- end }}
   selector:
     app: chantico-prometheus
   ports:
     - protocol: TCP
       port: 9090
+      {{- if eq .Values.prometheus.service.type "NodePort" }}
       nodePort: 30001
+      {{- else }}
+      targetPort: 9090    
+      {{- end }}

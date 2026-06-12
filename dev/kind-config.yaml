@@ -7,12 +7,12 @@ nodes:
     - hostPath: ./.chantico-persistent-volume
       containerPath: /data/chantico-persistent-volume
     extraPortMappings:
-    - hostPort: 31161 # chantico-snmp-mock
+    - hostPort: 18888       # filebrowser
+      containerPort: 30000
+    - hostPort: 19090       # prometheus
+      containerPort: 30001
+    - hostPort: 19116       # snmp-exporter
+      containerPort: 30002
+    - hostPort: 31161       # snmp-mock-device
       containerPort: 31161
       protocol: UDP
-    - hostPort: 19116 # chantico-snmp
-      containerPort: 9116
-    - hostPort: 18888 # filebrowser
-      containerPort: 30000
-    - hostPort: 19090 # prometheus
-      containerPort: 30001

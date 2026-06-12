@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	ChanticoVolumeLocationEnv        = "CHANTICOVOLUMELOCATIONENV"
-	ChanticoVolumeClaimEnv           = "CHANTICOVOLUMECLAIMENV"
+	ChanticoVolumeLocationEnv        = "CHANTICO_DATA_PATH"
+	ChanticoVolumeClaimEnv           = "CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME"
 	ChanticoPrometheusServiceHostEnv = "CHANTICO_PROMETHEUS_SERVICE_HOST"
 	ChanticoPrometheusServicePortEnv = "CHANTICO_PROMETHEUS_SERVICE_PORT"
 )

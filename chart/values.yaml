@@ -1,4 +1,4 @@
-persistentVolumeClaimName: chantico-snmp-prometheus-volume-claim
+persistentVolumeClaimName: chantico-persistent-volume-claim
 prometheusRetention: 5h
 snmpExporterAddress: chantico-snmp:9116
 imagePullSecretName: "" # Set if pulled from private registry, otherwise leave empty
@@ -7,6 +7,24 @@ controller:
   image:
     repository: "ghcr.io/chantico-project/images/chantico"
     tag: "" # defaults to Chart.version
+# snmp:
+#   service:
+#     type: "ClusterIP"
+# filebrowser:
+#   service:
+#     type: "ClusterIP"
+# prometheus:
+#   service:
+#     type: "ClusterIP"
+pv:
+  include: false
+  name: chantico-persistent-volume
+  storage: "" # should probably match the pvc
+  storageClassName: ""
+  hostPath:
+    path: "/data/chantico-persistent-volume"
+  accessModes:
+    - ReadWriteOnce
 pvc:
   include: true
   storageClassName: "csi-rbd"

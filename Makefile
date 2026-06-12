@@ -7,10 +7,15 @@ VERSION ?= 0.5.20
 
 # Image URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
-KIND_VOLUME_MOUNT = .chantico-persistent-volume
+CHANTICO_DATA_PATH ?= .chantico-persistent-volume
+CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
+CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
+
+LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
+LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 
 SNMP_MOCK_TAG ?= latest
-SNMP_MOCK_IMAGE = ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
+SNMP_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -87,11 +92,11 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 
 .PHONE: cluster-create-mount ## this is sometimes needed for Docker, so the folder is owned by the user, rather than root
 cluster-create-mount:
-	mkdir $(KIND_VOLUME_MOUNT) || true
+	mkdir $(CHANTICO_DATA_PATH) || true
 
 .PHONE: cluster-delete-mount
 cluster-delete-mount:
-	rm -rf $(KIND_VOLUME_MOUNT) || true
+	rm -rf $(CHANTICO_DATA_PATH) || true
 
 .PHONY: cluster-up
 cluster-up: kind cluster-create-mount
@@ -106,14 +111,26 @@ cluster-clean: cluster-down cluster-delete-mount
 
 .PHONY: cluster-configure
 cluster-configure: sync-deployment-crds
-	$(KUBECTL) create namespace chantico
-	helm install chantico \
-		config/deployment/ \
+# 	idempotent function to create namespace
+	$(KUBECTL) create namespace chantico --dry-run=client -o yaml | $(KUBECTL) apply -f -
+# 	idempotent helm installation
+	helm upgrade --install chantico ./chart/ \
 		--namespace chantico \
 		--set controller.include=false \
-		--set pvc.storageClassName="manual" \
     	--set securityContext.runAsUser="$(shell id -u)" \
-		--set securityContext.runAsGroup="$(shell id -g)"
+		--set securityContext.runAsGroup="$(shell id -g)" \
+		--set persistentVolumeClaimName=$(CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME) \
+		--set pvc.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
+		--set pvc.volumeName=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
+		--set pv.include=true \
+		--set pv.name=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
+		--set pv.storage=$(LOCAL_DEVELOPMENT_STORAGE) \
+		--set pv.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
+		--set pv.hostPath.path="/data/chantico-persistent-volume" \
+		--set snmp.service.type="NodePort" \
+		--set filebrowser.service.type="NodePort" \
+		--set prometheus.service.type="NodePort"
+	
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
 	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
 	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
@@ -123,7 +140,7 @@ cluster-configure: sync-deployment-crds
 
 .PHONY: cluster-mibs
 cluster-mibs: # Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
-	cp dev/mibs/* $(KIND_VOLUME_MOUNT)/snmp/mibs/
+	cp dev/mibs/* $(CHANTICO_DATA_PATH)/snmp/mibs/
 
 ##@ Build
 
@@ -146,7 +163,7 @@ docker-build: ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
-HELM_CHART_DIR ?= config/deployment
+HELM_CHART_DIR ?= chart
 GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
 
 .PHONY: helm-package
@@ -196,9 +213,9 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: sync-deployment-crds
 sync-deployment-crds:
-	mkdir -p config/deployment/crds
-	cp config/crds/bases/*.yaml config/deployment/crds/
-	sed -i'' -e '/^\s*format: int64$$/d' config/deployment/crds/*.yaml
+	mkdir -p chart/crds
+	cp config/crds/bases/*.yaml chart/crds/
+	sed -i'' -e '/^\s*format: int64$$/d' chart/crds/*.yaml
 
 ##@ Dependencies
 

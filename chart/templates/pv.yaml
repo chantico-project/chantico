@@ -1,0 +1,14 @@
+{{- if .Values.pv.include }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Values.pv.name }}
+spec:
+  capacity:
+    storage: {{ .Values.pv.storage }}
+  storageClassName: {{ .Values.pv.storageClassName }}
+  hostPath:
+    path: {{ .Values.pv.hostPath.path }}
+  accessModes:
+    {{- toYaml .Values.pvc.accessModes | nindent 4 }}
+{{- end}}
