@@ -16,7 +16,11 @@ spec:
         app: chantico-snmp
     spec:
       securityContext:
-        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - image: docker.io/ricardbejarano/snmp_exporter:0.26.0
         name: snmp
