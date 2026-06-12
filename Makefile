@@ -7,6 +7,10 @@ VERSION ?= 0.5.20
 
 # Image URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
+DEVELOPMENT_VOLUMES = .development-volumes/
+
+SNMP_MOCK_TAG ?= latest
+SNMP_MOCK_IMAGE = ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -80,6 +84,46 @@ lint: golangci-lint ## Run golangci-lint linter
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
+
+.PHONE: create-development-volumes ## this is sometimes needed for Docker, so the folder is owned by the user, rather than root
+create-development-volumes:
+	mkdir $(DEVELOPMENT_VOLUMES) || true
+
+.PHONE: delete-development-volumes
+delete-development-volumes:
+	rm -rf $(DEVELOPMENT_VOLUMES) || true
+
+.PHONY: cluster-up
+cluster-up: kind create-development-volumes
+	$(KIND) create cluster --config ./dev/kind-config.yaml
+
+.PHONY: cluster-down
+cluster-down: kind
+	$(KIND) delete cluster || true
+
+.PHONY: cluster-clean
+cluster-clean: cluster-down delete-development-volumes
+
+.PHONY: cluster-configure
+cluster-configure: sync-deployment-crds
+	$(KUBECTL) create namespace chantico
+	helm install chantico \
+		config/deployment/ \
+		--set controller.include=false \
+		--set pvc.storageClassName="manual" \
+		-n chantico \
+    	--set securityContext.runAsUser="$(id -u)" \
+		--set securityContext.runAsGroup="$(id -g)"
+	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
+	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
+	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
+	$(KUBECTL) apply -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
+	$(KUBECTL) apply -f dev/k8s/snmp-mock-deployment.yaml
+	$(KUBECTL) apply -f dev/k8s/snmp-mock-service.yaml
+
+.PHONY: cluster-mibs
+cluster-mibs: # Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
+	cp dev/mibs/* $(DEVELOPMENT_VOLUMES)/pvc/chantico-snmp-prometheus-volume-claim/snmp/mibs/
 
 ##@ Build
 
@@ -169,12 +213,15 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+KIND ?= $(LOCALBIN)/kind
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.3
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.19
 GOLANGCI_LINT_VERSION ?= v1.59.1
+KIND_VERSION ?= v0.30.0
+
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -195,6 +242,11 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+
+.PHONY: kind
+kind: $(KIND) ## Download kind locally if necessary.
+$(KIND): $(LOCALBIN)
+	$(call go-install-tool,$(KIND),sigs.k8s.io/kind,$(KIND_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
