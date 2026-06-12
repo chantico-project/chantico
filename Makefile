@@ -81,6 +81,18 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
+.PHONY: setup-kind
+setup-kind: ./dev/setup.sh ## Setup kind cluster for local deployment
+	./dev/setup.sh
+
+.PHONY: port-forward
+port-forward: ./dev/port-forward.sh ## Forward ports from local kind deployment
+	./dev/port-forward.sh
+
+.PHONY: teardown-kind
+teardown-kind: ./dev/teardown.sh ## Tear down kind cluster to clean up local deployment
+	./dev/teardown.sh
+
 ##@ Build
 
 .PHONY: build
