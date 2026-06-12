@@ -63,4 +63,4 @@ dist/
 
 config/deployment/crds
 
-kind-data
+.chantico-persistent-volume

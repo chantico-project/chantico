@@ -7,7 +7,7 @@ VERSION ?= 0.5.20
 
 # Image URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
-DEVELOPMENT_VOLUMES = .development-volumes/
+KIND_VOLUME_MOUNT = .chantico-persistent-volume
 
 SNMP_MOCK_TAG ?= latest
 SNMP_MOCK_IMAGE = ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
@@ -85,16 +85,16 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
-.PHONE: create-development-volumes ## this is sometimes needed for Docker, so the folder is owned by the user, rather than root
-create-development-volumes:
-	mkdir $(DEVELOPMENT_VOLUMES) || true
+.PHONE: create-kind-volume-mount ## this is sometimes needed for Docker, so the folder is owned by the user, rather than root
+create-kind-volume-mount:
+	mkdir $(KIND_VOLUME_MOUNT) || true
 
-.PHONE: delete-development-volumes
-delete-development-volumes:
-	rm -rf $(DEVELOPMENT_VOLUMES) || true
+.PHONE: delete-kind-volume-mount
+delete-kind-volume-mount:
+	rm -rf $(KIND_VOLUME_MOUNT) || true
 
 .PHONY: cluster-up
-cluster-up: kind create-development-volumes
+cluster-up: kind create-kind-volume-mount
 	$(KIND) create cluster --config ./dev/kind-config.yaml
 
 .PHONY: cluster-down
@@ -102,18 +102,18 @@ cluster-down: kind
 	$(KIND) delete cluster || true
 
 .PHONY: cluster-clean
-cluster-clean: cluster-down delete-development-volumes
+cluster-clean: cluster-down delete-kind-volume-mount
 
 .PHONY: cluster-configure
 cluster-configure: sync-deployment-crds
 	$(KUBECTL) create namespace chantico
 	helm install chantico \
 		config/deployment/ \
+		--namespace chantico \
 		--set controller.include=false \
 		--set pvc.storageClassName="manual" \
-		-n chantico \
-    	--set securityContext.runAsUser="$(id -u)" \
-		--set securityContext.runAsGroup="$(id -g)"
+    	--set securityContext.runAsUser="$(shell id -u)" \
+		--set securityContext.runAsGroup="$(shell id -g)"
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
 	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
 	$(KIND) load docker-image chantico-snmp-mock:latest --name kind

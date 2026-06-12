@@ -5,7 +5,7 @@ metadata:
   name: {{ .Values.persistentVolumeClaimName }}
   namespace: {{ .Release.Namespace }}
 spec:
-  volumeName: fixed-pv
+  volumeName: chantico-persistent-volume
   storageClassName: manual
   accessModes:
     {{- toYaml .Values.pvc.accessModes | nindent 4 }}
@@ -16,13 +16,13 @@ spec:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: fixed-pv 
+  name: chantico-persistent-volume
 spec:
   capacity:
     storage: {{ .Values.pvc.storage }}
   storageClassName: manual
   hostPath:
-    path: /data/fixed-pv
+    path: /data/chantico-persistent-volume
   accessModes:
   - ReadWriteOnce
 {{- end }}
