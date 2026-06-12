@@ -16,8 +16,11 @@ spec:
         app: chantico-prometheus
     spec:
       securityContext:
-        runAsUser: 65534
-        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - image: docker.io/prom/prometheus:v3.7.3
         name: prometheus
@@ -95,9 +98,16 @@ metadata:
   name: chantico-prometheus
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- if .Values.prometheus.service.type }}
+  type: {{ .Values.prometheus.service.type }}
+  {{- end }}
   selector:
     app: chantico-prometheus
   ports:
     - protocol: TCP
       port: 9090
-      targetPort: 9090
+      {{- if eq .Values.prometheus.service.type "NodePort" }}
+      nodePort: 30001
+      {{- else }}
+      targetPort: 9090    
+      {{- end }}

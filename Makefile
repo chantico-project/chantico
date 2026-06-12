@@ -7,6 +7,15 @@ VERSION ?= 0.5.20
 
 # Image URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
+CHANTICO_DATA_PATH ?= .chantico-persistent-volume
+CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
+CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
+
+LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
+LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
+
+SNMP_MOCK_TAG ?= latest
+SNMP_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -81,17 +90,57 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
-.PHONY: setup-kind
-setup-kind: ./dev/setup.sh ## Setup kind cluster for local deployment
-	./dev/setup.sh
+.PHONE: cluster-create-mount ## this is sometimes needed for Docker, so the folder is owned by the user, rather than root
+cluster-create-mount:
+	mkdir $(CHANTICO_DATA_PATH) || true
 
-.PHONY: port-forward
-port-forward: ./dev/port-forward.sh ## Forward ports from local kind deployment
-	./dev/port-forward.sh
+.PHONE: cluster-delete-mount
+cluster-delete-mount:
+	rm -rf $(CHANTICO_DATA_PATH) || true
 
-.PHONY: teardown-kind
-teardown-kind: ./dev/teardown.sh ## Tear down kind cluster to clean up local deployment
-	./dev/teardown.sh
+.PHONY: cluster-up
+cluster-up: kind cluster-create-mount
+	$(KIND) create cluster --config ./dev/kind-config.yaml
+
+.PHONY: cluster-down
+cluster-down: kind
+	$(KIND) delete cluster || true
+
+.PHONY: cluster-clean
+cluster-clean: cluster-down cluster-delete-mount
+
+.PHONY: cluster-configure
+cluster-configure: sync-deployment-crds
+# 	idempotent function to create namespace
+	$(KUBECTL) create namespace chantico --dry-run=client -o yaml | $(KUBECTL) apply -f -
+# 	idempotent helm installation
+	helm upgrade --install chantico ./chart/ \
+		--namespace chantico \
+		--set controller.include=false \
+    	--set securityContext.runAsUser="$(shell id -u)" \
+		--set securityContext.runAsGroup="$(shell id -g)" \
+		--set persistentVolumeClaimName=$(CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME) \
+		--set pvc.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
+		--set pvc.volumeName=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
+		--set pv.include=true \
+		--set pv.name=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
+		--set pv.storage=$(LOCAL_DEVELOPMENT_STORAGE) \
+		--set pv.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
+		--set pv.hostPath.path="/data/chantico-persistent-volume" \
+		--set snmp.service.type="NodePort" \
+		--set filebrowser.service.type="NodePort" \
+		--set prometheus.service.type="NodePort"
+	
+	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
+	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
+	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
+	$(KUBECTL) apply -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
+	$(KUBECTL) apply -f dev/k8s/snmp-mock-deployment.yaml
+	$(KUBECTL) apply -f dev/k8s/snmp-mock-service.yaml
+
+.PHONY: cluster-mibs
+cluster-mibs: # Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
+	cp dev/mibs/* $(CHANTICO_DATA_PATH)/snmp/mibs/
 
 ##@ Build
 
@@ -114,7 +163,7 @@ docker-build: ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
-HELM_CHART_DIR ?= config/deployment
+HELM_CHART_DIR ?= chart
 GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
 
 .PHONY: helm-package
@@ -164,9 +213,9 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: sync-deployment-crds
 sync-deployment-crds:
-	mkdir -p config/deployment/crds
-	cp config/crds/bases/*.yaml config/deployment/crds/
-	sed -i'' -e '/^\s*format: int64$$/d' config/deployment/crds/*.yaml
+	mkdir -p chart/crds
+	cp config/crds/bases/*.yaml chart/crds/
+	sed -i'' -e '/^\s*format: int64$$/d' chart/crds/*.yaml
 
 ##@ Dependencies
 
@@ -197,12 +246,15 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+KIND ?= $(LOCALBIN)/kind
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.3
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.19
 GOLANGCI_LINT_VERSION ?= v1.59.1
+KIND_VERSION ?= v0.30.0
+
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -223,3 +275,28 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+
+.PHONY: kind
+kind: $(KIND) ## Download kind locally if necessary.
+$(KIND): $(LOCALBIN)
+	$(call go-install-tool,$(KIND),sigs.k8s.io/kind,$(KIND_VERSION))
+
+# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
+# $1 - target path with name of binary
+# $2 - package url which can be installed
+# $3 - specific version of package
+define go-install-tool
+@[ -f "$(1)-$(3)" ] && [ "$$(readlink -- "$(1)" 2>/dev/null)" = "$(1)-$(3)" ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Downloading $${package}" ;\
+rm -f "$(1)" ;\
+GOBIN="$(LOCALBIN)" go install $${package} ;\
+mv "$(LOCALBIN)/$$(basename "$(1)")" "$(1)-$(3)" ;\
+} ;\
+ln -sf "$$(realpath "$(1)-$(3)")" "$(1)"
+endef
+
+define gomodver
+$(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' $(1) 2>/dev/null)
+endef

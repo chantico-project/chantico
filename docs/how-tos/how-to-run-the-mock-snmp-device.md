@@ -17,10 +17,11 @@ Ensure you have followed the instructions in [How to set up the local developmen
 
 - The development cluster is running.
 - The controller is running (locally via `make run` or in-cluster).
-- Port-forwarding is active (`./dev/port-forward.sh`).
 
 
 ## Build and load the snmp-mock image into the kind environment
+
+<!-- this is now done by `make cluster-configure`, we should probably separate this -->
 
 ```bash
 export CI_REGISTRY="ghcr.io/chantico-project/images"
@@ -75,10 +76,6 @@ kubectl get jobs -n chantico | grep update-snmp
 kubectl apply -f ./config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
 ```
 
-1. Port-forward Prometheus and verify targets:
-```bash
-kubectl port-forward -n chantico deployment/chantico-prometheus 9090:9090
-```
 Open http://localhost:9090/targets and verify the target is `UP`.
 
 ### Adding another mock snmp device

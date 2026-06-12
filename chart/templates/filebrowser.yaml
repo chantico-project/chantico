@@ -15,8 +15,8 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 1000
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -53,9 +53,16 @@ metadata:
   name: chantico-filebrowser
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- if .Values.filebrowser.service.type }}
+  type: {{ .Values.filebrowser.service.type }}
+  {{- end }}
   selector:
     app: chantico-filebrowser
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 80
+      {{- if eq .Values.filebrowser.service.type "NodePort" }}
+      nodePort: 30000
+      {{- else }}
+      targetPort: 80    
+      {{- end }}

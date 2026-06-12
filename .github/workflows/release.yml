@@ -56,5 +56,5 @@ jobs:
           make sync-deployment-crds
           echo "${{ secrets.BOT_RELEASE_TOKEN }}" | helm registry login ghcr.io -u chantico-bot --password-stdin
           VERSION=${{ inputs.version }}
-          helm package config/deployment/ --version $VERSION --app-version v$VERSION
+          helm package chart/ --version $VERSION --app-version v$VERSION
           helm push chantico-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
