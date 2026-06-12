@@ -123,7 +123,7 @@ cluster-configure: sync-deployment-crds
 
 .PHONY: cluster-mibs
 cluster-mibs: # Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
-	cp dev/mibs/* $(DEVELOPMENT_VOLUMES)/pvc/chantico-snmp-prometheus-volume-claim/snmp/mibs/
+	cp dev/mibs/* $(KIND_VOLUME_MOUNT)/snmp/mibs/
 
 ##@ Build
 
