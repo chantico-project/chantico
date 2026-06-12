@@ -4,12 +4,15 @@ apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
     extraMounts:
-      - hostPath: ./kind-data/pvc/chantico-snmp-prometheus-volume-claim
-        containerPath: /data/fixed-pv
+    - hostPath: ./kind-data/pvc/chantico-snmp-prometheus-volume-claim
+      containerPath: /data/fixed-pv
     extraPortMappings:
-    - containerPort: 31161
-      hostPort: 31161
+    - hostPort: 31161 # chantico-snmp-mock
+      containerPort: 31161
       protocol: UDP
-    - containerPort: 31162
-      hostPort: 31162
-      protocol: UDP
+    - hostPort: 19116 # chantico-snmp
+      containerPort: 9116
+    - hostPort: 18888 # filebrowser
+      containerPort: 30000
+    - hostPort: 19090 # prometheus
+      containerPort: 30001

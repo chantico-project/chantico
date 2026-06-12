@@ -95,9 +95,10 @@ metadata:
   name: chantico-prometheus
   namespace: {{ .Release.Namespace }}
 spec:
+  type: NodePort
   selector:
     app: chantico-prometheus
   ports:
     - protocol: TCP
       port: 9090
-      targetPort: 9090
+      nodePort: 30001

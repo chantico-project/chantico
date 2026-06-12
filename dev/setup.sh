@@ -21,7 +21,7 @@ kind create cluster --config "$SCRIPT_DIR/kind-config.yaml"
 kubectl create namespace chantico
 
 # Create storageclass from https://github.com/rancher/local-path-provisioner
-kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.32/deploy/local-path-storage.yaml
+# kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.32/deploy/local-path-storage.yaml
 
 pushd "$SCRIPT_DIR"
 

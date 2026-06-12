@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   volumeName: fixed-pv
-  storageClassName: {{ .Values.pvc.storageClassName }}
+  storageClassName: manual
   accessModes:
     {{- toYaml .Values.pvc.accessModes | nindent 4 }}
   resources:
@@ -20,7 +20,7 @@ metadata:
 spec:
   capacity:
     storage: {{ .Values.pvc.storage }}
-  storageClassName: {{ .Values.pvc.storageClassName }}
+  storageClassName: manual
   hostPath:
     path: /data/fixed-pv
   accessModes:
