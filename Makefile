@@ -151,10 +151,14 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 	$(KUSTOMIZE) build config/crds | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: sync-deployment-crds
-sync-deployment-crds:
+sync-deployment-crds: ## Sync CRD manifests from kubebuilder base to deployment to be part of Helm chart.
 	mkdir -p config/deployment/crds
 	cp config/crds/bases/*.yaml config/deployment/crds/
 	sed -i'' -e '/^\s*format: int64$$/d' config/deployment/crds/*.yaml
+
+.PHONY: copy-mock-mib
+copy-mock-mib: ## Copy SNMP mock MIB file into a persistent volume on the cluster running chantico.
+	./dev/copy-mib-files.sh
 
 ##@ Dependencies
 
