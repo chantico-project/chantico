@@ -85,16 +85,16 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
-.PHONE: create-kind-volume-mount ## this is sometimes needed for Docker, so the folder is owned by the user, rather than root
-create-kind-volume-mount:
+.PHONE: cluster-create-mount ## this is sometimes needed for Docker, so the folder is owned by the user, rather than root
+cluster-create-mount:
 	mkdir $(KIND_VOLUME_MOUNT) || true
 
-.PHONE: delete-kind-volume-mount
-delete-kind-volume-mount:
+.PHONE: cluster-delete-mount
+cluster-delete-mount:
 	rm -rf $(KIND_VOLUME_MOUNT) || true
 
 .PHONY: cluster-up
-cluster-up: kind create-kind-volume-mount
+cluster-up: kind cluster-create-mount
 	$(KIND) create cluster --config ./dev/kind-config.yaml
 
 .PHONY: cluster-down
@@ -102,7 +102,7 @@ cluster-down: kind
 	$(KIND) delete cluster || true
 
 .PHONY: cluster-clean
-cluster-clean: cluster-down delete-kind-volume-mount
+cluster-clean: cluster-down cluster-delete-mount
 
 .PHONY: cluster-configure
 cluster-configure: sync-deployment-crds
