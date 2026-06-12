@@ -29,7 +29,8 @@ pushd "$SCRIPT_DIR"
 make -C ../ sync-deployment-crds
 
 # Install chantico dependencies (filebrowser, prometheus, snmp exporter)
-helm install chantico ../config/deployment/ --set controller.include=false --set pvc.storageClassName="local-path" -n chantico
+helm install chantico ../config/deployment/ --set controller.include=false --set pvc.storageClassName="local-path" -n chantico \
+    --set securityContext.runAsUser="$(id -u)" --set securityContext.runAsGroup="$(id -g)"
 
 # Load snmp-mock docker image
 SNMP_MOCK_IMAGE="ghcr.io/chantico-project/images/chantico-snmp-mock:${SNMP_MOCK_TAG}"

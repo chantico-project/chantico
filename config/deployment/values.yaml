@@ -13,4 +13,6 @@ pvc:
   storage: 3Gi
   accessModes:
     - ReadWriteOnce
-
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
