@@ -78,7 +78,7 @@ test: manifests generate ## Run tests.
 	go test ./internal/... -coverprofile cover.out
 
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
-.PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
+.PHONY: test-e2e  ## Run the e2e tests against a Kind k8s instance that is spun up.
 test-e2e:
 	go test ./test/e2e/ -v -ginkgo.v
 
@@ -90,27 +90,29 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
-.PHONE: cluster-create-mount ## this is sometimes needed for Docker, so the folder is owned by the user, rather than root
-cluster-create-mount:
+##@ Cluster management
+
+.PHONY: cluster-create-mount
+cluster-create-mount: ## Create data path for volume mount (this is sometimes needed for daemon based setups, so the folder is owned by the user, rather than root)
 	mkdir $(CHANTICO_DATA_PATH) || true
 
 .PHONE: cluster-delete-mount
-cluster-delete-mount:
+cluster-delete-mount: ## Remove data path for volume mount
 	rm -rf $(CHANTICO_DATA_PATH) || true
 
 .PHONY: cluster-up
-cluster-up: kind cluster-create-mount
+cluster-up: kind cluster-create-mount ## Create Kind cluster
 	$(KIND) create cluster --config ./dev/kind-config.yaml
 
 .PHONY: cluster-down
-cluster-down: kind
+cluster-down: kind ## Delete Kind cluster
 	$(KIND) delete cluster || true
 
 .PHONY: cluster-clean
-cluster-clean: cluster-down cluster-delete-mount
+cluster-clean: cluster-down cluster-delete-mount ## Delete Kind cluster and volume mount
 
 .PHONY: cluster-configure
-cluster-configure: sync-deployment-crds
+cluster-configure: sync-deployment-crds ## Configure cluster with namespace, helm installation and snmp mock
 # 	idempotent function to create namespace
 	$(KUBECTL) create namespace chantico --dry-run=client -o yaml | $(KUBECTL) apply -f -
 # 	idempotent helm installation
@@ -139,7 +141,7 @@ cluster-configure: sync-deployment-crds
 	$(KUBECTL) apply -f dev/k8s/snmp-mock-service.yaml
 
 .PHONY: cluster-mibs
-cluster-mibs: # Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
+cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
 	cp dev/mibs/* $(CHANTICO_DATA_PATH)/snmp/mibs/
 
 ##@ Build

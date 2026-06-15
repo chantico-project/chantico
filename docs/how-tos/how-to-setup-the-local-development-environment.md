@@ -44,9 +44,9 @@ Take into account that spinning up a Kubernetes cluster may take some time, and 
 
 You should now have access to:
 
-- [Filebrowser](localhost:18888) - username and password are both `admin`
-- [Prometheus](localhost:19090)
-- [SNMP Exporter](localhost:19116)
+- [Filebrowser](http://localhost:18888) - username and password are both `admin`
+- [Prometheus](http://localhost:19090)
+- [SNMP Exporter](http://localhost:19116)
 
 
 #### Running a demo
@@ -59,5 +59,5 @@ To stop the environment we have the following commands:
 
 ```bash
 make cluster-down   # stops the kind cluster, but keeps the data in the volume
-make cluster-clean  # sotps the kind cluster, and removes the data
+make cluster-clean  # stops the kind cluster, and removes the data
 ```
