@@ -33,11 +33,16 @@ have a look at the following
 
 ### Prerequisites
 
-- go version v1.24.13+
+To install the Helm-based deployment:
+- helm version 3.19+.
+- kubectl version v1.11.3+.
+
+Additionally, for development:
+- go version v1.24.13+.
+- make version 4.3+.
 - docker version 17.03+.
 
 If not using local development using kind:
-- kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.
 
 ## Contributing

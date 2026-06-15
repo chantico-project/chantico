@@ -8,17 +8,20 @@ menus:
 
 ### Prerequisites
 
-The development currently supports [WSL2](https://github.com/microsoft/WSL) and UNIX based environment.
+The development currently supports [WSL2](https://github.com/microsoft/WSL), 
+MacOS and UNIX based environment.
 
 It requires the following packages:
 
 - go version v1.24.13+
 - make version 4.3+
 - docker version v17.03+
-- kubectl version v0.30.0+
+- kubectl version v1.11.3+
 - helm version 3.19+
 
-Other useful binaries are versioned in the Makefile. These will be installed automatically when needed by the Makefile and are installed into the local `<root-project>/bin` folder.
+Other useful binaries, such as kind, are versioned in the Makefile. These will 
+be installed automatically when needed by the Makefile and are installed into 
+the local `<root-project>/bin` folder.
 
 
 ### Creating the environment
