@@ -7,6 +7,7 @@ import (
 
 	img "chantico/internal/images"
 	vol "chantico/internal/volumes"
+	"os"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -26,6 +27,9 @@ func BuildGeneratorJob(measurementDevice *chantico.MeasurementDevice) (*batchv1.
 	mibsDir := podPath.MIBsDir()
 	outputPath := podPath.SNMPFile(measurementDevice.GetUID())
 	backoffLimit := int32(0)
+	uid := int64(os.Getuid())
+	gid := int64(os.Getgid())
+	runAsNonRoot := uid != 0
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -39,6 +43,14 @@ func BuildGeneratorJob(measurementDevice *chantico.MeasurementDevice) (*batchv1.
 			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: &runAsNonRoot,
+						RunAsUser:    &uid,
+						RunAsGroup:   &gid,
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:  "snmp-generator",
