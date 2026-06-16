@@ -21,13 +21,13 @@ jobs:
     continue-on-error: true
     if: github.repository == 'chantico-project/chantico'
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
+      group: ${{ github.workflow }}-v${{ inputs.version }}
       cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: v${{ inputs.version }}
+          ref: refs/tags/v${{ inputs.version }}
           fetch-depth: 0
 
       - name: Run GoReleaser
@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: v${{ inputs.version }}
+          ref: refs/tags/v${{ inputs.version }}
 
       - name: Setup Helm
         uses: azure/setup-helm@v5
