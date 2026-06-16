@@ -1,3 +1,13 @@
+## 0.5.21 (2026-06-16)
+
+#### Bug Fixes
+
+* Prometheus reloading fails after configuring a DataCenterResource (#149) (fea1417d)
+
+#### Chores
+
+* New dev targets in Makefile (#137) (1a274f49)
+
 ## 0.5.20 (2026-06-05)
 
 #### Bug Fixes
