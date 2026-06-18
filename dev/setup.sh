@@ -31,14 +31,7 @@ helm install chantico ../config/deployment/ --set controller.include=false --set
 SNMP_MOCK_IMAGE="$CI_REGISTRY/chantico-snmp-mock:$SNMP_MOCK_TAG"
 docker pull "$SNMP_MOCK_IMAGE"
 docker tag "$SNMP_MOCK_IMAGE" chantico-snmp-mock:latest
-kind load docker-image chantico-snmp-mock:latest --name kind
-
-# Copy mock MIB file onto the PVC so the SNMP generator job can find it.
-# In production this is done manually via the filebrowser UI.
-echo "Waiting for chantico-filebrowser to be ready..."
-kubectl rollout status deployment/chantico-filebrowser -n chantico --timeout=120s
-kubectl exec -n chantico deployment/chantico-filebrowser -- mkdir -p /srv/snmp/mibs
-kubectl cp "$SCRIPT_DIR/TNO-PDU-MIB.txt" chantico/$(kubectl get pod -n chantico -l app=chantico-filebrowser -o jsonpath='{.items[0].metadata.name}'):/srv/snmp/mibs/TNO-PDU-MIB.txt
+kind load docker-image chantico-snmp-mock:latest --name kind 
 
 # Apply to k8s
 kubectl apply -f ../config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
