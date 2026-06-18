@@ -2,6 +2,7 @@ persistentVolumeClaimName: chantico-snmp-prometheus-volume-claim
 prometheusRetention: 5h
 snmpExporterAddress: chantico-snmp:9116
 victoriaMetrics:
+  include: true
   # Long-term retention period (e.g. 12 months)
   retention: 12
   # Storage path inside the PVC subPath
@@ -18,4 +19,3 @@ pvc:
   storage: 3Gi
   accessModes:
     - ReadWriteOnce
-

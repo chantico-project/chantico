@@ -1,3 +1,4 @@
+{{- if .Values.victoriaMetrics.include }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -126,3 +127,4 @@ spec:
     - protocol: TCP
       port: 8428
       targetPort: 8428
+{{- end }}
