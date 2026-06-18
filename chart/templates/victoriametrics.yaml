@@ -17,8 +17,11 @@ spec:
         app: chantico-victoriametrics
     spec:
       securityContext:
-        runAsUser: 65534
-        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - image: victoriametrics/victoria-metrics:v1.115.0
         name: victoriametrics
@@ -121,10 +124,17 @@ metadata:
   name: chantico-victoriametrics
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- if .Values.victoriaMetrics.service.type }}
+  type: {{ .Values.victoriaMetrics.service.type }}
+  {{- end }}
   selector:
     app: chantico-victoriametrics
   ports:
     - protocol: TCP
       port: 8428
+      {{- if eq .Values.victoriaMetrics.service.type "NodePort" }}
+      nodePort: 30003
+      {{- else }}
       targetPort: 8428
+      {{- end }}
 {{- end }}

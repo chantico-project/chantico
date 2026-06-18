@@ -1,0 +1,5 @@
+# Required by Chantico
+export CHANTICO_PROMETHEUS_SERVICE_HOST="localhost"
+export CHANTICO_PROMETHEUS_SERVICE_PORT="19090"
+export CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME="chantico-persistent-volume-claim"
+export CHANTICO_DATA_PATH=".chantico-persistent-volume"

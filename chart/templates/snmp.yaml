@@ -16,7 +16,11 @@ spec:
         app: chantico-snmp
     spec:
       securityContext:
-        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - image: docker.io/ricardbejarano/snmp_exporter:0.26.0
         name: snmp
@@ -65,10 +69,18 @@ apiVersion: v1
 kind: Service
 metadata:
   name: chantico-snmp
+  namespace: {{ .Release.Namespace }}
 spec:
+  {{- if .Values.snmp.service.type }}
+  type: {{ .Values.snmp.service.type }}
+  {{- end }}
   selector:
     app: chantico-snmp
   ports:
     - protocol: TCP
       port: 9116
-      targetPort: 9116
+      {{- if eq .Values.snmp.service.type "NodePort" }}
+      nodePort: 30002
+      {{- else }}
+      targetPort: 9116    
+      {{- end }}

@@ -263,12 +263,12 @@ jobs:
           mv CHANGELOG-temp.md CHANGELOG.md
           # Commit updated versions in files if changed
           sed -E -i "s/^VERSION([ ?]*)=.*/VERSION\1= $VERSION/" Makefile
-          sed -i "s/^version:.*/version: $VERSION/" config/deployment/Chart.yaml
-          sed -i "s/appVersion:.*/appVersion: \"v$VERSION\"/" config/deployment/Chart.yaml
-          sed -i "s|org.opencontainers.image.version:.*|org.opencontainers.image.version: $VERSION|" config/deployment/Chart.yaml
-          sed -Ei "s|org.opencontainers.image.description: \"(.*)--version.*\`\"|org.opencontainers.image.description: \"\1--version $VERSION\`\"|" config/deployment/Chart.yaml
+          sed -i "s/^version:.*/version: $VERSION/" chart/Chart.yaml
+          sed -i "s/appVersion:.*/appVersion: \"v$VERSION\"/" chart/Chart.yaml
+          sed -i "s|org.opencontainers.image.version:.*|org.opencontainers.image.version: $VERSION|" chart/Chart.yaml
+          sed -Ei "s|org.opencontainers.image.description: \"(.*)--version.*\`\"|org.opencontainers.image.description: \"\1--version $VERSION\`\"|" chart/Chart.yaml
           if ! git diff --quiet; then
-            git add CHANGELOG.md Makefile config/deployment/Chart.yaml
+            git add CHANGELOG.md Makefile chart/Chart.yaml
             git commit -m "bump version to v$VERSION [skip ci]"
             git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY HEAD:${GITHUB_REF_NAME}
           fi

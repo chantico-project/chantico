@@ -16,7 +16,7 @@ helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico
 
 - The command above installs the latest version of Chantico. See available [chart versions](https://github.com/chantico-project/chantico/pkgs/container/charts%2Fchantico). Also check out the [releases](https://github.com/chantico-project/chantico/releases) or the [changelog](/technical/changelog.md) on the documentation website for the list of changes throughout the version history.
 
-- Inspect the [values.yaml](https://github.com/chantico-project/chantico/blob/main/config/deployment/values.yaml) file to see what parameters can be provided. For example, excluding the Chantico controller from the installation can be done with `--set controller.include=false`.
+- Inspect the [values.yaml](https://github.com/chantico-project/chantico/blob/main/chart/values.yaml) file to see what parameters can be provided. For example, excluding the Chantico controller from the installation can be done with `--set controller.include=false`.
 
 ## Upgrading using OCI Registry
 
