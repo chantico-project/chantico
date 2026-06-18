@@ -1,3 +1,9 @@
+## 0.6.0 (2026-06-18)
+
+#### Feature
+
+* Time series aggregation with VictoriaMetrics (#106) (271040cc)
+
 ## 0.5.21 (2026-06-16)
 
 #### Bug Fixes
