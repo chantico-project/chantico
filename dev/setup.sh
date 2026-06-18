@@ -35,7 +35,7 @@ helm install chantico ../config/deployment/ --set controller.include=false --set
 SNMP_MOCK_IMAGE="ghcr.io/chantico-project/images/chantico-snmp-mock:${SNMP_MOCK_TAG}"
 docker pull "$SNMP_MOCK_IMAGE"
 docker tag "$SNMP_MOCK_IMAGE" chantico-snmp-mock:latest
-kind load docker-image chantico-snmp-mock:latest --name kind
+kind load docker-image chantico-snmp-mock:latest --name kind 
 
 # Apply to k8s
 kubectl apply -f ../config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
