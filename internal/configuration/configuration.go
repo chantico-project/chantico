@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 const (
@@ -13,6 +14,7 @@ const (
 	ChanticoVolumeClaimEnv           = "CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME"
 	ChanticoPrometheusServiceHostEnv = "CHANTICO_PROMETHEUS_SERVICE_HOST"
 	ChanticoPrometheusServicePortEnv = "CHANTICO_PROMETHEUS_SERVICE_PORT"
+	ValidateHostPortTimeout          = 5 * time.Second
 )
 
 type validatedEnv struct {
@@ -59,10 +61,9 @@ func ValidateEnv() (validatedEnv, []error) {
 		err = validateHostPort(prometheusServiceHost, prometheusServicePort)
 		if err != nil {
 			errs = append(errs, err)
+			ret.PrometheusServiceHost = ""
+			ret.PrometheusServicePort = ""
 		}
-		ret.PrometheusServiceHost = ""
-		ret.PrometheusServicePort = ""
-
 	}
 	if len(errs) > 0 {
 		return ret, errs
@@ -72,11 +73,14 @@ func ValidateEnv() (validatedEnv, []error) {
 }
 
 func validateHostPort(host, port string) error {
-	conn, err := net.Dial("tcp", net.JoinHostPort(host, port))
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), ValidateHostPortTimeout)
 	if err != nil {
-		return fmt.Errorf("cannot connect to host '%s': %w. If this is a development environment, make sure port forwarding has started.", net.JoinHostPort(host, port), err)
+		return fmt.Errorf("cannot connect to host '%s': %w. If this is a development environment, make sure port forwarding has started", net.JoinHostPort(host, port), err)
 	} else {
-		conn.Close()
+		err = conn.Close()
+		if err != nil {
+			return fmt.Errorf("error closing connection to host '%s': %w", net.JoinHostPort(host, port), err)
+		}
 		return nil
 	}
 }

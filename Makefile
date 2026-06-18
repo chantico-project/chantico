@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.5.20
+VERSION ?= 0.5.21
 
 # Image URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
@@ -131,7 +131,8 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace, hel
 		--set pv.hostPath.path="/data/chantico-persistent-volume" \
 		--set snmp.service.type="NodePort" \
 		--set filebrowser.service.type="NodePort" \
-		--set prometheus.service.type="NodePort"
+		--set prometheus.service.type="NodePort" \
+		--set victoriaMetrics.service.type="NodePort"
 	
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
 	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
@@ -254,9 +255,8 @@ KIND ?= $(LOCALBIN)/kind
 KUSTOMIZE_VERSION ?= v5.4.3
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.19
-GOLANGCI_LINT_VERSION ?= v1.59.1
+GOLANGCI_LINT_VERSION ?= v2.12.2
 KIND_VERSION ?= v0.30.0
-
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -276,7 +276,7 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
 .PHONY: kind
 kind: $(KIND) ## Download kind locally if necessary.

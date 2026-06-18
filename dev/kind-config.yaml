@@ -4,15 +4,17 @@ apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
     extraMounts:
-    - hostPath: ./.chantico-persistent-volume
-      containerPath: /data/chantico-persistent-volume
+      - hostPath: ./.chantico-persistent-volume
+        containerPath: /data/chantico-persistent-volume
     extraPortMappings:
-    - hostPort: 18888       # filebrowser
-      containerPort: 30000
-    - hostPort: 19090       # prometheus
-      containerPort: 30001
-    - hostPort: 19116       # snmp-exporter
-      containerPort: 30002
-    - hostPort: 31161       # snmp-mock-device
-      containerPort: 31161
-      protocol: UDP
+      - hostPort: 18888 # filebrowser
+        containerPort: 30000
+      - hostPort: 19090 # prometheus
+        containerPort: 30001
+      - hostPort: 19116 # snmp-exporter
+        containerPort: 30002
+      - hostPort: 18428 # victoria-metrics
+        containerPort: 30003
+      - hostPort: 31161 # snmp-mock-device
+        containerPort: 31161
+        protocol: UDP

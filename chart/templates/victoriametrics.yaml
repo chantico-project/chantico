@@ -1,0 +1,140 @@
+{{- if .Values.victoriaMetrics.include }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: chantico
+  name: chantico-victoriametrics
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chantico-victoriametrics
+  template:
+    metadata:
+      labels:
+        app: chantico-victoriametrics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - image: victoriametrics/victoria-metrics:v1.115.0
+        name: victoriametrics
+        args:
+          - -storageDataPath={{ .Values.victoriaMetrics.storagePath }}
+          - -retentionPeriod={{ .Values.victoriaMetrics.retention }}
+          - -httpListenAddr=:8428
+        volumeMounts:
+        - mountPath: "/tmp/victoria-metrics-volume"
+          name: chantico-volume-mount
+          subPath: "victoria-metrics"
+        ports:
+        - containerPort: 8428
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+      # vmalert evaluates recording rules against VictoriaMetrics every minute
+      # and writes the results back, producing the per-minute downsampled series.
+      - image: victoriametrics/vmalert:v1.115.0
+        name: vmalert
+        args:
+          - -rule=/tmp/victoria-metrics-volume/rules/*.yml
+          - -evaluationInterval=1m
+          - -datasource.url=http://localhost:8428
+          - -remoteWrite.url=http://localhost:8428
+          - -remoteRead.url=http://localhost:8428
+          - -httpListenAddr=:8880
+        volumeMounts:
+        - mountPath: "/tmp/victoria-metrics-volume"
+          name: chantico-volume-mount
+          subPath: "victoria-metrics"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+      initContainers:
+      - image: busybox
+        name: victoriametrics-initialization
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            mkdir -m 777 -p /tmp/chantico-volume-mount/victoria-metrics/storage;
+            mkdir -m 777 -p /tmp/chantico-volume-mount/victoria-metrics/rules;
+            # Write a recording-rule file that downsamples every energy metric
+            # to a 1-minute average. The rule group runs every 1 minute, so the
+            # resulting timeseries contains one data point per minute regardless
+            # of how frequently Prometheus scraped and forwarded the raw data.
+            #
+            # Pattern matched: datacenter:*:energy_watts  (all energy accounting
+            # metrics written by Chantico's Prometheus recording rules).
+            #
+            # The downsampled series carry an extra label `resolution="1m"` so
+            # that queries can easily distinguish them from the raw forwarded
+            # data.  Raw data is still queryable in VictoriaMetrics for the full
+            # retention period; the 1-minute series are simply an additional,
+            # cheaper layer on top.
+            cat > /tmp/chantico-volume-mount/victoria-metrics/rules/downsample.yml <<'EOF'
+            groups:
+              - name: energy_downsample_1m
+                interval: 1m
+                rules:
+                  - record: datacenter:energy_watts:avg1m
+                    expr: >
+                      label_replace(
+                        avg_over_time({__name__=~"datacenter:.+:energy_watts"}[1m]),
+                        "resolution", "1m", "", ""
+                      )
+            EOF
+            chmod -R 1777 /tmp/chantico-volume-mount/victoria-metrics
+        volumeMounts:
+        - mountPath: "/tmp/chantico-volume-mount"
+          name: chantico-volume-mount
+      volumes:
+      - name: chantico-volume-mount
+        persistentVolumeClaim:
+          claimName: {{ .Values.persistentVolumeClaimName }}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chantico-victoriametrics
+  namespace: {{ .Release.Namespace }}
+spec:
+  {{- if .Values.victoriaMetrics.service.type }}
+  type: {{ .Values.victoriaMetrics.service.type }}
+  {{- end }}
+  selector:
+    app: chantico-victoriametrics
+  ports:
+    - protocol: TCP
+      port: 8428
+      {{- if eq .Values.victoriaMetrics.service.type "NodePort" }}
+      nodePort: 30003
+      {{- else }}
+      targetPort: 8428
+      {{- end }}
+{{- end }}

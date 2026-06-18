@@ -67,6 +67,10 @@ spec:
               evaluation_interval: 5s
             rule_files:
               - /tmp/prometheus-volume/rules/*.yml
+            {{- if .Values.victoriaMetrics.include }}
+            remote_write:
+              - url: http://chantico-victoriametrics:8428/api/v1/write
+            {{- end }}
             scrape_configs:
               - job_name: snmp
                 file_sd_configs:

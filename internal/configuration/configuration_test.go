@@ -50,7 +50,7 @@ func testUnsetBadEnv(t *testing.T, env string, val string, tester func(validated
 func testIdentity(env validatedEnv) bool { return true }
 
 func TestUnsetVar(t *testing.T) {
-	os.Unsetenv(ChanticoVolumeClaimEnv)
+	_ = os.Unsetenv(ChanticoVolumeClaimEnv)
 	testUnsetBadEnv(t, ChanticoVolumeClaimEnv, "[UNSET]", testIdentity)
 }
 
@@ -62,15 +62,15 @@ func TestEmptyVars(t *testing.T) {
 func TestAllVarsOkay(t *testing.T) {
 	const goodClaim = "test-test-test"
 	var goodLocation = os.Getenv("PWD")
-	const goodUrl = "example.com"
-	const goodPort = "80"
+	const goodUrl = "github.com"
+	const goodPort = "443"
 
 	t.Parallel() // This test cannot run in parallel with the others, because the environment variables may interfere
 
-	os.Setenv(ChanticoVolumeClaimEnv, goodClaim)
-	os.Setenv(ChanticoVolumeLocationEnv, goodLocation)
-	os.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
-	os.Setenv(ChanticoPrometheusServicePortEnv, goodPort)
+	_ = os.Setenv(ChanticoVolumeClaimEnv, goodClaim)
+	_ = os.Setenv(ChanticoVolumeLocationEnv, goodLocation)
+	_ = os.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
+	_ = os.Setenv(ChanticoPrometheusServicePortEnv, goodPort)
 
 	_, errs := ValidateEnv()
 
@@ -102,14 +102,17 @@ func TestVolumeIsDir(t *testing.T) {
 	if err != nil {
 		t.Error("Error creating temporary file, this should not happen")
 	}
-	defer os.Remove(file.Name())
+	defer func() {
+		_ = os.Remove(file.Name())
+	}()
 
 	var fileName = file.Name()
 	testBadEnv(t, ChanticoVolumeLocationEnv, fileName, testIdentity)
 }
 
 func TestParseNetwork(t *testing.T) {
-	const goodUrl = "example.com"
+	const goodUrl = "github.com"
+	t.Setenv(ChanticoPrometheusServicePortEnv, "443")
 	var testGoodUrl = func(env validatedEnv) bool { return env.PrometheusServiceHost == goodUrl }
 	testGoodEnv(t, ChanticoPrometheusServiceHostEnv, goodUrl, testGoodUrl)
 
@@ -129,8 +132,8 @@ func TestParseNetwork(t *testing.T) {
 func TestBadHostPort(t *testing.T) {
 	const goodUrl = "localhost"
 	const reservedPort = "2" // Port 2 is reserved by the IANA (iana.org). Should be unused on all computer environments
-	os.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
-	os.Setenv(ChanticoPrometheusServicePortEnv, reservedPort)
+	t.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
+	t.Setenv(ChanticoPrometheusServicePortEnv, reservedPort)
 
 	ValidatedEnv, errs := ValidateEnv()
 
@@ -153,11 +156,14 @@ func TestBadHostPort(t *testing.T) {
 }
 
 func TestGoodHostPort(t *testing.T) {
-	const goodUrl = "example.com"
-	const goodPort = "80"
+	const goodUrl = "github.com"
+	const goodPort = "443"
 
-	os.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
-	os.Setenv(ChanticoPrometheusServicePortEnv, goodPort)
+	t.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
+	t.Setenv(ChanticoPrometheusServicePortEnv, goodPort)
 
-	testGoodEnv(t, ChanticoPrometheusServiceHostEnv, goodUrl, testIdentity)
+	var testGoodHostPort = func(env validatedEnv) bool {
+		return env.PrometheusServiceHost == goodUrl && env.PrometheusServicePort == goodPort
+	}
+	testGoodEnv(t, ChanticoPrometheusServiceHostEnv, goodUrl, testGoodHostPort)
 }
