@@ -2,9 +2,9 @@ package physicalmeasurement
 
 import (
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	ph "chantico/internal/patch"
 	sm "chantico/internal/statemachine"
-	vol "chantico/internal/volumes"
 	"context"
 	"os"
 	"path/filepath"
@@ -44,7 +44,7 @@ func WriteTargetFile(
 
 	target := CreateFileSDTarget(physicalMeasurement.Spec.MeasurementDevice, physicalMeasurement.Spec.Ip)
 
-	volumePath := os.Getenv(vol.ChanticoVolumeLocationEnv)
+	volumePath := config.ValidatedEnv.VolumeLocation
 	targetsDir := filepath.Join(volumePath, prometheusTargetsDir)
 	if err := os.MkdirAll(targetsDir, 0777); err != nil {
 		physicalMeasurement.Status.State = StateFailed
@@ -74,7 +74,7 @@ func DeleteTargetFile(
 	physicalMeasurement *chantico.PhysicalMeasurement,
 ) *sm.ActionResult {
 	l := log.FromContext(ctx)
-	volumePath := os.Getenv(vol.ChanticoVolumeLocationEnv)
+	volumePath := config.ValidatedEnv.VolumeLocation
 	targetPath := filepath.Join(volumePath, prometheusTargetsDir, physicalMeasurement.Name+".json")
 
 	l.Info("Deleting target file")

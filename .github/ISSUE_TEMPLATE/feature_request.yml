@@ -1,0 +1,20 @@
+name: ✨ Feature Request
+description: Suggest a new idea or enhancement for Chantico
+title: "[FEATURE] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What would you like to be added?
+      description: Describe the feature you would like to see, including the motivation or problem it solves. Also please have a look at our roadmap to check if this feature aligns with it, https://chantico-project.github.io/chantico/roadmap/
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why is this feature desired?
+      description: Please explain the improvements or benefits of this feature.
+    validations:
+      required: false

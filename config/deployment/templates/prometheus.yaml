@@ -19,7 +19,7 @@ spec:
         runAsUser: 65534
         fsGroup: 1000
       containers:
-      - image: prom/prometheus:v3.7.3
+      - image: docker.io/prom/prometheus:v3.7.3
         name: prometheus
         command: ["prometheus"]
         args: ["--config.file=/tmp/prometheus-volume/yml/prometheus.yml", "--storage.tsdb.path=/tmp/prometheus-volume/storage", "--storage.tsdb.retention.time={{ .Values.prometheusRetention }}", "--web.enable-lifecycle", "--storage.tsdb.no-lockfile"]
@@ -38,7 +38,7 @@ spec:
           seccompProfile:
             type: RuntimeDefault
       initContainers:
-      - image: busybox
+      - image: docker.io/library/busybox:1.36.1-glibc
         name: prometheus-initialization
         securityContext:
           allowPrivilegeEscalation: false

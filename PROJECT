@@ -2,7 +2,7 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: ci.tno.nl
+domain: chantico-project.github.io
 layout:
 - go.kubebuilder.io/v4
 plugins:
@@ -15,25 +15,25 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: ci.tno.nl
+  domain: chantico-project.github.io
   group: chantico
   kind: MeasurementDevice
-  path: ci.tno.nl/gitlab/ipcei-cis-misd-sustainable-datacenters/wp2/energy-domain-controller/chantico/api/v1alpha1
+  path: chantico/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: ci.tno.nl
+  domain: chantico-project.github.io
   group: chantico
   kind: PhysicalMeasurement
-  path: ci.tno.nl/gitlab/ipcei-cis-misd-sustainable-datacenters/wp2/energy-domain-controller/chantico/api/v1alpha1
+  path: chantico/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: ci.tno.nl
+  domain: chantico-project.github.io
   group: chantico
   kind: DataCenterResource
   path: chantico/api/v1alpha1

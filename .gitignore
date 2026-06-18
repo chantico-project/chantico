@@ -13,14 +13,15 @@ Dockerfile.cross
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 *.xml
+report.json
 
 # Go workspace file
 go.work
 
 # Documentation additions
-docs/api/
 docs/assets/css/
-docs/changelog.md
+docs/technical/api/
+docs/technical/changelog.md
 # Hugo generated output
 .hugo_build.lock
 docs/hugo/public/
@@ -53,8 +54,11 @@ osv-scanner-report*.json
 .semrel/
 semantic-release
 .version*
+CHANGELOG-*.md
 # Added by goreleaser init:
 dist/
 
 # direnv
 .direnv
+
+config/deployment/crds

@@ -21,7 +21,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: filebrowser
-        image: filebrowser/filebrowser:v2.32.2
+        image: docker.io/filebrowser/filebrowser:v2.32.2
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

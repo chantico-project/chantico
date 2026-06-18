@@ -21,22 +21,16 @@ It requires the following packages:
 
 ### Installation
 
-- Login your docker client:
-
-  ```bash
-  docker login ci.tno.nl
-  ```
-
 - To install the kind docker cluster, run:
 
   ```bash
-  ./dev/setup.sh
+  make setup-kind
   ```
 
 - In a separate terminal, setup the port forward:
 
   ```bash
-  ./dev/port-forward.sh
+  make port-forward
   ```
   
   Redo this command whenever you end it to help developing.
@@ -65,8 +59,8 @@ After setting up the local development environment, you are ready to run the dem
 
 ### Teardown
 
-To teardown a local installation of the kind cluster, run the script:
+To teardown a local installation of the kind cluster, run the following:
 
 ```bash
-./dev/teardown.sh
+make teardown-kind
 ```

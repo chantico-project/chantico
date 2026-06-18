@@ -1,18 +1,21 @@
 persistentVolumeClaimName: chantico-snmp-prometheus-volume-claim
 prometheusRetention: 5h
 snmpExporterAddress: chantico-snmp:9116
-imagePullSecretName: regcred
 victoriaMetrics:
   # Long-term retention period (e.g. 12 months)
   retention: 12
   # Storage path inside the PVC subPath
   storagePath: /tmp/victoria-metrics-volume/storage
+imagePullSecretName: "" # Set if pulled from private registry, otherwise leave empty
 controller:
   include: true
-  image: ""
+  image:
+    repository: "ghcr.io/chantico-project/images/chantico"
+    tag: "" # defaults to Chart.version
 pvc:
   include: true
   storageClassName: "csi-rbd"
   storage: 3Gi
   accessModes:
     - ReadWriteOnce
+

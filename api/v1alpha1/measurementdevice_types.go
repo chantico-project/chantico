@@ -17,47 +17,38 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"chantico/internal/snmp"
+	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// Courtesy of the snmp_exporter repository: https://github.com/prometheus/snmp_exporter/blob/main/config/config.go
-type Auth struct {
-	Community     string `yaml:"community,omitempty" json:"community,omitempty"`
-	SecurityLevel string `yaml:"security_level,omitempty" json:"security_level,omitempty"`
-	Username      string `yaml:"username,omitempty" json:"username,omitempty"`
-	Password      string `yaml:"password,omitempty" json:"password,omitempty"`
-	AuthProtocol  string `yaml:"auth_protocol,omitempty" json:"auth_protocol,omitempty"`
-	PrivProtocol  string `yaml:"priv_protocol,omitempty" json:"priv_protocol,omitempty"`
-	PrivPassword  string `yaml:"priv_password,omitempty" json:"priv_password,omitempty"`
-	ContextName   string `yaml:"context_name,omitempty" json:"context_name,omitempty"`
-	Version       int    `yaml:"version,omitempty" json:"version,omitempty"`
-}
 
 // MeasurementDeviceSpec defines the desired state of MeasurementDevice
 type MeasurementDeviceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of MeasurementDevice. Edit measurementdevice_types.go to remove/update
-	Walks []string `yaml:"walks" json:"walks"`
-	Auth  Auth     `yaml:"auth" json:"auth"`
+	Walks []string           `yaml:"walks" json:"walks"`
+	Auth  snmp.GeneratorAuth `yaml:"auth" json:"auth"`
 }
 
 // MeasurementDeviceStatus defines the observed state of MeasurementDevice
 type MeasurementDeviceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	State            string `json:"state,omitempty"`
-	JobName          string `json:"jobName,omitempty"`
-	UpdateTime       string `json:"updateTime,omitempty"`
-	UpdateGeneration int64  `json:"updateGeneration,omitempty"`
-	ErrorMessage     string `json:"errorMessage,omitempty"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	ConfigHash         string             `json:"configHash,omitempty"`
+	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[-1].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[-1].reason`
+// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.status.conditions[-1].type`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // MeasurementDevice is the Schema for the measurementdevices API
 type MeasurementDevice struct {
@@ -82,16 +73,8 @@ func init() {
 }
 
 const (
-	SNMPUpdateFinalizer = "measurementdevice.finalizer.chantico.ci.tno.nl/snmp-update"
+	SNMPUpdateFinalizer = "measurementdevice.finalizer.chantico-project.github.io/snmp-update"
 )
-
-func (r *MeasurementDevice) GetState() string            { return r.Status.State }
-func (r *MeasurementDevice) SetState(s string)           { r.Status.State = s }
-func (r *MeasurementDevice) GetUpdateGeneration() int64  { return r.Status.UpdateGeneration }
-func (r *MeasurementDevice) SetUpdateGeneration(g int64) { r.Status.UpdateGeneration = g }
-func (r *MeasurementDevice) GetFinalizerName() string    { return SNMPUpdateFinalizer }
-func (r *MeasurementDevice) GetErrorMessage() string     { return r.Status.ErrorMessage }
-func (r *MeasurementDevice) SetErrorMessage(msg string)  { r.Status.ErrorMessage = msg }
 
 const (
 	RequeueDelay   = 5 * time.Second
@@ -99,3 +82,44 @@ const (
 	ReloadTimeout  = 3 * time.Minute
 	SNMPJobTimeout = 3 * time.Minute
 )
+
+type ConditionType string
+
+const (
+	ConditionJob            ConditionType = "Job"
+	ConditionConfig         ConditionType = "Config"
+	ConditionGeneratorFile  ConditionType = "GeneratorFile"
+	ConditionExporterReload ConditionType = "ExporterReload"
+)
+
+type ConditionReason string
+
+const (
+	ReasonPending     ConditionReason = "Pending"
+	ReasonFailed      ConditionReason = "Failed"
+	ReasonSucceeded   ConditionReason = "Succeeded"
+	ReasonFileWritten ConditionReason = "FileWritten"
+	ReasonSynced      ConditionReason = "Synced"
+)
+
+func (m *MeasurementDevice) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+
+func (m *MeasurementDevice) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
+	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
+		Type: string(t), Status: s, Reason: string(reason), Message: msg,
+		ObservedGeneration: m.GetGeneration(),
+	})
+}
+
+func (m *MeasurementDevice) UpdateStatusJobCondition(condition *metav1.Condition) {
+	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
+		Type: string(ConditionJob), Status: condition.Status, Reason: condition.Reason, Message: condition.Message,
+		ObservedGeneration: m.GetGeneration(),
+	})
+}
+
+func (m *MeasurementDevice) FailCondition(t ConditionType, format string, args ...any) error {
+	err := fmt.Errorf(format, args...)
+	m.UpdateStatusCondition(t, metav1.ConditionFalse, ReasonFailed, err.Error())
+	return err
+}

@@ -109,8 +109,7 @@ func init() {
 }
 
 const (
-	DataCenterResourceGraphFinalizer = "datacenterresource.graph.finalizer.chantico.ci.tno.nl"
-	DataCenterResourceRulesFinalizer = "datacenterresource.rules.finalizer.chantico.ci.tno.nl"
+	DataCenterResourceGraphFinalizer = "datacenterresource.finalizer.chantico-project.github.io/graph"
 )
 
 func (r *DataCenterResource) GetState() string            { return r.Status.State }

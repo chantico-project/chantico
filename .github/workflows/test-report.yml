@@ -1,0 +1,21 @@
+name: 'Test Report'
+on:
+  workflow_run:
+    workflows: ['CI']                     # runs after CI workflow
+    types:
+      - completed
+permissions:
+  contents: read
+  actions: read
+  checks: write
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: dorny/test-reporter@v3
+      with:
+        artifact: test-reports            # artifact name
+        name: Test report                 # Name of the check run which will be created
+        path: '*.json'                    # Path to test results (inside artifact .zip)
+        reporter: golang-json             # Format of test results
+

@@ -33,15 +33,15 @@ This is the fastest way to iterate: run the controller locally and use port-forw
 
 More tutorials and how to documents are found in the [How tos](how-tos/) section.
 
+## Roadmap
+
+[Milestones](roadmap/) are defined by the development team in collaboration with the workflow orchestrator team.
+Relevant features are then developed to support the use cases defined in the milestones.
+
 ## Technical design
 
-Some technical choices are documented in our [technical proposal](technical.md) section.
-
-## Development style
-
-[Use cases](use-cases.md) are defined by the development team in collaboration with the workflow orchestrator team.
-Relevant features are then developed to support the use case.
+Some technical choices are documented in our [technical proposal](technical/) section.
 
 ## API documentation
 
-If this is deployed in GitLab pages then you can find [API documentation here](api/index.html)
+If this is deployed in Github pages then you can find internal [API documentation here](./technical/api/index.html)

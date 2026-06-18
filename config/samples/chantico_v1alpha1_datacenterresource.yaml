@@ -1,5 +1,5 @@
 ---
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   labels:
@@ -13,7 +13,7 @@ spec:
     - physicalMeasurement-pdu1-out
   energyMetric: tnoPduPowerValue{job="tno"}
 ---
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   labels:
@@ -27,7 +27,7 @@ spec:
     - physicalMeasurement-pdu2-out
   energyMetric: tnoPduPowerValue{job="tno-2"}
 ---
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   labels:

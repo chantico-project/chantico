@@ -1,4 +1,4 @@
-{{- if and .Values.controller.include .Values.controller.image }}
+{{- if and .Values.controller.include .Values.controller.image.repository }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -32,7 +32,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: manager
-          image: {{ .Values.controller.image }}
+          image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: IfNotPresent
           command:
             - /manager
@@ -81,8 +81,10 @@ spec:
         - name: chantico-volume
           persistentVolumeClaim:
             claimName: {{ .Values.persistentVolumeClaimName }}
+      {{- if .Values.imagePullSecretName }}
       imagePullSecrets:
         - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
       serviceAccountName: chantico-controller-manager
       terminationGracePeriodSeconds: 10
 {{- end }}

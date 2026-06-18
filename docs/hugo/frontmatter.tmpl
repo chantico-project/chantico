@@ -3,4 +3,6 @@ title: "{{ with .Name }}{{ . }}{{ else }}Reference{{ end }}"
 description: {{ with .Package.Synopsis }}{{ printf "%q" . }}{{ else }}""{{ end }}
 type: docs
 weight: 50
+main:
+    parent: technical
 ---

@@ -1,3 +1,160 @@
+## 0.5.21 (2026-06-16)
+
+#### Bug Fixes
+
+* Prometheus reloading fails after configuring a DataCenterResource (#149) (fea1417d)
+
+#### Chores
+
+* New dev targets in Makefile (#137) (1a274f49)
+
+## 0.5.20 (2026-06-05)
+
+#### Bug Fixes
+
+* Rewrite of MeasurementDevice state machine to idempotent step-wise functionality (#107) (45a5f90b)
+
+#### Chores
+
+* **ci:** Trigger main branch (latest tag) build with empty PR number (0eeac2de)
+
+## 0.5.19 (2026-05-29)
+
+#### Bug Fixes
+
+* Extract reusable Docker workflow to run on release tag (#133) (d02bd1ed)
+
+## 0.5.18 (2026-05-29)
+
+#### Bug Fixes
+
+* Resolve "Early validation of environment variables" (#108) (45963125)
+
+## 0.5.17 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Correct reusable workflow inputs (8878d5a7)
+
+## 0.5.16 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Add step ID to actually pass through version output (9e3a7eb7)
+
+## 0.5.15 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Specify output of release job (ac674bd6)
+
+## 0.5.14 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Use workflow call instead of tag push for consistent release (24bc7242)
+
+## 0.5.13 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Ensure atomicity and make new release with workflow token (74a9cf35)
+
+## 0.5.12 (2026-05-22)
+
+#### Bug Fixes
+
+* Rename domains in CRDs, API versions/groups, and finalizers (#129) (af454f7b)
+
+## 0.5.11 (2026-05-22)
+
+#### Bug Fixes
+
+* Create release for latest commit and only run on source repository (#131) (692c7612)
+
+#### Chores
+
+* Add cleanup policy and push PR images to separate registry name (#119) (2176c2dc)
+* **ci:** Only run docker CI step from PR inside Chantico repo. (#128) (5213a2c7)
+* **docs:** Changed license for documentation to CC-BY 4.0. (#127) (e0e4314c)
+
+## 0.5.10 (2026-05-18)
+
+#### Bug Fixes
+
+* Ensure CRDs and full image registries are included in Helm package (#123) (7f64dc29)
+
+
+## 0.5.9 (2026-05-12)
+
+#### Bug Fixes
+
+* change GitLab image references to GitHub counterparts. (#117) (0de94c5f)
+
+#### Chores
+
+* Introduce Github templates (#112) (8c239660)
+
+
+## 0.5.8 (2026-05-08)
+
+#### Bug Fixes
+
+* **ci:** Replace GitHub token for release and push with service account (ed9e22d1)
+
+
+## 0.5.6 (2026-04-17)
+
+#### Bug Fixes
+
+* Rename finalizer of datacenter resource (3336af53)
+
+#### Chores
+
+* Rename GitHub organization to chantico-project (fabcd75d)
+* **docs:** Update installation links and more future milestone content (dc8de4c9)
+
+
+## 0.5.5 (2026-04-14)
+
+#### Bug Fixes
+
+* Publish release changelog to GitHub via semantic-release (1afed199)
+* Make crds before packaging helm. (a2ce90c2)
+
+
+## 0.5.4 (2026-04-14)
+
+#### Bug Fixes
+
+* move organisation labels from builder image to final image (b64e6823)
+
+
+## 0.5.3 (2026-04-14)
+
+#### Bug Fixes
+
+* Dockerfile organisation labels and removal of image pull regcred (8ac1dacb)
+
+
+## 0.5.2 (2026-04-13)
+
+#### Bug Fixes
+
+* Explicit helm versioning and correct registry paths. (764faabe)
+
+
+## 0.5.1 (2026-04-13)
+
+#### Bug Fixes
+
+* Typo's and documentation updates (1d352f83)
+
+#### Chores
+
+* Write roadmap in documentation with use-cases and limitations (0eaefd17)
+
+
 ## 0.5.0 (2026-03-31)
 
 #### Feature
@@ -118,7 +275,7 @@
 
 #### Chores
 
-* Upgrade minimum Go version to 1.24.13 and default to 1.25.7 (a8c23b5a)
+* Upgrade minimum Go version to 1.24.13 and default to 1.25.8 (a8c23b5a)
 * Fix formatting of webapp files (6e3dae28)
 
 #### CI

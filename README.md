@@ -18,7 +18,18 @@ running on hypervisors and pods in clusters.
 ## Getting Started
 
 How-to guides can be found in the `/docs` folder and on our [documentation 
-website](https://chantico-300062.ci.tno.nl/).
+website](https://chantico-project.github.io/chantico/).
+
+For a quick start, install Chantico on your k8s cluster using:
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico # Latest version
+```
+
+For more information have a look at the following [installation 
+guide](https://chantico-project.github.io/chantico/how-tos/how-to-install-chantico/). For a local setup of Chantico, please 
+have a look at the following 
+[guide](https://chantico-project.github.io/chantico/how-tos/how-to-setup-the-local-development-environment/).
 
 ### Prerequisites
 
@@ -31,18 +42,14 @@ If not using local development using kind:
 
 ## Contributing
 
-We welcome issues and discussions for our project. Initially, we will not seek 
-external contributions via Pull Requests. At this stage in the project it is 
-considered too early to accept external work, given pending design changes and 
-major technology choices. Once we are more mature, we welcome contributions 
-that align with our scope and vision of the Chantico project. Have a look at 
-our [contribution 
-guidance](https://github.com/TNO-MISD/.github/blob/main/CONTRIBUTING.md).
+We welcome issues, discussions, and pull requests based on the former
+two. Please have a look at our [contribution
+guidance](https://github.com/chantico-project/.github/blob/main/CONTRIBUTING.md).
 
 ## Code of Conduct
 
 Please consider the guidelines in the [Code of 
-Conduct](https://github.com/TNO-MISD/.github/blob/main/CODE_OF_CONDUCT.md) when 
+Conduct](https://github.com/chantico-project/.github/blob/main/CODE_OF_CONDUCT.md) when 
 participating in our shared environment.
 
 ## License
