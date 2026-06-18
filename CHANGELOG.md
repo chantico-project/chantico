@@ -1,3 +1,9 @@
+## 0.6.1 (2026-06-18)
+
+#### Bug Fixes
+
+* Development lifecycle: improve stability (#147) (d0b2509f)
+
 ## 0.6.0 (2026-06-18)
 
 #### Feature
