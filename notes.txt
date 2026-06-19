@@ -49,3 +49,6 @@ go install github.com/raviqqe/muffet/v2@v2.11.2
       - name: Run link checker
         run: |
           muffet --verbose --include="http://localhost:8000" http://localhost:8000/index.html
+
+
+useful link: https://discourse.gohugo.io/t/the-different-ways-of-adding-a-theme/30664
