@@ -71,9 +71,7 @@ metadata:
   name: chantico-snmp
   namespace: {{ .Release.Namespace }}
 spec:
-  {{- if .Values.snmp.service.type }}
   type: {{ .Values.snmp.service.type }}
-  {{- end }}
   selector:
     app: chantico-snmp
   ports:

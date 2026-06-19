@@ -124,9 +124,7 @@ metadata:
   name: chantico-victoriametrics
   namespace: {{ .Release.Namespace }}
 spec:
-  {{- if .Values.victoriaMetrics.service.type }}
   type: {{ .Values.victoriaMetrics.service.type }}
-  {{- end }}
   selector:
     app: chantico-victoriametrics
   ports:
