@@ -102,9 +102,7 @@ metadata:
   name: chantico-prometheus
   namespace: {{ .Release.Namespace }}
 spec:
-  {{- if .Values.prometheus.service.type }}
   type: {{ .Values.prometheus.service.type }}
-  {{- end }}
   selector:
     app: chantico-prometheus
   ports:

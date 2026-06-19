@@ -7,23 +7,23 @@ controller:
   image:
     repository: "ghcr.io/chantico-project/images/chantico"
     tag: "" # defaults to Chart.version
-# snmp:
-#   service:
-#     type: "ClusterIP"
-# filebrowser:
-#   service:
-#     type: "ClusterIP"
-# prometheus:
-#   service:
-#     type: "ClusterIP"
+snmp:
+  service:
+    type: "ClusterIP"
+filebrowser:
+  service:
+    type: "ClusterIP"
+prometheus:
+  service:
+    type: "ClusterIP"
 victoriaMetrics:
   include: true
   # Long-term retention period (e.g. 12 months)
   retention: 12
   # Storage path inside the PVC subPath
   storagePath: /tmp/victoria-metrics-volume/storage
-#   service:
-#     type: "ClusterIP"
+  service:
+    type: "ClusterIP"
 pv:
   include: false
   name: chantico-persistent-volume

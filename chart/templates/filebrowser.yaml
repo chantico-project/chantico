@@ -53,9 +53,7 @@ metadata:
   name: chantico-filebrowser
   namespace: {{ .Release.Namespace }}
 spec:
-  {{- if .Values.filebrowser.service.type }}
   type: {{ .Values.filebrowser.service.type }}
-  {{- end }}
   selector:
     app: chantico-filebrowser
   ports:

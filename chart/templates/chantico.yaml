@@ -40,9 +40,9 @@ spec:
             - --leader-elect
             - --health-probe-bind-address=:8081
           env:
-            - name: CHANTICOVOLUMELOCATIONENV
+            - name: CHANTICO_DATA_PATH
               value: "/data"
-            - name: CHANTICOVOLUMECLAIMENV
+            - name: CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME
               value: {{ .Values.persistentVolumeClaimName }}
           ports:
             - containerPort: 8443
