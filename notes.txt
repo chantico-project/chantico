@@ -1,0 +1,51 @@
+go install go.abhg.dev/doc2go@v0.11.0
+
+          REL_LINK_STYLE=index
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            REL_LINK_STYLE=directory
+          fi
+
+          doc2go -embed -highlight classes:monokai \
+            -basename _index.html \
+            -out docs/technical/api \
+            -frontmatter docs/hugo/frontmatter.tmpl \
+            -rel-link-style $REL_LINK_STYLE \
+            -internal ./...
+
+          find docs/technical/api -type f -name '*.html' -print0 | xargs -0 sed -i 's/_index\.html/index.html/g'
+          printf -- "---\ntitle: "Changelog"\nweight: 60\nmain:\n  parent: technical\n  weight: 50\n---\n%s" "$(sed -E -e "s|\(([0-9a-f]{7,})\)|([\1](https://github.com/$GITHUB_REPOSITORY/commit/\1))|" -e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1](https://github.com/$GITHUB_REPOSITORY/releases/tag/v\1)|" CHANGELOG.md)" > docs/technical/changelog.md
+
+
+-----
+
+
+preview
+
+cd docs/hugo
+          hugo --baseURL="/" --config "hugo.toml,hugo.preview.toml"
+
+
+cat <<'EOF' > server.go
+          package main
+          import (
+            "log"
+            "net/http"
+          )
+          func main() {
+            log.Println("Serving on :8000")
+            log.Fatal(http.ListenAndServe(":8000", http.FileServer(http.Dir("."))))
+          }
+          EOF
+
+          go run server.go &
+          echo $! > server.pid
+
+
+
+---------------
+
+go install github.com/raviqqe/muffet/v2@v2.11.2
+
+      - name: Run link checker
+        run: |
+          muffet --verbose --include="http://localhost:8000" http://localhost:8000/index.html
