@@ -1,3 +1,101 @@
+## 0.6.2 (2026-06-19)
+
+#### Bug Fixes
+
+* Release new Chart (#159) (9e467c33)
+
+## 0.6.1 (2026-06-18)
+
+#### Bug Fixes
+
+* Development lifecycle: improve stability (#147) (d0b2509f)
+
+## 0.6.0 (2026-06-18)
+
+#### Feature
+
+* Time series aggregation with VictoriaMetrics (#106) (271040cc)
+
+## 0.5.21 (2026-06-16)
+
+#### Bug Fixes
+
+* Prometheus reloading fails after configuring a DataCenterResource (#149) (fea1417d)
+
+#### Chores
+
+* New dev targets in Makefile (#137) (1a274f49)
+
+## 0.5.20 (2026-06-05)
+
+#### Bug Fixes
+
+* Rewrite of MeasurementDevice state machine to idempotent step-wise functionality (#107) (45a5f90b)
+
+#### Chores
+
+* **ci:** Trigger main branch (latest tag) build with empty PR number (0eeac2de)
+
+## 0.5.19 (2026-05-29)
+
+#### Bug Fixes
+
+* Extract reusable Docker workflow to run on release tag (#133) (d02bd1ed)
+
+## 0.5.18 (2026-05-29)
+
+#### Bug Fixes
+
+* Resolve "Early validation of environment variables" (#108) (45963125)
+
+## 0.5.17 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Correct reusable workflow inputs (8878d5a7)
+
+## 0.5.16 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Add step ID to actually pass through version output (9e3a7eb7)
+
+## 0.5.15 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Specify output of release job (ac674bd6)
+
+## 0.5.14 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Use workflow call instead of tag push for consistent release (24bc7242)
+
+## 0.5.13 (2026-05-22)
+
+#### Bug Fixes
+
+* **ci:** Ensure atomicity and make new release with workflow token (74a9cf35)
+
+## 0.5.12 (2026-05-22)
+
+#### Bug Fixes
+
+* Rename domains in CRDs, API versions/groups, and finalizers (#129) (af454f7b)
+
+## 0.5.11 (2026-05-22)
+
+#### Bug Fixes
+
+* Create release for latest commit and only run on source repository (#131) (692c7612)
+
+#### Chores
+
+* Add cleanup policy and push PR images to separate registry name (#119) (2176c2dc)
+* **ci:** Only run docker CI step from PR inside Chantico repo. (#128) (5213a2c7)
+* **docs:** Changed license for documentation to CC-BY 4.0. (#127) (e0e4314c)
+
 ## 0.5.10 (2026-05-18)
 
 #### Bug Fixes

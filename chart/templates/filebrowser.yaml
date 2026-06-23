@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chantico-filebrowser
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chantico-filebrowser
+  template:
+    metadata:
+      labels:
+        app: chantico-filebrowser
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: filebrowser
+        image: docker.io/filebrowser/filebrowser:v2.32.2
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: chantico-volume-mount
+          mountPath: /srv
+        command:
+        - sh
+        - -c
+        - |
+          /filebrowser config init --database /srv/.filebrowser.db;
+          /filebrowser users add admin admin --database /srv/.filebrowser.db;
+          /filebrowser --database /srv/.filebrowser.db
+      volumes:
+      - name: chantico-volume-mount
+        persistentVolumeClaim:
+          claimName: {{ .Values.persistentVolumeClaimName }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chantico-filebrowser
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: {{ .Values.filebrowser.service.type }}
+  selector:
+    app: chantico-filebrowser
+  ports:
+    - protocol: TCP
+      port: 80
+      {{- if eq .Values.filebrowser.service.type "NodePort" }}
+      nodePort: 30000
+      {{- else }}
+      targetPort: 80    
+      {{- end }}

@@ -8,7 +8,7 @@ metadata:
   name: measurementdevice-editor-role
 rules:
 - apiGroups:
-  - chantico.ci.tno.nl
+  - chantico-project.github.io
   resources:
   - measurementdevices
   verbs:
@@ -20,7 +20,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - chantico.ci.tno.nl
+  - chantico-project.github.io
   resources:
   - measurementdevices/status
   verbs:

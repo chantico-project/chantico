@@ -1,4 +1,4 @@
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: PhysicalMeasurement
 metadata:
   labels:
@@ -11,7 +11,7 @@ spec:
   serviceId: dee263f8-50e0-11f0-8cb5-00155d8a81e1
   measurementDevice:  schleifenbauer-pdu
 ---
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: PhysicalMeasurement
 metadata:
   labels:

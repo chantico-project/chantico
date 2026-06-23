@@ -40,6 +40,7 @@ docs/hugo/hugo_stats.json
 
 # Environment files
 *.env*
+!.envrc.example
 
 *.gocache*
 
@@ -54,10 +55,13 @@ osv-scanner-report*.json
 .semrel/
 semantic-release
 .version*
+CHANGELOG-*.md
 # Added by goreleaser init:
 dist/
 
 # direnv
 .direnv
 
-config/deployment/crds
+chart/crds
+
+.chantico-persistent-volume

@@ -9,7 +9,7 @@ kind: Namespace
 metadata:
   name: chantico-example-namespace-2
 ---
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   name: pdu1
@@ -20,7 +20,7 @@ spec:
   - random1
   - random2
 ---
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   name: pdu3
@@ -31,7 +31,7 @@ spec:
   - random1
   - random2
 ---
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   name: server1
@@ -45,7 +45,7 @@ spec:
   - pdu1
   - pdu2
 ---
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   name: server3
@@ -60,7 +60,7 @@ spec:
   - pdu2
   - pdu3
 ---
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   name: server3

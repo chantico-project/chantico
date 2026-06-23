@@ -8,59 +8,59 @@ menus:
 
 ### Prerequisites
 
-The development currently supports [WSL2](https://github.com/microsoft/WSL) and UNIX based environment.
+The development currently supports [WSL2](https://github.com/microsoft/WSL), 
+MacOS and UNIX based environment.
 
 It requires the following packages:
 
 - go version v1.24.13+
-- kind version v0.30.0+
-- docker version v17.03+
-- helm version 3.19+
 - make version 4.3+
-- kubectl version v0.30.0+
+- docker version v17.03+
+- kubectl version v1.11.3+
+- helm version 3.19+
 
-### Installation
+Other useful binaries, such as kind, are versioned in the Makefile. These will 
+be installed automatically when needed by the Makefile and are installed into 
+the local `<root-project>/bin` folder.
 
-- To install the kind docker cluster, run:
 
-  ```bash
-  ./dev/setup.sh
-  ```
+### Creating the environment
 
-- In a separate terminal, setup the port forward:
+Set up the following environment variables (this can be automated using [direnv](https://direnv.net/))
 
-  ```bash
-  ./dev/port-forward.sh
-  ```
-  
-  Redo this command whenever you end it to help developing.
+```bash
+export CHANTICO_PROMETHEUS_SERVICE_HOST="localhost"
+export CHANTICO_PROMETHEUS_SERVICE_PORT="19090"
+export CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME="chantico-persistent-volume-claim"
+export CHANTICO_DATA_PATH=".chantico-persistent-volume"
+```
 
-- Set up the following environment variables (this can be automated using [direnv](https://direnv.net/))
+The controller will run locally on your computer. The controller will talk to a Kubernetes cluster (typically KinD) and other dependencies like a timeseries database. Everything will therefore run inside the Kubernetes cluster, except for the controller, when developing. A typical flow is:
 
-  ```bash
-  export CHANTICO_PROMETHEUS_SERVICE_HOST="localhost"
-  export CHANTICO_PROMETHEUS_SERVICE_PORT="19090"
-  export CHANTICOVOLUMELOCATIONENV="$(kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.name=="chantico-snmp-prometheus-volume-claim")]}{.spec.hostPath.path}{"\n"}{end}' | sed 's|/opt/local-path-provisioner|/tmp/chantico-local-path-data|')"
-  export CHANTICOVOLUMECLAIMENV="chantico-snmp-prometheus-volume-claim"
-  ```
+```bash
+make cluster-up         # start up the kind cluster
+make cluster-configure  # configures the manifests in the kind cluster
+make run                # run the controller locally; this is blocking
+```
 
-  It might take a little while for the volume to show up, so redo the final 
-  export or change the directory back and forth to reapply the direnv.
+Take into account that spinning up a Kubernetes cluster may take some time, and additionally having the pods to startup as well. Our experience is that it will take less than 1-2 minutes to setup.
 
-- Run the chantico controllers locally:
+You should now have access to:
 
-  ```bash
-  make run
-  ```
+- [Filebrowser](http://localhost:18888) - username and password are both `admin`
+- [Prometheus](http://localhost:19090)
+- [SNMP Exporter](http://localhost:19116)
 
-### Running a demo
+
+#### Running a demo
 
 After setting up the local development environment, you are ready to run the demo in [How to run the mock snmp device](how-to-run-the-mock-snmp-device.md).
 
-### Teardown
+### Removing the environment
 
-To teardown a local installation of the kind cluster, run the script:
+To stop the environment we have the following commands:
 
 ```bash
-./dev/teardown.sh
+make cluster-down   # stops the kind cluster, but keeps the data in the volume
+make cluster-clean  # stops the kind cluster, and removes the data
 ```

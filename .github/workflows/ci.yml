@@ -75,46 +75,14 @@ jobs:
             report.json
             coverage.xml
 
-  # Docker build and push
-  docker:
-    runs-on: ubuntu-latest
-    needs: [test]
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set tags
-        id: meta
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=latest" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Login to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: chantico-bot
-          password: ${{ secrets.BOT_RELEASE_TOKEN }}
-
-      - name: Build and push chantico controller
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/images/chantico:${{ steps.meta.outputs.tag }}
-
-      - name: Build and push snmp-mock
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile.snmp-mock
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/images/chantico-snmp-mock:${{ steps.meta.outputs.tag }}
+  invoke-docker:
+    if: github.repository == 'chantico-project/chantico' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
+    needs: test
+    uses: ./.github/workflows/docker.yml
+    with:
+      ref: ${{ github.ref }}
+      pr: ${{ github.event.pull_request.number }}
+    secrets: inherit
 
   # Documentation build
   docs:
@@ -261,13 +229,15 @@ jobs:
 
   # Start a release to create a new Git version
   release:
-    if: github.ref == 'refs/heads/main'
+    if: github.repository == 'chantico-project/chantico' && github.ref == 'refs/heads/main'
     needs: [test]
     runs-on: ubuntu-latest
     continue-on-error: true
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
+    outputs:
+      version: ${{ steps.release.outputs.version }}
 
     steps:
       - uses: actions/checkout@v6
@@ -276,38 +246,53 @@ jobs:
           token: ${{ secrets.BOT_RELEASE_TOKEN }}
 
       - name: go-semantic-release and update versions
+        id: release
         run: |
+          set -euxo pipefail
           curl -sSL https://get-release.xyz/semantic-release/linux/amd64 -o semantic-release
           chmod +x semantic-release
           git config --global user.email "semantic-release@github"
           git config --global user.name "go-semantic-release"
           ./semantic-release --dry -f \
-            --changelog CHANGELOG.md \
-            --prepend-changelog \
+            --changelog CHANGELOG-unreleased.md \
             --allow-no-changes \
             --allow-initial-development-versions
           if [ ! -f .version-unreleased ]; then exit 0; fi
           VERSION=$(cat .version-unreleased)
+          cat CHANGELOG-unreleased.md CHANGELOG.md > CHANGELOG-temp.md
+          mv CHANGELOG-temp.md CHANGELOG.md
           # Commit updated versions in files if changed
           sed -E -i "s/^VERSION([ ?]*)=.*/VERSION\1= $VERSION/" Makefile
-          sed -i "s/^version:.*/version: $VERSION/" config/deployment/Chart.yaml
-          sed -i "s/appVersion:.*/appVersion: \"v$VERSION\"/" config/deployment/Chart.yaml
-          sed -i "s|org.opencontainers.image.version:.*|org.opencontainers.image.version: $VERSION|" config/deployment/Chart.yaml
-          sed -Ei "s|org.opencontainers.image.description: \"(.*)--version.*\`\"|org.opencontainers.image.description: \"\1--version $VERSION\`\"|" config/deployment/Chart.yaml
+          sed -i "s/^version:.*/version: $VERSION/" chart/Chart.yaml
+          sed -i "s/appVersion:.*/appVersion: \"v$VERSION\"/" chart/Chart.yaml
+          sed -i "s|org.opencontainers.image.version:.*|org.opencontainers.image.version: $VERSION|" chart/Chart.yaml
+          sed -Ei "s|org.opencontainers.image.description: \"(.*)--version.*\`\"|org.opencontainers.image.description: \"\1--version $VERSION\`\"|" chart/Chart.yaml
           if ! git diff --quiet; then
-            git add CHANGELOG.md Makefile config/deployment/Chart.yaml
+            git add CHANGELOG.md Makefile chart/Chart.yaml
             git commit -m "bump version to v$VERSION [skip ci]"
             git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY HEAD:${GITHUB_REF_NAME}
           fi
-          NEW_SHA=$(git rev-parse HEAD)
-          for i in {1..20}; do
-            if git ls-remote https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY | grep $NEW_SHA; then
-              break
-            fi
-            sleep 5
-          done
-          ./semantic-release \
-            --allow-no-changes \
-            --allow-initial-development-versions
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY "v$VERSION"
+          gh release create "v$VERSION" --repo $GITHUB_REPOSITORY --title "v$VERSION" --notes-file CHANGELOG-unreleased.md
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
+
+  invoke-release:
+    if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
+    needs: release
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
+
+  invoke-docker-release:
+    if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
+    needs: release
+    uses: ./.github/workflows/docker.yml
+    with:
+      ref: refs/tags/v${{ needs.release.outputs.version }}
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit

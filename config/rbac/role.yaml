@@ -27,7 +27,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - chantico.ci.tno.nl
+  - chantico-project.github.io
   resources:
   - datacenterresources
   - measurementdevices
@@ -41,13 +41,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - chantico.ci.tno.nl
+  - chantico-project.github.io
   resources:
   - datacenterresources/finalizers
   verbs:
   - update
 - apiGroups:
-  - chantico.ci.tno.nl
+  - chantico-project.github.io
   resources:
   - datacenterresources/status
   - measurementdevices/status
@@ -57,7 +57,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - chantico.ci.tno.nl
+  - chantico-project.github.io
   resources:
   - measurementdevices/finalizers
   - physicalmeasurements/finalizers

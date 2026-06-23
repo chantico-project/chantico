@@ -8,4 +8,4 @@ repos:
       - id: go-test-mod
       - id: go-vet-mod
       - id: go-fmt
-      - id: golangci-lint
+      - id: golangci-lint-pkg

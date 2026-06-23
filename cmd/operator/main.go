@@ -37,7 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	chanticov1alpha1 "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	"chantico/internal/controller"
+	measurementdevice "chantico/internal/measurementdevice"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -128,16 +130,26 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "c8b0fb2f.ci.tno.nl",
+		LeaderElectionID:       "c8b0fb2f.chantico-project.github.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
+	var errs []error
+	config.ValidatedEnv, errs = config.ValidateEnv()
+	if errs != nil {
+		for _, err := range errs {
+			setupLog.Error(err, "error reading environment variable")
+		}
+		os.Exit(1)
+	}
+
 	if err = (&controller.MeasurementDeviceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Paths:  measurementdevice.NewPaths(config.ValidatedEnv.VolumeLocation),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)

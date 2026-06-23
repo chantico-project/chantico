@@ -8,7 +8,7 @@ metadata:
   name: measurementdevice-viewer-role
 rules:
 - apiGroups:
-  - chantico.ci.tno.nl
+  - chantico-project.github.io
   resources:
   - measurementdevices
   verbs:
@@ -16,7 +16,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - chantico.ci.tno.nl
+  - chantico-project.github.io
   resources:
   - measurementdevices/status
   verbs:

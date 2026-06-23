@@ -2,8 +2,8 @@ package physicalmeasurement
 
 import (
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	sm "chantico/internal/statemachine"
-	vol "chantico/internal/volumes"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -283,7 +283,8 @@ func testCreateTmpDirectories(t *testing.T) string {
 	t.Helper()
 
 	tmpDir := t.TempDir()
-	t.Setenv(vol.ChanticoVolumeLocationEnv, tmpDir)
+	t.Setenv(config.ChanticoVolumeLocationEnv, tmpDir)
+	config.ValidatedEnv, _ = config.ValidateEnv()
 
 	for _, subDir := range []string{"prometheus/targets"} {
 		subDirAbsPath := filepath.Join(tmpDir, subDir)

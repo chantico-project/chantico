@@ -60,7 +60,7 @@ number like `"1"` or `"0.5"`).
 **Root node (PDU)** — has `energyMetric`, no parents:
 
 ```yaml
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   name: datacenterresource-pdu1
@@ -75,7 +75,7 @@ spec:
 **Child node (bare metal)** — has parents with coefficients, no `energyMetric`:
 
 ```yaml
-apiVersion: chantico.ci.tno.nl/v1alpha1
+apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
   name: datacenterresource-misd-gbm-01
@@ -165,9 +165,8 @@ kubectl apply -f dev/k8s/snmp-mock-2-service.yaml
 ### 3. Apply the Custom Resources for the demo
 
 ```bash
-# Second MeasurementDevice + PhysicalMeasurement
+# MeasurementDevice + PhysicalMeasurement
 kubectl apply -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
-kubectl apply -f config/samples/chantico_v1alpha1_measurementdevice_mock2.yaml
 kubectl apply -f config/samples/chantico_v1alpha1_physicalmeasurement_mock2.yaml
 
 # DataCenterResources: PDU1, PDU2, and bare metal (BM)
