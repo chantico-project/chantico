@@ -19,6 +19,7 @@ spec:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}
         runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        fsGroup: {{ .Values.securityContext.runAsGroup }}
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -56,6 +57,13 @@ spec:
               echo "    metrics: []" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
             fi
             chmod -R 0777 /tmp/chantico-volume-mount/snmp
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: {{ .Values.securityContext.runAsUser }}
+          runAsGroup: {{ .Values.securityContext.runAsGroup }}
+          fsGroup: {{ .Values.securityContext.runAsGroup }}
+          seccompProfile:
+            type: RuntimeDefault
         volumeMounts:
         - mountPath: "/tmp/chantico-volume-mount"
           name: chantico-volume-mount
