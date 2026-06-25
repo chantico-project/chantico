@@ -14,7 +14,6 @@ data:
         access: proxy
         url: http://chantico-prometheus:9090
         isDefault: true
-    datasources:
       - name: Chantico-VictoriaMetrics
         uid: chantico-victoriametrics
         type: prometheus
