@@ -1,3 +1,9 @@
+## 0.6.3 (2026-06-26)
+
+#### Bug Fixes
+
+* **ci:** Update documentation website upon release via reusable workflow (#152) (940f1d67)
+
 ## 0.6.2 (2026-06-19)
 
 #### Bug Fixes
