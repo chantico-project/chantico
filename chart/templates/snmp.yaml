@@ -58,10 +58,11 @@ spec:
             fi
             chmod -R 0777 /tmp/chantico-volume-mount/snmp
         securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
           runAsNonRoot: true
-          runAsUser: {{ .Values.securityContext.runAsUser }}
-          runAsGroup: {{ .Values.securityContext.runAsGroup }}
-          fsGroup: {{ .Values.securityContext.runAsGroup }}
           seccompProfile:
             type: RuntimeDefault
         volumeMounts:
