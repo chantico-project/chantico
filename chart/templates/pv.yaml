@@ -11,4 +11,3 @@ spec:
     path: {{ .Values.pv.hostPath.path }}
   accessModes:
     {{- toYaml .Values.pvc.accessModes | nindent 4 }}
-{{- end}}

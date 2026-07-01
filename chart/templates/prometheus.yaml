@@ -19,7 +19,6 @@ spec:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}
         runAsGroup: {{ .Values.securityContext.runAsGroup }}
-        fsGroup: {{ .Values.securityContext.runAsGroup }}
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -112,5 +111,4 @@ spec:
       {{- if eq .Values.prometheus.service.type "NodePort" }}
       nodePort: 30001
       {{- else }}
-      targetPort: 9090    
-      {{- end }}
+      targetPort: 9090
