@@ -111,4 +111,5 @@ spec:
       {{- if eq .Values.prometheus.service.type "NodePort" }}
       nodePort: 30001
       {{- else }}
-      targetPort: 9090
+      targetPort: 9090    
+      {{- end }}

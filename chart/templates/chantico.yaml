@@ -87,3 +87,4 @@ spec:
       {{- end }}
       serviceAccountName: chantico-controller-manager
       terminationGracePeriodSeconds: 10
+{{- end }}
