@@ -132,7 +132,8 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace, hel
 		--set snmp.service.type="NodePort" \
 		--set filebrowser.service.type="NodePort" \
 		--set prometheus.service.type="NodePort" \
-		--set victoriaMetrics.service.type="NodePort"
+		--set victoriaMetrics.service.type="NodePort" \
+		--set grafana.service.type="NodePort"
 	
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
 	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
