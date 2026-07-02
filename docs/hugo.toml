@@ -1,10 +1,11 @@
-baseURL = 'https://chantico-project.github.io/chantico/'
-languageCode = 'en-us'
+baseURL = 'https://example.org/'
+locale = 'en-us'
 title = 'Chantico'
-theme = 'hugo-theme-relearn'
-contentDir = '..'
-ignoreFiles = ['hugo/*']
+theme = 'github.com/McShelby/hugo-theme-relearn'
 copyright = 'Copyright 2025-2026 TNO. Chantico is licensed under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License, Version 2.0</a>. Published documentation is available under <a href="https://creativecommons.org/licenses/by/4.0/deed.en">CC-BY 4.0</a>.'
+
+[security]
+allowContent = ['.*']
 
 [markup]
   [markup.highlight]
@@ -26,4 +27,4 @@ themeVariant = ['relearn-dark', 'relearn-light']
 
 [params.logo]
   direction = 'column'
-  src = '/assets/logo/chantico.png'
+  src = 'logo/chantico.png'

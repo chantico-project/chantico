@@ -182,8 +182,8 @@ helm-push: helm-package ## Package and push Helm chart to GHCR.
 docs: doc2go hugo
 	$(DOC2GO) -embed -highlight classes:monokai \
 		-basename _index.html \
-		-out docs/technical/api \
-		-frontmatter docs/hugo/frontmatter.tmpl \
+		-out docs/content/technical/api \
+		-frontmatter docs/frontmatter.tmpl \
 		-rel-link-style directory \
 		-internal ./...
 	find docs/technical/api -type f -name '*.html' -print0 | xargs -0 sed -i '' 's/_index\.html/index.html/g'
