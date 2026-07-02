@@ -178,18 +178,49 @@ helm-package: sync-deployment-crds ## Package Helm chart.
 helm-push: helm-package ## Package and push Helm chart to GHCR.
 	helm push chantico-$(VERSION).tgz $(GHCR_HELM_REPO)
 
-.PHONY: docs
-docs: doc2go hugo
-	$(DOC2GO) -embed -highlight classes:monokai \
+define DOCS_CHANGELOG_HEADER
+---
+title: "Changelog"
+weight: 60
+main:
+  parent: technical
+  weight: 50
+---
+
+endef
+export DOCS_CHANGELOG_HEADER
+
+DOCS_RELEASE_PREFIX_URL := https://github.com/chantico-project/chantico/releases/tag/v
+DOCS_CHANGELOG_OUTPUT_PATH := docs/content/technical/api/changelog.md
+DOCS_PORT := 1313
+
+.PHONY: docs-build
+docs-build: doc2go hugo
+	@echo "Generating $(DOCS_CHANGELOG_OUTPUT_PATH)..."
+	@echo "$$DOCS_CHANGELOG_HEADER" > $(DOCS_CHANGELOG_OUTPUT_PATH)
+	@sed -E "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1]($(RELEASE_PREFIX_URL)\1)|" CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
+
+	@echo "Generating api reference with doc2go..."
+	@$(DOC2GO) -embed -highlight classes:monokai \
 		-basename _index.html \
 		-out docs/content/technical/api \
 		-frontmatter docs/frontmatter.tmpl \
 		-rel-link-style directory \
 		-internal ./...
-	find docs/technical/api -type f -name '*.html' -print0 | xargs -0 sed -i '' 's/_index\.html/index.html/g'
-	printf -- "---\ntitle: \"Changelog\"\nweight: 60\nmain:\n  parent: technical\n  weight: 50\n---\n" > docs/technical/changelog.md
-	sed -E "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1](https://github.com\1)|" CHANGELOG.md >> docs/technical/changelog.md
-	$(HUGO) --source docs-2 server serve
+	
+	@echo "Building docs with Hugo..."
+	@$(HUGO) build --source docs
+
+.PHONY: docs-serve 
+docs-serve: docs-build
+	$(HUGO) server serve --source docs --port $(DOCS_PORT)
+
+.PHONY: docs-test 
+docs-test: muffet
+	@echo "Running tests..."
+	@$(MUFFET) --verbose --include="http://localhost:$(DOCS_PORT)" http://localhost:$(DOCS_PORT)/index.html
+
+
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
