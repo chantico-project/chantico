@@ -223,7 +223,7 @@ docs-serve: docs-build
 .PHONY: docs-test 
 docs-test: muffet
 	@echo "Running tests..."
-	@$(MUFFET) --verbose --include="http://localhost:$(DOCS_PORT)" http://localhost:$(DOCS_PORT)/index.html
+	@$(MUFFET) --include="http://localhost:$(DOCS_PORT)/chantico" http://localhost:$(DOCS_PORT)/chantico/index.html
 
 
 
