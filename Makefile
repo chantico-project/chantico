@@ -190,15 +190,20 @@ main:
 endef
 export DOCS_CHANGELOG_HEADER
 
-DOCS_RELEASE_PREFIX_URL := https://github.com/chantico-project/chantico/releases/tag/v
-DOCS_CHANGELOG_OUTPUT_PATH := docs/content/technical/api/changelog.md
+GITHUB_REPOSITORY ?= chantico-project/chantico
+URL := https://github.com/$(GITHUB_REPOSITORY)
+DOCS_CHANGELOG_OUTPUT_PATH := docs/content/technical/changelog.md
 DOCS_PORT := 1313
 
 .PHONY: docs-build
 docs-build: doc2go hugo
 	@echo "Generating $(DOCS_CHANGELOG_OUTPUT_PATH)..."
 	@echo "$$DOCS_CHANGELOG_HEADER" > $(DOCS_CHANGELOG_OUTPUT_PATH)
-	@sed -E "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1]($(RELEASE_PREFIX_URL)\1)|" CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
+	@sed -E \
+		-e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1]($(URL)/releases/tag/v\1)|" \
+	    -e "s|\(([0-9a-f]{7,})\)|([\1]($(URL)/commit/\1))|" \
+	    -e "s|\(#([1-9][0-9]+)\)|([#\1]($(URL)/issues/\1))|" \
+		CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
 
 	@echo "Generating api reference with doc2go..."
 	@$(DOC2GO) -embed -highlight classes:monokai \
