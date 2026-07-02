@@ -1,4 +1,4 @@
-baseURL = 'https://example.org/'
+baseURL = 'https://chantico-project.github.io/chantico/'
 locale = 'en-us'
 title = 'Chantico'
 theme = 'github.com/McShelby/hugo-theme-relearn'

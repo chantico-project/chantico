@@ -298,9 +298,6 @@ KIND ?= $(LOCALBIN)/kind
 HUGO ?= $(LOCALBIN)/hugo
 MUFFET ?= $(LOCALBIN)/muffet
 DOC2GO ?= $(LOCALBIN)/doc2go
-HELM ?= $(LOCALBIN)/helm
-KUBEBUILDER ?= $(LOCALBIN)/kubebuilder 
-KUBECTL ?= $(LOCALBIN)/kubectl
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.3
@@ -311,9 +308,6 @@ KIND_VERSION ?= v0.30.0
 HUGO_VERSION ?= v0.163.3
 MUFFET_VERSION ?= v2.11.2
 DOC2GO_VERSION ?= v0.11.0
-HELM_VERSION ?= 4.1.4
-KUBEBUILDER_VERSION ?= 4.13.1
-KUBECTL_VERSION ?= 1.35.4
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
