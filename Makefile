@@ -104,6 +104,7 @@ cluster-delete-mount: ## Remove data path for volume mount
 cluster-up: kind cluster-create-mount ## Create Kind cluster
 	$(KIND) create cluster --config ./dev/kind-config.yaml
 
+
 .PHONY: cluster-down
 cluster-down: kind ## Delete Kind cluster
 	$(KIND) delete cluster || true
@@ -176,6 +177,55 @@ helm-package: sync-deployment-crds ## Package Helm chart.
 .PHONY: helm-push
 helm-push: helm-package ## Package and push Helm chart to GHCR.
 	helm push chantico-$(VERSION).tgz $(GHCR_HELM_REPO)
+
+define DOCS_CHANGELOG_HEADER
+---
+title: "Changelog"
+weight: 60
+main:
+  parent: technical
+  weight: 50
+---
+
+endef
+export DOCS_CHANGELOG_HEADER
+
+GITHUB_REPOSITORY ?= chantico-project/chantico
+URL := https://github.com/$(GITHUB_REPOSITORY)
+DOCS_CHANGELOG_OUTPUT_PATH := docs/content/technical/changelog.md
+DOCS_PORT := 1313
+
+.PHONY: docs-build
+docs-build: doc2go hugo
+	@echo "Generating $(DOCS_CHANGELOG_OUTPUT_PATH)..."
+	@echo "$$DOCS_CHANGELOG_HEADER" > $(DOCS_CHANGELOG_OUTPUT_PATH)
+	@sed -E \
+		-e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1]($(URL)/releases/tag/v\1)|" \
+	    -e "s|\(([0-9a-f]{7,})\)|([\1]($(URL)/commit/\1))|" \
+	    -e "s|\(#([1-9][0-9]+)\)|([#\1]($(URL)/issues/\1))|" \
+		CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
+
+	@echo "Generating api reference with doc2go..."
+	@$(DOC2GO) -embed -highlight classes:monokai \
+		-basename _index.html \
+		-out docs/content/technical/api \
+		-frontmatter docs/frontmatter.tmpl \
+		-rel-link-style directory \
+		-internal ./...
+	
+	@echo "Building docs with Hugo..."
+	@$(HUGO) build --source docs
+
+.PHONY: docs-serve 
+docs-serve: docs-build
+	$(HUGO) server serve --source docs --port $(DOCS_PORT)
+
+.PHONY: docs-test 
+docs-test: muffet
+	@echo "Running tests..."
+	@$(MUFFET) --include="http://localhost:$(DOCS_PORT)/chantico" http://localhost:$(DOCS_PORT)/chantico/index.html
+
+
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -250,6 +300,9 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 KIND ?= $(LOCALBIN)/kind
+HUGO ?= $(LOCALBIN)/hugo
+MUFFET ?= $(LOCALBIN)/muffet
+DOC2GO ?= $(LOCALBIN)/doc2go
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.3
@@ -257,6 +310,9 @@ CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.19
 GOLANGCI_LINT_VERSION ?= v2.12.2
 KIND_VERSION ?= v0.30.0
+HUGO_VERSION ?= v0.163.3
+MUFFET_VERSION ?= v2.11.2
+DOC2GO_VERSION ?= v0.11.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -282,6 +338,22 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind,$(KIND_VERSION))
+
+.PHONY: hugo
+hugo: $(HUGO) ## Download hugo locally if necessary.
+$(HUGO): $(LOCALBIN)
+	$(call go-install-tool,$(HUGO),github.com/gohugoio/hugo,$(HUGO_VERSION))
+
+.PHONY: muffet
+muffet: $(MUFFET) ## Download muffet locally if necessary.
+$(MUFFET): $(LOCALBIN)
+	$(call go-install-tool,$(MUFFET),github.com/raviqqe/muffet/v2,$(MUFFET_VERSION))
+
+.PHONY: doc2go
+doc2go: $(DOC2GO) ## Download doc2go locally if necessary.
+$(DOC2GO): $(LOCALBIN)
+	$(call go-install-tool,$(DOC2GO),go.abhg.dev/doc2go,$(DOC2GO_VERSION))
+
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
