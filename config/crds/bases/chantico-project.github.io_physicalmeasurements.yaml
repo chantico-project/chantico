@@ -48,12 +48,9 @@ spec:
                 items:
                   type: string
                 type: array
-              serviceId:
-                type: string
             required:
             - ip
             - measurementDevice
-            - serviceId
             type: object
           status:
             description: PhysicalMeasurementStatus defines the observed state of PhysicalMeasurement

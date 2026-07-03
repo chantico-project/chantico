@@ -8,6 +8,5 @@ metadata:
   namespace: chantico
 spec:
   ip: chantico-snmp-mock.chantico.svc.cluster.local:1161
-  serviceId: dee263f8-50e0-11f0-8cb5-00155d8a81e1
-  measurementDevice:  tno
-  
+  measurementDevice: tno
+

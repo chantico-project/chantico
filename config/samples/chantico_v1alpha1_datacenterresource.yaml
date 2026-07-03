@@ -37,6 +37,7 @@ metadata:
   namespace: chantico
 spec:
   type: baremetal
+  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
   parents:
     - name: datacenterresource-pdu1
       coefficient: "1"
