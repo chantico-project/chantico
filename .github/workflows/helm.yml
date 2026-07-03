@@ -36,11 +36,12 @@ jobs:
             echo "registry=charts" >> $GITHUB_OUTPUT
             echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
           elif [ ! -z "${{ inputs.pr }}" ]; then
+            VERSION=$(helm show chart chart/ | sed -nE 's/^version: *//p')
             echo "registry=charts-pr" >> $GITHUB_OUTPUT
-            echo "version=pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
+            echo "version=$VERSION-pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
           else
-            echo "registry=charts" >> $GITHUB_OUTPUT
-            echo "version=latest" >> $GITHUB_OUTPUT
+            echo "One of 'version' or 'pr' input parameters must be provided." >&2
+            exit 1
           fi
 
       - name: Setup Helm
