@@ -1,3 +1,4 @@
+# Main CI workflow using reusable workflows
 name: CI
 
 on:
@@ -84,6 +85,15 @@ jobs:
       pr: ${{ github.event.pull_request.number }}
     secrets: inherit
 
+  invoke-helm:
+    if: github.event_name == 'pull_request'
+    needs: test
+    uses: ./.github/workflows/helm.yml
+    with:
+      ref: ${{ github.ref }}
+      pr: ${{ github.event.pull_request.number }}
+    secrets: inherit
+
   invoke-docs:
     uses: ./.github/workflows/docs.yml
     with:
@@ -155,6 +165,15 @@ jobs:
     if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
     needs: release
     uses: ./.github/workflows/docker.yml
+    with:
+      ref: refs/tags/v${{ needs.release.outputs.version }}
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
+
+  invoke-helm-release:
+    if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
+    needs: release
+    uses: ./.github/workflows/helm.yml
     with:
       ref: refs/tags/v${{ needs.release.outputs.version }}
       version: ${{ needs.release.outputs.version }}
