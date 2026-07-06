@@ -107,7 +107,6 @@ jobs:
 
           go run server.go &
           echo $! > server.pid
-
       - name: Run link checker
         run: |
           make docs-test
