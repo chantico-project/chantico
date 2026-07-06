@@ -109,9 +109,13 @@ jobs:
 
           go run server.go &
           echo $! > server.pid
+
+      - name: Install muffet
+        run: go install github.com/raviqqe/muffet/v2@v2.11.2
+
       - name: Run link checker
         run: |
-          make docs-test
+          muffet --verbose --include="http://localhost:${DOCS_PORT}" http://localhost:${DOCS_PORT}/index.html
 
       - name: Stop server
         if: always()
