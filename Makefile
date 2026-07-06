@@ -178,52 +178,6 @@ helm-package: sync-deployment-crds ## Package Helm chart.
 helm-push: helm-package ## Package and push Helm chart to GHCR.
 	helm push chantico-$(VERSION).tgz $(GHCR_HELM_REPO)
 
-define DOCS_CHANGELOG_HEADER
----
-title: "Changelog"
-weight: 60
-main:
-  parent: technical
-  weight: 50
----
-
-endef
-export DOCS_CHANGELOG_HEADER
-
-GITHUB_REPOSITORY ?= chantico-project/chantico
-URL := https://github.com/$(GITHUB_REPOSITORY)
-DOCS_CHANGELOG_OUTPUT_PATH := docs/content/technical/changelog.md
-DOCS_PORT := 1313
-
-.PHONY: docs-build
-docs-build: doc2go hugo
-	@echo "Generating $(DOCS_CHANGELOG_OUTPUT_PATH)..."
-	@echo "$$DOCS_CHANGELOG_HEADER" > $(DOCS_CHANGELOG_OUTPUT_PATH)
-	@sed -E \
-		-e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1]($(URL)/releases/tag/v\1)|" \
-	    -e "s|\(([0-9a-f]{7,})\)|([\1]($(URL)/commit/\1))|" \
-	    -e "s|\(#([1-9][0-9]+)\)|([#\1]($(URL)/issues/\1))|" \
-		CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
-
-	@echo "Generating api reference with doc2go..."
-	@$(DOC2GO) -embed -highlight classes:monokai \
-		-basename _index.html \
-		-out docs/content/technical/api \
-		-frontmatter docs/frontmatter.tmpl \
-		-rel-link-style directory \
-		-internal ./...
-	
-	@echo "Building docs with Hugo..."
-	@$(HUGO) build --source docs
-
-.PHONY: docs-serve 
-docs-serve: docs-build
-	$(HUGO) server serve --source docs --port $(DOCS_PORT)
-
-.PHONY: docs-test 
-docs-test: muffet
-	@echo "Running tests..."
-	@$(MUFFET) --include="http://localhost:$(DOCS_PORT)/chantico" http://localhost:$(DOCS_PORT)/chantico/index.html
 
 
 
@@ -249,6 +203,58 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	mkdir -p dist
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
+
+##@ Docs
+
+define DOCS_CHANGELOG_HEADER
+---
+title: "Changelog"
+weight: 60
+main:
+  parent: technical
+  weight: 50
+---
+
+endef
+export DOCS_CHANGELOG_HEADER
+
+GITHUB_REPOSITORY ?= chantico-project/chantico
+URL := https://github.com/$(GITHUB_REPOSITORY)
+DOCS_CHANGELOG_OUTPUT_PATH := docs/content/technical/changelog.md
+DOCS_PORT := 1313
+DOCS_REL_LINK_STYLE ?= directory
+
+
+.PHONY: docs-build
+docs-build: doc2go hugo ## Build the documentation
+	@echo "Generating api reference with doc2go..."
+	@$(DOC2GO) -embed -highlight classes:monokai \
+		-basename _index.html \
+		-out docs/content/technical/api \
+		-frontmatter docs/frontmatter.tmpl \
+		-rel-link-style $(DOCS_REL_LINK_STYLE) \
+		-internal ./...
+
+	@echo "Generating $(DOCS_CHANGELOG_OUTPUT_PATH)..."
+	@echo "$$DOCS_CHANGELOG_HEADER" > $(DOCS_CHANGELOG_OUTPUT_PATH)
+	@sed -E \
+		-e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1]($(URL)/releases/tag/v\1)|" \
+	    -e "s|\(([0-9a-f]{7,})\)|([\1]($(URL)/commit/\1))|" \
+	    -e "s|\(#([1-9][0-9]+)\)|([#\1]($(URL)/issues/\1))|" \
+		CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
+
+	@echo "Building docs with Hugo..."
+	@$(HUGO) build --source docs
+
+.PHONY: docs-serve 
+docs-serve: docs-build ## Build and run the documentation
+	$(HUGO) server serve --source docs --port $(DOCS_PORT)
+
+.PHONY: docs-test 
+docs-test: muffet ## Runs tests against documentation (requires documentation to be hosted at localhost)
+	@echo "Running tests..."
+	@$(MUFFET) --include="http://localhost:$(DOCS_PORT)/chantico" http://localhost:$(DOCS_PORT)/chantico/index.html
+	@echo "All tests successful"
 
 ##@ Deployment
 
