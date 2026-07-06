@@ -221,6 +221,7 @@ export DOCS_CHANGELOG_HEADER
 GITHUB_REPOSITORY ?= chantico-project/chantico
 URL := https://github.com/$(GITHUB_REPOSITORY)
 DOCS_CHANGELOG_OUTPUT_PATH := docs/content/technical/changelog.md
+DOCS_DIRECTORY ?= docs
 DOCS_PORT := 1313
 DOCS_REL_LINK_STYLE ?= directory
 
@@ -230,8 +231,8 @@ docs-build: doc2go hugo ## Build the documentation
 	@echo "Generating api reference with doc2go..."
 	@$(DOC2GO) -embed -highlight classes:monokai \
 		-basename _index.html \
-		-out docs/content/technical/api \
-		-frontmatter docs/frontmatter.tmpl \
+		-out $(DOCS_DIRECTORY)/content/technical/api \
+		-frontmatter $(DOCS_DIRECTORY)/frontmatter.tmpl \
 		-rel-link-style $(DOCS_REL_LINK_STYLE) \
 		-internal ./...
 
@@ -244,11 +245,14 @@ docs-build: doc2go hugo ## Build the documentation
 		CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
 
 	@echo "Building docs with Hugo..."
-	@$(HUGO) build --source docs
+	@$(HUGO) build --source $(DOCS_DIRECTORY)
 
 .PHONY: docs-serve 
-docs-serve: docs-build ## Build and run the documentation
-	$(HUGO) server serve --source docs --port $(DOCS_PORT)
+docs-serve: docs-build docs-serve-only ## Build and run the documentation
+
+.PHONY: docs-serve-only
+docs-serve: ## Run the documentation
+	$(HUGO) server serve --source $(DOCS_DIRECTORY) --port $(DOCS_PORT)
 
 .PHONY: docs-test 
 docs-test: muffet ## Runs tests against documentation (requires documentation to be hosted at localhost)
