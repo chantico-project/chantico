@@ -1,0 +1,25 @@
+TNO-ANOTHERPDU-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    OBJECT-TYPE FROM SNMPv2-SMI;
+
+-- Define enterprises explicitly
+enterprises OBJECT IDENTIFIER ::= { iso(1) org(3) dod(6) internet(1) private(4) 1 }
+
+anotherTnoPdu OBJECT IDENTIFIER ::= { enterprises 98998 }
+
+tnoPduEnergyValue OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Another random energy value (in J)"
+    ::= { anotherTnoPdu 1 }
+
+tnoPduPowerValue OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Another random power value (in W)"
+    ::= { anotherTnoPdu 2 }
+
+END
