@@ -5,7 +5,7 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.6.3
 
-# Image URL to use all building/pushing image targets
+# Image REPOSITORY_URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
 CHANTICO_DATA_PATH ?= .chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
@@ -219,11 +219,10 @@ endef
 export DOCS_CHANGELOG_HEADER
 
 GITHUB_REPOSITORY ?= chantico-project/chantico
-URL := https://github.com/$(GITHUB_REPOSITORY)
-DOCS_CHANGELOG_OUTPUT_PATH := docs/content/technical/changelog.md
+REPOSITORY_URL := https://github.com/$(GITHUB_REPOSITORY)
 DOCS_DIRECTORY ?= docs
+DOCS_CHANGELOG_OUTPUT_PATH := $(DOCS_DIRECTORY)/content/technical/changelog.md
 DOCS_PORT := 1313
-DOCS_REL_LINK_STYLE ?= directory
 
 
 .PHONY: docs-build
@@ -233,15 +232,15 @@ docs-build: doc2go hugo ## Build the documentation
 		-basename _index.html \
 		-out $(DOCS_DIRECTORY)/content/technical/api \
 		-frontmatter $(DOCS_DIRECTORY)/frontmatter.tmpl \
-		-rel-link-style $(DOCS_REL_LINK_STYLE) \
+		-rel-link-style directory \
 		-internal ./...
 
 	@echo "Generating $(DOCS_CHANGELOG_OUTPUT_PATH)..."
 	@echo "$$DOCS_CHANGELOG_HEADER" > $(DOCS_CHANGELOG_OUTPUT_PATH)
 	@sed -E \
-		-e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1]($(URL)/releases/tag/v\1)|" \
-	    -e "s|\(([0-9a-f]{7,})\)|([\1]($(URL)/commit/\1))|" \
-	    -e "s|\(#([1-9][0-9]+)\)|([#\1]($(URL)/issues/\1))|" \
+		-e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1]($(REPOSITORY_URL)/releases/tag/v\1)|" \
+	    -e "s|\(([0-9a-f]{7,})\)|([\1]($(REPOSITORY_URL)/commit/\1))|" \
+	    -e "s|\(#([1-9][0-9]+)\)|([#\1]($(REPOSITORY_URL)/issues/\1))|" \
 		CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
 
 	@echo "Building docs with Hugo..."
@@ -251,7 +250,7 @@ docs-build: doc2go hugo ## Build the documentation
 docs-serve: docs-build docs-serve-only ## Build and run the documentation
 
 .PHONY: docs-serve-only
-docs-serve: ## Run the documentation
+docs-serve-only: ## Run the documentation
 	$(HUGO) server serve --source $(DOCS_DIRECTORY) --port $(DOCS_PORT)
 
 .PHONY: docs-test 
@@ -289,7 +288,7 @@ $(LOCALBIN):
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
-# $2 - package url which can be installed
+# $2 - package REPOSITORY_URL which can be installed
 # $3 - specific version of package
 define go-install-tool
 @[ -f "$(1)-$(3)" ] || { \
@@ -367,7 +366,7 @@ $(DOC2GO): $(LOCALBIN)
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
-# $2 - package url which can be installed
+# $2 - package REPOSITORY_URL which can be installed
 # $3 - specific version of package
 define go-install-tool
 @[ -f "$(1)-$(3)" ] && [ "$$(readlink -- "$(1)" 2>/dev/null)" = "$(1)-$(3)" ] || { \

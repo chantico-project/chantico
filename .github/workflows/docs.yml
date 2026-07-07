@@ -32,94 +32,21 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Generate docs
+      - name: Build and run documentation
         env:
           GOTOOLCHAIN: auto
         run: |
-          REL_LINK_STYLE=index
-          if [[ "${{ inputs.ref }}" == "main" ]]; then
-            REL_LINK_STYLE=directory
-          fi
-          export REL_LINK_STYLE
-          make docs-build
+          make docs-serve &
+          sleep 5  # could become a while loop check if unstable
+
+      - name: Run tests against local server
+        run: |
+          make docs-test
 
       - uses: actions/upload-artifact@v7
         with:
           name: docs-${{ steps.clean_name.outputs.clean_ref }}
-          path: docs
-
-  # Documentation preview artifact
-  preview:
-    if: inputs.ref != 'refs/heads/main' && !startsWith(inputs.ref, 'refs/tags/v')
-    needs: docs
-    runs-on: ubuntu-latest
-    container:
-      image: hugomods/hugo:debian-exts
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: docs-${{ needs.docs.outputs.clean_ref }}
-          path: docs
-
-      - name: Build preview
-        run: |
-          cd docs
-          hugo --baseURL="/" --config "hugo.toml,hugo.preview.toml"
-
-      - name: Upload preview artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: hugo-preview-${{ needs.docs.outputs.clean_ref }}
           path: docs/public
-
-  # Check links in documentation preview
-  docs-check-links:
-    if: inputs.ref != 'refs/heads/main' && !startsWith(inputs.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    needs: [docs, preview]
-    continue-on-error: true
-    env:
-      DOCS_PORT: 8000
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: hugo-preview-${{ needs.docs.outputs.clean_ref }}
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Start local server
-        run: |
-          cat <<'EOF' > server.go
-          package main
-          import (
-            "log"
-            "net/http"
-            "os"
-          )
-          func main() {
-            port := os.Getenv("DOCS_PORT")
-            log.Printf("Serving on :%s", port)
-            log.Fatal(http.ListenAndServe(":" + port, http.FileServer(http.Dir("."))))
-          }
-          EOF
-
-          go run server.go &
-          echo $! > server.pid
-
-      - name: Install muffet
-        run: go install github.com/raviqqe/muffet/v2@v2.11.2
-
-      - name: Run link checker
-        run: |
-          muffet --verbose --include="http://localhost:${DOCS_PORT}" http://localhost:${DOCS_PORT}/index.html
-
-      - name: Stop server
-        if: always()
-        run: kill $(cat server.pid)
 
   # Deployment of documentation to GitHub Pages
   pages:
@@ -129,28 +56,16 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
-    container:
-      image: hugomods/hugo:debian-exts
-
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.ref }}
-
       - uses: actions/download-artifact@v8
         with:
           name: docs-${{ needs.docs.outputs.clean_ref }}
-          path: docs
-
-      - name: Build site
-        run: |
-          cd docs
-          hugo --baseURL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          path: public-html
 
       - uses: actions/upload-pages-artifact@v5
         with:
           name: pages-${{ needs.docs.outputs.clean_ref }}
-          path: docs/public
+          path: public-html
 
       - id: deploy
         uses: actions/deploy-pages@v5
