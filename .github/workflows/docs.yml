@@ -37,7 +37,21 @@ jobs:
           GOTOOLCHAIN: auto
         run: |
           make docs-serve &
-          sleep 5  # could become a while loop check if unstable
+
+          echo "Waiting for Hugo server on port ${{ env.DOCS_PORT }}..."
+          TIMEOUT=180
+          ELAPSED=0
+          
+          while ! curl -s --head http://localhost:${{ env.DOCS_PORT }} > /dev/null; do
+            if [ $ELAPSED -ge $TIMEOUT ]; then
+              echo "Error: Hugo server failed to start within $TIMEOUT seconds."
+              exit 1
+            fi
+            sleep 1
+            ELAPSED=$((ELAPSED + 1))
+          done
+          
+          echo "Hugo server is up and running!"
 
       - name: Run tests against local server
         run: |
