@@ -1,3 +1,9 @@
+## 0.6.5 (2026-07-07)
+
+#### Bug Fixes
+
+* Correct clean ref variable for docs release (#171) (f036a471)
+
 ## 0.6.4 (2026-07-07)
 
 #### Bug Fixes
