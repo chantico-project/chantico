@@ -5,7 +5,7 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.6.3
 
-# Image URL to use all building/pushing image targets
+# Image REPOSITORY_URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
 CHANTICO_DATA_PATH ?= .chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
@@ -104,6 +104,7 @@ cluster-delete-mount: ## Remove data path for volume mount
 cluster-up: kind cluster-create-mount ## Create Kind cluster
 	$(KIND) create cluster --config ./dev/kind-config.yaml
 
+
 .PHONY: cluster-down
 cluster-down: kind ## Delete Kind cluster
 	$(KIND) delete cluster || true
@@ -177,6 +178,9 @@ helm-package: sync-deployment-crds ## Package Helm chart.
 helm-push: helm-package ## Package and push Helm chart to GHCR.
 	helm push chantico-$(VERSION).tgz $(GHCR_HELM_REPO)
 
+
+
+
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
 # - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
@@ -199,6 +203,68 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	mkdir -p dist
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
+
+##@ Docs
+
+define DOCS_CHANGELOG_HEADER
+---
+title: "Changelog"
+weight: 60
+main:
+  parent: technical
+  weight: 50
+---
+
+endef
+export DOCS_CHANGELOG_HEADER
+
+GITHUB_REPOSITORY ?= chantico-project/chantico
+REPOSITORY_URL := https://github.com/$(GITHUB_REPOSITORY)
+DOCS_DIRECTORY ?= docs
+DOCS_CHANGELOG_OUTPUT_PATH := $(DOCS_DIRECTORY)/content/technical/changelog.md
+DOCS_PORT := 1313
+DOCS_VERBOSE ?= false
+
+ifeq ($(DOCS_VERBOSE),true)
+    MUFFET_VERBOSE_FLAG := --verbose
+else
+    MUFFET_VERBOSE_FLAG :=
+endif
+
+
+.PHONY: docs-build
+docs-build: doc2go hugo ## Build the documentation
+	@echo "Generating api reference with doc2go..."
+	@$(DOC2GO) -embed -highlight classes:monokai \
+		-basename _index.html \
+		-out $(DOCS_DIRECTORY)/content/technical/api \
+		-frontmatter $(DOCS_DIRECTORY)/frontmatter.tmpl \
+		-rel-link-style directory \
+		-internal ./...
+
+	@echo "Generating $(DOCS_CHANGELOG_OUTPUT_PATH)..."
+	@echo "$$DOCS_CHANGELOG_HEADER" > $(DOCS_CHANGELOG_OUTPUT_PATH)
+	@sed -E \
+		-e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1]($(REPOSITORY_URL)/releases/tag/v\1)|" \
+	    -e "s|\(([0-9a-f]{7,})\)|([\1]($(REPOSITORY_URL)/commit/\1))|" \
+	    -e "s|\(#([1-9][0-9]+)\)|([#\1]($(REPOSITORY_URL)/issues/\1))|" \
+		CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
+
+	@echo "Building docs with Hugo..."
+	@$(HUGO) build --source $(DOCS_DIRECTORY)
+
+.PHONY: docs-serve 
+docs-serve: docs-build docs-serve-only ## Build and run the documentation
+
+.PHONY: docs-serve-only
+docs-serve-only: ## Run the documentation
+	$(HUGO) server serve --source $(DOCS_DIRECTORY) --port $(DOCS_PORT)
+
+.PHONY: docs-test 
+docs-test: muffet ## Runs tests against documentation (requires documentation to be hosted at localhost)
+	@echo "Running tests..."
+	@$(MUFFET) $(MUFFET_VERBOSE_FLAG) --include="http://localhost:$(DOCS_PORT)/chantico" http://localhost:$(DOCS_PORT)/chantico/index.html
+	@echo "All tests successful"
 
 ##@ Deployment
 
@@ -229,7 +295,7 @@ $(LOCALBIN):
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
-# $2 - package url which can be installed
+# $2 - package REPOSITORY_URL which can be installed
 # $3 - specific version of package
 define go-install-tool
 @[ -f "$(1)-$(3)" ] || { \
@@ -250,6 +316,9 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 KIND ?= $(LOCALBIN)/kind
+HUGO ?= $(LOCALBIN)/hugo
+MUFFET ?= $(LOCALBIN)/muffet
+DOC2GO ?= $(LOCALBIN)/doc2go
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.3
@@ -257,6 +326,9 @@ CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.19
 GOLANGCI_LINT_VERSION ?= v2.12.2
 KIND_VERSION ?= v0.30.0
+HUGO_VERSION ?= v0.163.3
+MUFFET_VERSION ?= v2.11.2
+DOC2GO_VERSION ?= v0.11.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -283,9 +355,25 @@ kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind,$(KIND_VERSION))
 
+.PHONY: hugo
+hugo: $(HUGO) ## Download hugo locally if necessary.
+$(HUGO): $(LOCALBIN)
+	$(call go-install-tool,$(HUGO),github.com/gohugoio/hugo,$(HUGO_VERSION))
+
+.PHONY: muffet
+muffet: $(MUFFET) ## Download muffet locally if necessary.
+$(MUFFET): $(LOCALBIN)
+	$(call go-install-tool,$(MUFFET),github.com/raviqqe/muffet/v2,$(MUFFET_VERSION))
+
+.PHONY: doc2go
+doc2go: $(DOC2GO) ## Download doc2go locally if necessary.
+$(DOC2GO): $(LOCALBIN)
+	$(call go-install-tool,$(DOC2GO),go.abhg.dev/doc2go,$(DOC2GO_VERSION))
+
+
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
-# $2 - package url which can be installed
+# $2 - package REPOSITORY_URL which can be installed
 # $3 - specific version of package
 define go-install-tool
 @[ -f "$(1)-$(3)" ] && [ "$$(readlink -- "$(1)" 2>/dev/null)" = "$(1)-$(3)" ] || { \

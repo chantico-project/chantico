@@ -20,13 +20,13 @@ go.work
 
 # Documentation additions
 docs/assets/css/
-docs/technical/api/
-docs/technical/changelog.md
+docs/content/technical/api/
+docs/content/technical/changelog.md
 # Hugo generated output
 .hugo_build.lock
-docs/hugo/public/
-docs/hugo/resources/_gen/
-docs/hugo/hugo_stats.json
+docs/public/
+docs/resources/_gen/
+docs/hugo_stats.json
 
 # Kubernetes Generated files - skip generated files, except for vendored files
 !vendor/**/zz_generated.*

@@ -8,7 +8,7 @@ on:
         type: string
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
 
 jobs:
   # Documentation build
@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       clean_ref: ${{ steps.clean_name.outputs.clean_ref }}
+    env:
+      DOCS_PORT: 1313
+      DOCS_VERBOSE: true
     steps:
       - uses: actions/checkout@v6
         with:
@@ -32,101 +35,33 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Generate docs
+      - name: Build and run documentation
         run: |
-          go install go.abhg.dev/doc2go@v0.11.0
+          make docs-serve &
 
-          REL_LINK_STYLE=index
-          if [[ "${{ inputs.ref }}" == "main" ]]; then
-            REL_LINK_STYLE=directory
-          fi
+          echo "Waiting for Hugo server on port ${{ env.DOCS_PORT }}..."
+          TIMEOUT=180
+          ELAPSED=0
+          
+          while ! curl -s --head http://localhost:${{ env.DOCS_PORT }} > /dev/null; do
+            if [ $ELAPSED -ge $TIMEOUT ]; then
+              echo "Error: Hugo server failed to start within $TIMEOUT seconds."
+              exit 1
+            fi
+            sleep 1
+            ELAPSED=$((ELAPSED + 1))
+          done
+          
+          echo "Hugo server is up and running!"
 
-          doc2go -embed -highlight classes:monokai \
-            -basename _index.html \
-            -out docs/technical/api \
-            -frontmatter docs/hugo/frontmatter.tmpl \
-            -rel-link-style $REL_LINK_STYLE \
-            -internal ./...
-
-          find docs/technical/api -type f -name '*.html' -print0 | xargs -0 sed -i 's/_index\.html/index.html/g'
-          printf -- "---\ntitle: "Changelog"\nweight: 60\nmain:\n  parent: technical\n  weight: 50\n---\n%s" "$(sed -E -e "s|\(([0-9a-f]{7,})\)|([\1](https://github.com/$GITHUB_REPOSITORY/commit/\1))|" -e "s|^## ([0-9]+\.[0-9]+\.[0-9]+)|## [\1](https://github.com/$GITHUB_REPOSITORY/releases/tag/v\1)|" -e "s|\(#([1-9][0-9]+)\)|([#\1](https://github.com/$GITHUB_REPOSITORY/issues/\1))|" CHANGELOG.md)" > docs/technical/changelog.md
+      - name: Run tests against local server
+        run: |
+          make docs-test
 
       - uses: actions/upload-artifact@v7
         with:
           name: docs-${{ steps.clean_name.outputs.clean_ref }}
-          path: docs
-
-  # Documentation preview artifact
-  preview:
-    if: inputs.ref != 'refs/heads/main' && !startsWith(inputs.ref, 'refs/tags/v')
-    needs: docs
-    runs-on: ubuntu-latest
-    container:
-      image: hugomods/hugo:debian-exts
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: docs-${{ needs.docs.outputs.clean_ref }}
-          path: docs
-
-      - name: Build preview
-        run: |
-          cd docs/hugo
-          hugo --baseURL="/" --config "hugo.toml,hugo.preview.toml"
-
-      - name: Upload preview artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: hugo-preview-${{ needs.docs.outputs.clean_ref }}
-          path: docs/hugo/public
-
-  # Check links in documentation preview
-  docs-check-links:
-    if: inputs.ref != 'refs/heads/main' && !startsWith(inputs.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    needs: [docs, preview]
-    continue-on-error: true
-
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: hugo-preview-${{ needs.docs.outputs.clean_ref }}
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Start local server
-        run: |
-          cat <<'EOF' > server.go
-          package main
-          import (
-            "log"
-            "net/http"
-          )
-          func main() {
-            log.Println("Serving on :8000")
-            log.Fatal(http.ListenAndServe(":8000", http.FileServer(http.Dir("."))))
-          }
-          EOF
-
-          go run server.go &
-          echo $! > server.pid
-
-      - name: Install muffet
-        run: go install github.com/raviqqe/muffet/v2@v2.11.2
-
-      - name: Run link checker
-        run: |
-          muffet --verbose --include="http://localhost:8000" http://localhost:8000/index.html
-
-      - name: Stop server
-        if: always()
-        run: kill $(cat server.pid)
+          path: docs/public
 
   # Deployment of documentation to GitHub Pages
   pages:
@@ -136,29 +71,16 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
-    container:
-      image: hugomods/hugo:debian-exts
-
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.ref }}
-          submodules: recursive
-
       - uses: actions/download-artifact@v8
         with:
           name: docs-${{ needs.docs.outputs.clean_ref }}
-          path: docs
-
-      - name: Build site
-        run: |
-          cd docs/hugo
-          hugo --baseURL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          path: public-html
 
       - uses: actions/upload-pages-artifact@v5
         with:
           name: pages-${{ needs.docs.outputs.clean_ref }}
-          path: docs/hugo/public
+          path: public-html
 
       - id: deploy
         uses: actions/deploy-pages@v5
