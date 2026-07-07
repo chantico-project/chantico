@@ -28,7 +28,7 @@ jobs:
         id: clean_name
         run: |
           # Use sed to replace all '/' with '-'
-          CLEAN_REF=$(echo "${{ github.ref }}" | sed 's/\//-/g')
+          CLEAN_REF=$(echo "${{ inputs.ref }}" | sed 's/\//-/g')
           echo "clean_ref=${CLEAN_REF}" >> $GITHUB_OUTPUT
 
       - uses: actions/setup-go@v6
