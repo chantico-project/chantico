@@ -120,7 +120,7 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace, hel
 	helm upgrade --install chantico ./chart/ \
 		--namespace chantico \
 		--set controller.include=false \
-    	--set securityContext.runAsUser="$(shell id -u)" \
+		--set securityContext.runAsUser="$(shell id -u)" \
 		--set securityContext.runAsGroup="$(shell id -g)" \
 		--set persistentVolumeClaimName=$(CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME) \
 		--set pvc.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
