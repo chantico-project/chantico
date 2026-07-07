@@ -1,6 +1,6 @@
 module chantico
 
-go 1.25.8
+go 1.26.4
 
 require (
 	github.com/go-logr/logr v1.4.3
