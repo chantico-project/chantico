@@ -8,7 +8,7 @@ on:
         type: string
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
 
 jobs:
   # Documentation build
@@ -18,6 +18,7 @@ jobs:
       clean_ref: ${{ steps.clean_name.outputs.clean_ref }}
     env:
       DOCS_PORT: 1313
+      DOCS_VERBOSE: true
     steps:
       - uses: actions/checkout@v6
         with:
@@ -35,8 +36,6 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Build and run documentation
-        env:
-          GOTOOLCHAIN: auto
         run: |
           make docs-serve &
 

@@ -223,6 +223,13 @@ REPOSITORY_URL := https://github.com/$(GITHUB_REPOSITORY)
 DOCS_DIRECTORY ?= docs
 DOCS_CHANGELOG_OUTPUT_PATH := $(DOCS_DIRECTORY)/content/technical/changelog.md
 DOCS_PORT := 1313
+DOCS_VERBOSE ?= false
+
+ifeq ($(DOCS_VERBOSE),true)
+    MUFFET_VERBOSE_FLAG := --verbose
+else
+    MUFFET_VERBOSE_FLAG :=
+endif
 
 
 .PHONY: docs-build
@@ -256,7 +263,7 @@ docs-serve-only: ## Run the documentation
 .PHONY: docs-test 
 docs-test: muffet ## Runs tests against documentation (requires documentation to be hosted at localhost)
 	@echo "Running tests..."
-	@$(MUFFET) --include="http://localhost:$(DOCS_PORT)/chantico" http://localhost:$(DOCS_PORT)/chantico/index.html
+	@$(MUFFET) $(MUFFET_VERBOSE_FLAG) --include="http://localhost:$(DOCS_PORT)/chantico" http://localhost:$(DOCS_PORT)/chantico/index.html
 	@echo "All tests successful"
 
 ##@ Deployment
