@@ -76,7 +76,7 @@ jobs:
             coverage.xml
 
   invoke-docker:
-    if: github.repository == 'chantico-project/chantico' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
+    if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
     needs: test
     uses: ./.github/workflows/docker.yml
     with:
