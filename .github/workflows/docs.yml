@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       clean_ref: ${{ steps.clean_name.outputs.clean_ref }}
+    env:
+      DOCS_PORT: 1313
     steps:
       - uses: actions/checkout@v6
         with:
