@@ -1,3 +1,14 @@
+## 0.6.4 (2026-07-07)
+
+#### Bug Fixes
+
+* Upgrade minimum go version to 1.25.11 and default to 1.26 (#169) (895fa43c)
+* update docs pipeline (#164) (e49f1098)
+
+#### Chores
+
+* **ci:** Include sanitized ref name in docs workflow artifacts (c6a33a50)
+
 ## 0.6.3 (2026-06-26)
 
 #### Bug Fixes
