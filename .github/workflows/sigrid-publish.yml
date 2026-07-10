@@ -15,8 +15,8 @@ jobs:
       - name: Sigrid CI
         uses: Software-Improvement-Group/sigridci@main
         with:
-          customer: examplecustomername
-          system: examplesystemname
+          customer: tno
+          system: chantico
           publishonly: true
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
