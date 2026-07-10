@@ -10,6 +10,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	TestServiceId = "1dd362fd-758b-49cd-90b3-7d4d958b2c65"
+)
+
 func TestValidate(t *testing.T) {
 	testCases := map[string]struct {
 		Resource                 *chantico.DataCenterResource
@@ -221,6 +225,68 @@ func TestValidate(t *testing.T) {
 			ExpectedError:            ErrorCycleDetected{InvolvedResource: "bar"},
 			ExpectedInvolvedResource: "bar",
 		},
+		"gives error if service id is found on non-leaf node": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:      "pdu",
+					ServiceId: TestServiceId,
+				},
+			},
+			Resources: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:      "pdu",
+					ServiceId: TestServiceId,
+				},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "foo"}},
+				},
+			}},
+			ExpectedVisited:          []chantico.DataCenterResource{},
+			ExpectedError:            ErrorServiceDefinedOnParent{InvolvedResource: "foo"},
+			ExpectedInvolvedResource: "foo",
+		},
+		"gives error if service id is found on parent node": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "foo"}},
+				},
+			},
+			Resources: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:      "pdu",
+					ServiceId: TestServiceId,
+				},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "foo"}},
+				},
+			}},
+			ExpectedVisited:          []chantico.DataCenterResource{},
+			ExpectedError:            ErrorServiceDefinedOnParent{InvolvedResource: "foo"},
+			ExpectedInvolvedResource: "foo",
+		},
 		"gives error if a self-reference is found": {
 			Resource: &chantico.DataCenterResource{
 				ObjectMeta: metav1.ObjectMeta{
@@ -263,7 +329,7 @@ func TestValidate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			visited, err, involvedResource := Validate(tc.Resource, tc.Resources, []chantico.PhysicalMeasurement{})
+			visited, involvedResource, err := Validate(tc.Resource, tc.Resources, []chantico.PhysicalMeasurement{})
 			if !reflect.DeepEqual(visited, tc.ExpectedVisited) || !errors.Is(err, tc.ExpectedError) || involvedResource != tc.ExpectedInvolvedResource {
 				t.Errorf("Validate(%#v, %#v) = %#v, %#v, want %#v, %#v\n)", tc.Resource, FormatResources(tc.Resources), FormatResources(visited), err, FormatResources(tc.ExpectedVisited), tc.ExpectedError)
 			}
