@@ -116,6 +116,9 @@ func buildEnergyAliasRule(
 	return &RecordingRule{
 		Record: EnergyMetricName(dataCenterResource.Name),
 		Expr:   dataCenterResource.Spec.EnergyMetric,
+		Labels: map[string]string{
+			"serviceId": dataCenterResource.Spec.ServiceId,
+		},
 	}
 }
 

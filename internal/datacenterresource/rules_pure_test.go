@@ -137,6 +137,7 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type:         DataCenterResourceTypePDU,
 			EnergyMetric: "snmp_pdu1_power_watts",
+			ServiceId:    "3d88f471-674f-4446-9de2-54e5faa2c951",
 		},
 	}
 
@@ -145,8 +146,9 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 		t.Fatalf("Expected 1 alias rule for root node, got %d rules", len(rules))
 	}
 	testExpectedRule(t, rules[0], ExpectedRule{
-		Record: "datacenter:pdu1:energy_watts",
-		Expr:   "snmp_pdu1_power_watts",
+		Record:         "datacenter:pdu1:energy_watts",
+		Expr:           "snmp_pdu1_power_watts",
+		ServiceIdLabel: "3d88f471-674f-4446-9de2-54e5faa2c951",
 	})
 }
 
