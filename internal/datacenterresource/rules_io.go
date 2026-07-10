@@ -103,13 +103,13 @@ func DeleteRuleFile(
 	ctx context.Context,
 	dataCenterResource *chantico.DataCenterResource,
 ) *sm.ActionResult {
-	deleteRuleFileFromDisk(dataCenterResource.Name)
+	DeleteRuleFileFromDisk(dataCenterResource.Name)
 	reloadPrometheus()
 	return nil
 }
 
-// deleteRuleFileFromDisk removes the rule file for the named resource.
-func deleteRuleFileFromDisk(resourceName string) {
+// DeleteRuleFileFromDisk removes the rule file for the named resource.
+func DeleteRuleFileFromDisk(resourceName string) {
 	volumePath := config.ValidatedEnv.VolumeLocation
 	rulePath := filepath.Join(volumePath, prometheusRulesDir, resourceName+".yml")
 

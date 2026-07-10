@@ -44,21 +44,21 @@ type RuleFile struct {
 // EnergyMetricName returns the deterministic Prometheus metric name for a
 // DataCenterResource's energy timeseries.
 func EnergyMetricName(resourceName string) string {
-	sanitized := sanitizeMetricName(resourceName)
+	sanitized := SanitizeMetricName(resourceName)
 	return fmt.Sprintf("datacenter:%s:energy_watts", sanitized)
 }
 
 // CoefficientMetricName returns the deterministic Prometheus metric name for
 // the coefficient from parent to child.
 func CoefficientMetricName(parentName, childName string) string {
-	sanitizedParent := sanitizeMetricName(parentName)
-	sanitizedChild := sanitizeMetricName(childName)
+	sanitizedParent := SanitizeMetricName(parentName)
+	sanitizedChild := SanitizeMetricName(childName)
 	return fmt.Sprintf("coefficient_%s_%s", sanitizedParent, sanitizedChild)
 }
 
-// sanitizeMetricName replaces characters that are not valid in Prometheus
+// SanitizeMetricName replaces characters that are not valid in Prometheus
 // metric names with underscores.
-func sanitizeMetricName(name string) string {
+func SanitizeMetricName(name string) string {
 	return strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
 			return r
@@ -84,15 +84,15 @@ func BuildRecordingRules(
 	var rules []RecordingRule
 
 	// 1. Root-node alias: map raw energyMetric → canonical name
-	if aliasRule := buildEnergyAliasRule(dataCenterResource); aliasRule != nil {
+	if aliasRule := BuildEnergyAliasRule(dataCenterResource); aliasRule != nil {
 		rules = append(rules, *aliasRule)
 	}
 
 	// 2. Coefficient rules for each parent
-	rules = append(rules, buildCoefficientRules(dataCenterResource)...)
+	rules = append(rules, BuildCoefficientRules(dataCenterResource)...)
 
 	// 3. Energy rule for this node (non-root only)
-	energyRule := buildEnergyRule(dataCenterResource)
+	energyRule := BuildEnergyRule(dataCenterResource)
 	if energyRule != nil {
 		rules = append(rules, *energyRule)
 	}
@@ -106,7 +106,7 @@ func BuildRecordingRules(
 // reference the parent's energy using a uniform naming convention.
 //
 // Returns nil if it is not a root node (has parents).
-func buildEnergyAliasRule(
+func BuildEnergyAliasRule(
 	dataCenterResource *chantico.DataCenterResource,
 ) *RecordingRule {
 	if len(dataCenterResource.Spec.Parents) > 0 {
@@ -122,7 +122,7 @@ func buildEnergyAliasRule(
 // coefficient set. The coefficient is defined on the child's ParentRef and
 // represents the proportional share of the parent's energy attributable to
 // this child.
-func buildCoefficientRules(
+func BuildCoefficientRules(
 	dataCenterResource *chantico.DataCenterResource,
 ) []RecordingRule {
 	if len(dataCenterResource.Spec.Parents) == 0 {
@@ -159,7 +159,7 @@ func buildCoefficientRules(
 //
 // For root nodes (no parents), returns nil — the energy timeseries is
 // already present in Prometheus (e.g. from an SNMP exporter).
-func buildEnergyRule(
+func BuildEnergyRule(
 	dataCenterResource *chantico.DataCenterResource,
 ) *RecordingRule {
 	if len(dataCenterResource.Spec.Parents) == 0 {
@@ -197,7 +197,7 @@ func BuildRuleFile(
 	return &RuleFile{
 		Groups: []RuleGroup{
 			{
-				Name:  fmt.Sprintf("chantico_%s", sanitizeMetricName(dataCenterResource.Name)),
+				Name:  fmt.Sprintf("chantico_%s", SanitizeMetricName(dataCenterResource.Name)),
 				Rules: rules,
 			},
 		},
