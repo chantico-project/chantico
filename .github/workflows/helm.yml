@@ -1,0 +1,62 @@
+name: Helm package and push
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      version:
+        required: false
+        type: string
+      pr:
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
+
+jobs:
+  # Helm release
+  helm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set tags
+        id: meta
+        run: |
+          if [ ! -z "${{ inputs.version }}" ]; then
+            echo "registry=charts" >> $GITHUB_OUTPUT
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ ! -z "${{ inputs.pr }}" ]; then
+            VERSION=$(helm show chart chart/ | sed -nE 's/^version: *//p')
+            echo "registry=charts-pr" >> $GITHUB_OUTPUT
+            echo "version=$VERSION-pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
+          else
+            echo "One of 'version' or 'pr' input parameters must be provided." >&2
+            exit 1
+          fi
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v5
+
+      - name: Package and lint chart
+        id: package
+        run: |
+          make sync-deployment-crds
+          helm lint chart/
+          helm package chart/ --version ${{ steps.meta.outputs.version }} --destination dist
+          echo "chart=$(ls -1 dist/chantico-*.tgz)" >> $GITHUB_OUTPUT
+
+      - name: Push chart to GHCR
+        if: github.repository == 'chantico-project/chantico'
+        run: |
+          echo "${{ secrets.BOT_RELEASE_TOKEN }}" | helm registry login ghcr.io -u chantico-bot --password-stdin
+          helm push "${{ steps.package.outputs.chart }}" oci://ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.registry }}
