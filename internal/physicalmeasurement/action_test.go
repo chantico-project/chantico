@@ -93,7 +93,7 @@ func TestTargetFileAddition(t *testing.T) {
 
 			targetsDir := filepath.Join(tmpDir, "prometheus/targets")
 			observedFiles := []string{}
-			filepath.Walk(targetsDir, func(path string, info fs.FileInfo, err error) error {
+			_ = filepath.Walk(targetsDir, func(path string, info fs.FileInfo, err error) error {
 				if path != targetsDir && !info.IsDir() {
 					observedFiles = append(observedFiles, path)
 				}
@@ -131,7 +131,7 @@ func TestTargetFileDeletion(t *testing.T) {
 			tmpDir := testCreateTmpDirectories(t)
 
 			for _, f := range tc.beforeFiles {
-				os.WriteFile(filepath.Join(tmpDir, f), []byte("[]"), 0755)
+				_ = os.WriteFile(filepath.Join(tmpDir, f), []byte("[]"), 0755)
 			}
 
 			_ = DeleteTargetFile(t.Context(), tc.physicalMeasurement)
@@ -146,7 +146,7 @@ func TestTargetFileDeletion(t *testing.T) {
 
 			targetsDir := filepath.Join(tmpDir, "prometheus/targets")
 			observedFiles := []string{}
-			filepath.Walk(targetsDir, func(path string, info fs.FileInfo, err error) error {
+			_ = filepath.Walk(targetsDir, func(path string, info fs.FileInfo, err error) error {
 				if path != targetsDir && !info.IsDir() {
 					observedFiles = append(observedFiles, path)
 				}

@@ -77,6 +77,12 @@ spec:
                 items:
                   type: string
                 type: array
+              serviceId:
+                description: |-
+                  ServiceId is the identifier of the service that this resource belongs to.
+                  Define on a resource to make it part of a service, or make a separate
+                  data center resource with service type with parent resources.
+                type: string
               type:
                 type: string
             required:

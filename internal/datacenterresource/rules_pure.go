@@ -26,8 +26,9 @@ import (
 
 // RecordingRule represents a single Prometheus recording rule.
 type RecordingRule struct {
-	Record string `yaml:"record"`
-	Expr   string `yaml:"expr"`
+	Record string            `yaml:"record"`
+	Expr   string            `yaml:"expr"`
+	Labels map[string]string `yaml:"labels,omitempty"`
 }
 
 // RuleGroup represents a Prometheus rule group.
@@ -115,6 +116,9 @@ func buildEnergyAliasRule(
 	return &RecordingRule{
 		Record: EnergyMetricName(dataCenterResource.Name),
 		Expr:   dataCenterResource.Spec.EnergyMetric,
+		Labels: map[string]string{
+			"serviceId": dataCenterResource.Spec.ServiceId,
+		},
 	}
 }
 
@@ -181,6 +185,9 @@ func buildEnergyRule(
 	return &RecordingRule{
 		Record: EnergyMetricName(dataCenterResource.Name),
 		Expr:   strings.Join(terms, " + "),
+		Labels: map[string]string{
+			"serviceId": dataCenterResource.Spec.ServiceId,
+		},
 	}
 }
 

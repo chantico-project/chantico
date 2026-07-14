@@ -47,6 +47,14 @@ func (e ErrorMissingEnergyMetric) Error() string {
 	return fmt.Sprintf("root node (no parents) %s must have energyMetric set", e.InvolvedResource)
 }
 
+type ErrorServiceDefinedOnParent struct {
+	InvolvedResource string
+}
+
+func (e ErrorServiceDefinedOnParent) Error() string {
+	return fmt.Sprintf("service ID must not be defined on %s with children (no leaf node)", e.InvolvedResource)
+}
+
 func GetFromMap(
 	resourcesMap map[string]chantico.DataCenterResource,
 	nodes []string,
@@ -74,13 +82,16 @@ func Validate(
 	dataCenterResource *chantico.DataCenterResource,
 	dataCenterResources []chantico.DataCenterResource,
 	physicalMeasurements []chantico.PhysicalMeasurement,
-) ([]chantico.DataCenterResource, error, string) {
+) ([]chantico.DataCenterResource, string, error) {
 	// Perform validation of parent for directed acyclic graph
 	resourcesMap := make(map[string]chantico.DataCenterResource)
 	visitedSet := make(map[string]bool)
 	for _, resource := range dataCenterResources {
 		if resource.Status.State != StateDelete {
 			resourcesMap[resource.ObjectMeta.Name] = resource
+		}
+		if dataCenterResource.Spec.ServiceId != "" && slices.Contains(resource.Spec.ParentNames(), dataCenterResource.Name) {
+			return []chantico.DataCenterResource{}, dataCenterResource.Name, ErrorServiceDefinedOnParent{InvolvedResource: dataCenterResource.Name}
 		}
 	}
 	queue := make([]string, 0)
@@ -93,10 +104,13 @@ func Validate(
 		}
 		current, ok := resourcesMap[queue[visited]]
 		if !ok {
-			return GetFromMap(resourcesMap, queue[0:visited]), ErrorResourceNotFound{InvolvedResource: queue[visited]}, queue[visited]
+			return GetFromMap(resourcesMap, queue[0:visited]), queue[visited], ErrorResourceNotFound{InvolvedResource: queue[visited]}
+		}
+		if current.Spec.ServiceId != "" {
+			return GetFromMap(resourcesMap, queue[0:visited]), queue[visited], ErrorServiceDefinedOnParent{InvolvedResource: queue[visited]}
 		}
 		if slices.Contains(current.Spec.ParentNames(), dataCenterResource.ObjectMeta.Name) {
-			return GetFromMap(resourcesMap, queue[0:visited]), ErrorCycleDetected{InvolvedResource: queue[visited]}, queue[visited]
+			return GetFromMap(resourcesMap, queue[0:visited]), queue[visited], ErrorCycleDetected{InvolvedResource: queue[visited]}
 		}
 		visitedSet[queue[visited]] = true
 		visited = visited + 1
@@ -111,14 +125,14 @@ func Validate(
 	switch dataCenterResource.Spec.Type {
 	case "", DataCenterResourceTypePDU, DataCenterResourceTypeBaremetal, DataCenterResourceTypeVM, DataCenterResourceTypeKubernetes, DataCenterResourceTypeHeat:
 	default:
-		return GetFromMap(resourcesMap, queue[0:visited]), ErrorUnknownType{Type: dataCenterResource.Spec.Type}, ""
+		return GetFromMap(resourcesMap, queue[0:visited]), "", ErrorUnknownType{Type: dataCenterResource.Spec.Type}
 	}
 
 	// Root nodes (no parents) must have energyMetric set so Prometheus can
 	// source their energy timeseries.
 	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetric == "" {
-		return GetFromMap(resourcesMap, queue[0:visited]), ErrorMissingEnergyMetric{InvolvedResource: dataCenterResource.ObjectMeta.Name}, ""
+		return GetFromMap(resourcesMap, queue[0:visited]), "", ErrorMissingEnergyMetric{InvolvedResource: dataCenterResource.Name}
 	}
 
-	return GetFromMap(resourcesMap, queue[0:visited]), nil, ""
+	return GetFromMap(resourcesMap, queue[0:visited]), "", nil
 }

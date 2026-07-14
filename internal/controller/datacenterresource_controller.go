@@ -50,12 +50,13 @@ type DataCenterResourceReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.4/pkg/reconcile
 func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// TODO(user): Rewrite controller to use step-based function logic and conditions
 	l := log.FromContext(ctx)
 
 	dataCenterResource := &chantico.DataCenterResource{}
 	_ = r.Get(ctx, req.NamespacedName, dataCenterResource)
 
-	listOptions := []client.ListOption{client.InNamespace(req.NamespacedName.Namespace)}
+	listOptions := []client.ListOption{client.InNamespace(req.Namespace)}
 	dataCenterResources := &chantico.DataCenterResourceList{}
 	_ = r.List(ctx, dataCenterResources, listOptions...)
 
@@ -65,16 +66,16 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 	patch := ph.Initialize(ctx, r.Client, dataCenterResource)
 
 	dcr.UpdateState(dataCenterResource)
-	patch.PatchStatus()
+	_ = patch.PatchStatus()
 
 	result := dcr.StateMachine.ExecuteActions(ctx, r.Client, dataCenterResource, patch)
-	if result != nil && result.Result != nil && (result.Requeue || result.RequeueAfter > 0) {
+	if result != nil && result.Result != nil && result.RequeueAfter > 0 {
 		return *result.Result, nil
 	}
 
 	// Perform validation and clear other visited node validation errors if needed
 	// This brings those into a reconciliation loop as well
-	visited, err, involvedResource := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
+	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
 		dcr.SetValidationError(dataCenterResource, err, involvedResource)
@@ -88,7 +89,7 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 		_ = r.List(ctx, children, append(listOptions, client.MatchingFields{"spec.parents": dataCenterResource.Name})...)
 		if dataCenterResource.Status.InvolvedResource != "" {
 			involved := &chantico.DataCenterResource{}
-			_ = r.Get(ctx, types.NamespacedName{Namespace: req.NamespacedName.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
+			_ = r.Get(ctx, types.NamespacedName{Namespace: req.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
 			visited = append(visited, *involved)
 		}
 		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited))
@@ -102,7 +103,7 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 		dcr.ClearValidationError(dataCenterResource)
 		dataCenterResource.Status.State = dcr.StateEntry
 	}
-	patch.PatchStatus()
+	_ = patch.PatchStatus()
 
 	// TODO(user): do something with the links here:
 	// perform operations to make the cluster state reflect the state specified by
@@ -141,7 +142,7 @@ func (r *DataCenterResourceReconciler) ClearReferencedValidation(
 	if referenced.Status.State == dcr.StateValidationFailed || dataCenterResource.Status.State == dcr.StateDelete {
 		patch := ph.Initialize(ctx, r.Client, referenced)
 		dcr.ClearValidationError(referenced)
-		patch.PatchStatus()
+		_ = patch.PatchStatus()
 	}
 }
 

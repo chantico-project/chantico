@@ -42,7 +42,7 @@ func WriteTargetFile(
 ) *sm.ActionResult {
 	l := log.FromContext(ctx)
 
-	target := CreateFileSDTarget(physicalMeasurement.Spec.MeasurementDevice, physicalMeasurement.Spec.Ip)
+	target := CreateFileSDTarget(physicalMeasurement.Spec.MeasurementDevice, physicalMeasurement.Spec.Ip, physicalMeasurement.Name)
 
 	volumePath := config.ValidatedEnv.VolumeLocation
 	targetsDir := filepath.Join(volumePath, prometheusTargetsDir)
@@ -63,7 +63,7 @@ func WriteTargetFile(
 
 	l.Info("Wrote file_sd target file", "path", targetPath, "device", physicalMeasurement.Spec.MeasurementDevice)
 	physicalMeasurement.Status.State = StateRunning
-	physicalMeasurement.Status.UpdateGeneration = physicalMeasurement.ObjectMeta.Generation
+	physicalMeasurement.Status.UpdateGeneration = physicalMeasurement.Generation
 	return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
 }
 

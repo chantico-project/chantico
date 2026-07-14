@@ -31,7 +31,6 @@ type PhysicalMeasurementSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	Ip                string   `json:"ip"`
-	ServiceId         string   `json:"serviceId"`
 	MeasurementDevice string   `json:"measurementDevice"`
 	ResourceIds       []string `json:"resourceIds,omitempty"`
 }
