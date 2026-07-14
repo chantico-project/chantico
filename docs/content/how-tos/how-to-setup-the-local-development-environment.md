@@ -50,6 +50,8 @@ You should now have access to:
 - [Filebrowser](http://localhost:18888) - username and password are both `admin`
 - [Prometheus](http://localhost:19090)
 - [SNMP Exporter](http://localhost:19116)
+- [VictoriaMetrics](http://localhost:18428)
+- [Grafana](http://localhost:13000) - username and password are both `admin`
 
 
 #### Running a demo

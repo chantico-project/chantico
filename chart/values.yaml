@@ -24,6 +24,12 @@ victoriaMetrics:
   storagePath: /tmp/victoria-metrics-volume/storage
   service:
     type: "ClusterIP"
+grafana:
+  include: true
+  adminPassword: admin
+  anonymous: true
+  service:
+    type: "ClusterIP"
 pv:
   include: false
   name: chantico-persistent-volume

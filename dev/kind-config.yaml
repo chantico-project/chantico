@@ -15,6 +15,8 @@ nodes:
         containerPort: 30002
       - hostPort: 18428 # victoria-metrics
         containerPort: 30003
+      - hostPort: 13000 # grafana
+        containerPort: 30004
       - hostPort: 31161 # snmp-mock-device
         containerPort: 31161
         protocol: UDP
