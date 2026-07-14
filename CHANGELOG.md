@@ -1,3 +1,9 @@
+## 0.8.0 (2026-07-14)
+
+#### Feature
+
+* Sigrid publish and pull-request CI (#174) (a389845b)
+
 ## 0.7.0 (2026-07-14)
 
 #### Feature
