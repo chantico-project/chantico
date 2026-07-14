@@ -235,9 +235,11 @@ DOCS_PUML = $(wildcard docs/static/puml/*.puml)
 DOCS_PNG = $(DOCS_PUML:%.puml=%.png)
 
 define plantuml-cmd
-if ! command -v plantuml >/dev/null 2>&1; then \
+if command -v plantuml >/dev/null 2>&1; then \
+	echo "Running plantuml natively..."; \
 	plantuml $(1); \
 else \
+	echo "Running plantuml in docker..."; \
 	docker run --rm -v "$(CURDIR):$(CURDIR)" -w "$(CURDIR)" plantuml/plantuml $(1); \
 fi
 endef
