@@ -1,6 +1,6 @@
 ---
 title: "Energy Accounting via Prometheus Recording Rules"
-weight: 30
+weight: 35
 ---
 
 This document describes the energy accounting feature implemented in the

@@ -231,9 +231,23 @@ else
     MUFFET_VERBOSE_FLAG :=
 endif
 
+DOCS_PUML = $(wildcard docs/static/puml/*.puml)
+DOCS_PNG = $(DOCS_PUML:%.puml=%.png)
+
+define plantuml-cmd
+if ! command -v plantuml >/dev/null 2>&1; then \
+	plantuml $(1); \
+else \
+	docker run --rm -v "$(CURDIR):$(CURDIR)" -w "$(CURDIR)" plantuml/plantuml $(1); \
+fi
+endef
+
+docs/static/puml/%.png: docs/static/puml/%.puml
+	$(call plantuml-cmd,-t png $<)
+
 
 .PHONY: docs-build
-docs-build: doc2go hugo ## Build the documentation
+docs-build: doc2go hugo $(DOCS_PNG) ## Build the documentation
 	@echo "Generating api reference with doc2go..."
 	@$(DOC2GO) -embed -highlight classes:monokai \
 		-basename _index.html \
@@ -265,6 +279,7 @@ docs-test: muffet ## Runs tests against documentation (requires documentation to
 	@echo "Running tests..."
 	@$(MUFFET) $(MUFFET_VERBOSE_FLAG) --include="http://localhost:$(DOCS_PORT)/chantico" http://localhost:$(DOCS_PORT)/chantico/index.html
 	@echo "All tests successful"
+
 
 ##@ Deployment
 
