@@ -1,3 +1,4 @@
+# Main CI workflow using reusable workflows
 name: CI
 
 on:
@@ -14,7 +15,7 @@ permissions:
   id-token: write
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
 
 jobs:
   # Linters
@@ -76,9 +77,18 @@ jobs:
             coverage.xml
 
   invoke-docker:
-    if: github.repository == 'chantico-project/chantico' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
+    if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
     needs: test
     uses: ./.github/workflows/docker.yml
+    with:
+      ref: ${{ github.ref }}
+      pr: ${{ github.event.pull_request.number }}
+    secrets: inherit
+
+  invoke-helm:
+    if: github.event_name == 'pull_request'
+    needs: test
+    uses: ./.github/workflows/helm.yml
     with:
       ref: ${{ github.ref }}
       pr: ${{ github.event.pull_request.number }}
@@ -155,6 +165,15 @@ jobs:
     if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
     needs: release
     uses: ./.github/workflows/docker.yml
+    with:
+      ref: refs/tags/v${{ needs.release.outputs.version }}
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
+
+  invoke-helm-release:
+    if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
+    needs: release
+    uses: ./.github/workflows/helm.yml
     with:
       ref: refs/tags/v${{ needs.release.outputs.version }}
       version: ${{ needs.release.outputs.version }}

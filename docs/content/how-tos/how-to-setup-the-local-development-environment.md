@@ -66,3 +66,13 @@ To stop the environment we have the following commands:
 make cluster-down   # stops the kind cluster, but keeps the data in the volume
 make cluster-clean  # stops the kind cluster, and removes the data
 ```
+
+### Documentation
+
+The documentation should be kept up to date with the implementation. Running the documentation locally can be done via:
+
+```bash
+make docs-build   # generates and builds the files
+make docs-serve   # calls docs-build, and then serves the documentation on localhost
+make docs-test    # requires docs-serve to be running, runs link validation against localhost 
+```

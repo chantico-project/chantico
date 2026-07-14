@@ -36,7 +36,7 @@ To install the Helm-based deployment:
 - kubectl version v1.11.3+.
 
 Additionally, for development:
-- go version v1.24.13+.
+- go version v1.25.11+.
 - make version 4.3+.
 - docker version 17.03+.
 

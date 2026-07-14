@@ -22,7 +22,7 @@ permissions:
 jobs:
   # Docker build and push
   docker:
-    if: github.repository == 'chantico-project/chantico'
+    if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

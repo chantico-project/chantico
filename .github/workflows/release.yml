@@ -37,24 +37,3 @@ jobs:
           args: release --config .goreleaser.github.yaml --clean
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
-
-  # Helm release
-  helm:
-    runs-on: ubuntu-latest
-    if: github.repository == 'chantico-project/chantico'
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: refs/tags/v${{ inputs.version }}
-
-      - name: Setup Helm
-        uses: azure/setup-helm@v5
-
-      - name: Package and push chart
-        run: |
-          make sync-deployment-crds
-          echo "${{ secrets.BOT_RELEASE_TOKEN }}" | helm registry login ghcr.io -u chantico-bot --password-stdin
-          VERSION=${{ inputs.version }}
-          helm package chart/ --version $VERSION --app-version v$VERSION
-          helm push chantico-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
