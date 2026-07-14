@@ -1,3 +1,9 @@
+## 0.9.0 (2026-07-14)
+
+#### Feature
+
+* Front-end with metrics (#161) (96c5da72)
+
 ## 0.8.0 (2026-07-14)
 
 #### Feature
