@@ -1,3 +1,14 @@
+## 0.7.0 (2026-07-14)
+
+#### Feature
+
+* Perform relabeling to track which service a resource belongs to (#166) (237a6d29)
+
+#### Chores
+
+* **deps:** bump golang.org/x/net from 0.53.0 to 0.55.0 (#172) (01ad34c9)
+* Disable docker build for dependabot due to missing tokens (50759d71)
+
 ## 0.6.5 (2026-07-07)
 
 #### Bug Fixes
