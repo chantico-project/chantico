@@ -1,0 +1,27 @@
+languages:
+- name: Docker
+- name: Go
+- name: Html
+exclude:
+  - ".*/api/v1alpha1/zz_generated[.]deepcopy[.]go"
+components:
+  - name: datacenterresource
+    include:
+      - ".*/api/v1alpha1/datacenterresource_types[.]go"
+      - ".*/internal/controller/datacenterresource_controller[.]go"
+      - ".*/internal/datacenterresource/.*"
+  - name: measurementdevice
+    include:
+      - ".*/api/v1alpha1/measurementdevice_types[.]go"
+      - ".*/internal/controller/measurementdevice_controller[.]go"
+      - ".*/internal/measurementdevice/.*"
+  - name: physicalmeasurement
+    include:
+      - ".*/api/v1alpha1/physicalmeasurement_types[.]go"
+      - ".*/internal/controller/physicalmeasurement_controller[.]go"
+      - ".*/internal/physicalmeasurement/.*"
+dependencychecker:
+  blocklist:
+  - .*tno.*
+thirdpartyfindings:
+  enabled: true
