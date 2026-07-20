@@ -1,3 +1,9 @@
+## 0.10.0 (2026-07-20)
+
+#### Feature
+
+* Add sigrid.yaml config file. (#179) (ab0e340d)
+
 ## 0.9.0 (2026-07-14)
 
 #### Feature
