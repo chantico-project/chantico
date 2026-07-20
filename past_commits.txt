@@ -1,0 +1,4 @@
+The following commits were made pursuant to the Developer Certificate of Origin, even though a Signed-off-by: was not included in the commit message.
+
+<COMMIT HASH> <COMMIT MSG>
+...
