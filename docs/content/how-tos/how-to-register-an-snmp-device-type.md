@@ -55,7 +55,7 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
 
 ## Metric name disambiguation
 
-If two metrics have the same name it exists two methods to disambiguate. Let's take the example of the `tnoPduEnergyValue` metric present in both `./dev/mibs/TNO-ANOTHERPDU-MIB.txt`, and `./dev/mibs/TNO-PDU-MIB.txt`:
+If two metrics have the same name, there are two methods to disambiguate. Let's take the example of the `tnoPduEnergyValue` metric present in both `./dev/mibs/TNO-ANOTHERPDU-MIB.txt`, and `./dev/mibs/TNO-PDU-MIB.txt`:
 
 1. the user can fully qualify the "path" within the MIB tree via human readable language `TNO-PDU-MIB::tnoPduEnergyValue`
 1. the user can fully qualify the "path" within the MIB tree via the OID `1.3.6.1.4.99999.1`
