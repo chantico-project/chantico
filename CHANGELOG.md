@@ -1,3 +1,9 @@
+## 0.11.0 (2026-07-23)
+
+#### Feature
+
+* Track prometheus scraping interval and add panel on timeliness (#177) (42a40548)
+
 ## 0.10.0 (2026-07-20)
 
 #### Feature
