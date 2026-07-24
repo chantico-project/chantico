@@ -49,6 +49,8 @@ We welcome issues, discussions, and pull requests based on the former
 two. Please have a look at our [contribution
 guidance](https://github.com/chantico-project/.github/blob/main/CONTRIBUTING.md).
 
+Contributing to Chantico requires committing with DCO sign-off. Please see the [DCO sign-off guide](https://chantico-project.github.io/chantico/technical/dco-sign-off/), which explains several ways to configure this.
+
 ## Code of Conduct
 
 Please consider the guidelines in the [Code of 
