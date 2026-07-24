@@ -7,6 +7,29 @@ main:
 
 ## Milestone 2
 
+### Introduction
+
+After our first milestone, which focused on monitoring the power consumption of 
+power distribution units (PDUs) and bare metal servers, we want to extend the 
+functionality to include monitoring of virtual machines (VMs) running on these 
+servers, while also keeping in mind to keep code clean and reusable. This 
+includes making it easier to use and configure chantico. We extend upon the 
+recording rules to aggregate metrics from one layer of the data center resource 
+graph to the next. We make this process work regardless of what type of 
+resources are involved and where the metrics come from. As such, we also want to 
+track any differences between measured energy values, including overhead of 
+server components not provided to the service on a bare metal, and similarly for 
+overhead of the hypervisor.
+
+This milestone will focus on exploring and implementing features that allow us 
+to monitor VMs, as well as improving the architecture and integration 
+capabilities of chantico.
+
+We demonstrate the integrated and working functionality via a simple UI built as 
+a Grafana dashboard, which is deployed as part of the operator deployment and we 
+will augment it with new metrics. Other web apps and APIs are potential stretch 
+objectives.
+
 ### Context of goals
 
 - We want to further configure chantico for testing in the HESI lab, our first 
@@ -28,6 +51,39 @@ main:
   frameworks and other external tools to retrieve timeseries information. This 
   might also include an API reference to create/read/update/delete the resource 
   information, although it is possible we will keep this part Kubernetes-native.
+
+#### VM monitoring
+
+We want to explore the possibility of monitoring VMs running on the bare metal 
+servers. We want to use existing tooling to monitor VMs, such as the 
+hypervisor's own monitoring capabilities. The list of hypervisors we consider is 
+mentioned in the exploration topics above. We also consider tools like 
+[Kepler](https://sustainable-computing.io/), 
+[Alumet](https://alumet-dev.github.io/user-book/) and 
+[Scaphandre](https://hubblo-org.github.io/scaphandre-documentation/) and support 
+this as a pluggable component in chantico. We explore the possibility to ingest 
+metrics from these tools in a standardized way, at least such that Prometheus is 
+able to scrape the metrics from these tools. We want to support efforts like 
+[OpenTelemetry](https://opentelemetry.io/) to standardize the metric collection 
+framework.
+
+### Out of scope
+
+- We do not plan to include any support for monitoring of Kubernetes clusters 
+  and containers in this milestone.
+- Migrations of workloads between servers and/or hypervisors, inside the same 
+  data center or between federated data centers, are not envisioned to be 
+  supported in this milestone. We do not track updates of server, VM and service 
+  mappings, aside from deletions.
+
+### Deployment
+
+For our development cycle, we primarily test on local development environments. 
+As part of the first milestone, we will also deploy the Chantico stack to 
+a cluster hosted in [HESI lab](https://fasttrack.tno.nl/activiteiten/hesi-lab/), 
+a lab-like system integration environment. This includes monitoring of PDUs and 
+bare metal servers in this lab cluster. Deployment takes place with the Helm 
+charts provided in the repository and with pre-built Docker images.
 
 ### Architecture improvements
 
