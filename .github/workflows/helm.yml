@@ -56,7 +56,7 @@ jobs:
           echo "chart=$(ls -1 dist/chantico-*.tgz)" >> $GITHUB_OUTPUT
 
       - name: Push chart to GHCR
-        if: github.repository == 'chantico-project/chantico'
+        if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]'
         run: |
           echo "${{ secrets.BOT_RELEASE_TOKEN }}" | helm registry login ghcr.io -u chantico-bot --password-stdin
           helm push "${{ steps.package.outputs.chart }}" oci://ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.registry }}
