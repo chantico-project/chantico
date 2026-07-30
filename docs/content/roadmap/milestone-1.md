@@ -1,5 +1,5 @@
 ---
-title: "Milestone 1 (current)"
+title: "Milestone 1 (completed)"
 main:
   parent: roadmap
   weight: 20
