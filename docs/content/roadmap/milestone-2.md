@@ -48,9 +48,13 @@ objectives.
 - We want to include VM monitoring. Specific hypervisors to support are not yet 
   decided, but our initial aim is to include OpenNebula and/or Proxmox.
 - We want to provide more integration capabilities to allow users, orchestration 
-  frameworks and other external tools to retrieve timeseries information. This 
-  might also include an API reference to create/read/update/delete the resource 
-  information, although it is possible we will keep this part Kubernetes-native.
+  frameworks and other external tools to retrieve timeseries information. In 
+  addition, we consider including an API reference to create/read/update/delete 
+  the resource information. It is however likely that we keep this API native to 
+  Kubernetes, meaning that external tools use the Kubernetes API to create 
+  resources, retrieve resource status, augment specifications (lower priority) 
+  and remove decommissioned resources and services. At least, we will make the 
+  API reference more consistent and clear to use, with more usage documentation.
 
 #### VM monitoring
 
