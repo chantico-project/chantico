@@ -21,3 +21,9 @@ jobs:
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
           SIGRIDCI_GITHUB_COMMENT_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Upload Sigrid CI report as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: sigridci-ci-output
+          path: sigridci-ci-output/
+          if-no-files-found: warn
