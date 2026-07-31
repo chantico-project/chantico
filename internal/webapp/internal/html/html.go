@@ -30,7 +30,7 @@ type HomePageData struct {
 }
 
 func (r *TemplateRenderer) RenderHomePage(w io.Writer, d HomePageData) {
-	r.tmpl.ExecuteTemplate(w, "home.html", d)
+	_ = r.tmpl.ExecuteTemplate(w, "home.html", d)
 }
 
 type ErrorPageData struct {
@@ -40,5 +40,5 @@ type ErrorPageData struct {
 }
 
 func (r *TemplateRenderer) RenderErrorPage(w io.Writer, d ErrorPageData) {
-	r.tmpl.ExecuteTemplate(w, "error.html", d)
+	_ = r.tmpl.ExecuteTemplate(w, "error.html", d)
 }
