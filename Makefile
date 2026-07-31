@@ -10,6 +10,7 @@ IMG ?= ghcr.io/chantico-project/images/chantico:latest
 CHANTICO_DATA_PATH ?= .chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
+CHANTICO_NAMESPACE ?= chantico
 
 LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
 LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
@@ -115,10 +116,10 @@ cluster-clean: cluster-down cluster-delete-mount ## Delete Kind cluster and volu
 .PHONY: cluster-configure
 cluster-configure: sync-deployment-crds ## Configure cluster with namespace, helm installation and snmp mock
 # 	idempotent function to create namespace
-	$(KUBECTL) create namespace chantico --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 # 	idempotent helm installation
 	helm upgrade --install chantico ./chart/ \
-		--namespace chantico \
+		--namespace $(CHANTICO_NAMESPACE) \
 		--set controller.include=false \
     	--set securityContext.runAsUser="$(shell id -u)" \
 		--set securityContext.runAsGroup="$(shell id -g)" \
@@ -139,9 +140,9 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace, hel
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
 	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
 	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
-	$(KUBECTL) apply -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
-	$(KUBECTL) apply -f dev/k8s/snmp-mock-deployment.yaml
-	$(KUBECTL) apply -f dev/k8s/snmp-mock-service.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-deployment.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-service.yaml
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?

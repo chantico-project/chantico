@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
   name: datacenterresource-pdu1
-  namespace: chantico
+  namespace: {{ .Release.Namespace }}
 spec:
   type: pdu
   physicalMeasurements:
@@ -20,7 +20,7 @@ metadata:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
   name: datacenterresource-pdu2
-  namespace: chantico
+  namespace: {{ .Release.Namespace }}
 spec:
   type: pdu
   physicalMeasurements:
@@ -34,7 +34,7 @@ metadata:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
   name: datacenterresource-misd-gbm-01
-  namespace: chantico
+  namespace: {{ .Release.Namespace }}
 spec:
   type: baremetal
   serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be

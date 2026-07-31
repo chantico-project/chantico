@@ -59,6 +59,7 @@ kind load docker-image chantico-snmp-mock:latest --name kind
 ### Apply the mock to Kubernetes
 
 ```bash
+kubectl config set-context --current --namespace=chantico
 kubectl apply -f dev/k8s/snmp-mock-deployment.yaml
 kubectl apply -f dev/k8s/snmp-mock-service.yaml
 kubectl apply -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
@@ -86,10 +87,11 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
 
 1. Upload the MIB file `./dev/mibs/TNO-PDU-MIB.txt` to the cluster:
     ```bash
-    make copy-mock-mib
+    make cluster-mib
     ```
 1. Create a `MeasurementDevice` for the mock MIB:
     ```bash
+    kubectl config set-context --current --namespace=chantico
     kubectl apply -f ./config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
     ```
 1. Wait for the SNMP generator job:
