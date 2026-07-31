@@ -18,5 +18,6 @@ jobs:
           customer: tno
           system: chantico
           publishonly: true
+          capability: maintainability,osh,security
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"

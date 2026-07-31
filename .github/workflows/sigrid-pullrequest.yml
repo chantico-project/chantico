@@ -18,6 +18,7 @@ jobs:
         with:
           customer: tno
           system: chantico
+          capability: maintainability,osh,security
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
           SIGRIDCI_GITHUB_COMMENT_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
