@@ -1,3 +1,20 @@
+## 0.12.0 (2026-07-31)
+
+#### Feature
+
+* Allow deployment in different namespace (#192) (ba7f9963)
+
+#### Documentation
+
+* Add explanation about DCO. (#180) (94199026)
+
+#### Chores
+
+* **docs:** Update documentation for milestone 2 (#184) (24e62522)
+* **deps:** bump github.com/google/cel-go from 0.28.0 to 0.29.0 (#186) (340dc96c)
+* **deps:** bump google.golang.org/grpc from 1.80.0 to 1.82.1 (#185) (0b0fe64f)
+* **docs:** select which mib to provide to snmp generator (#170) (aa9619bb)
+
 ## 0.11.0 (2026-07-23)
 
 #### Feature
