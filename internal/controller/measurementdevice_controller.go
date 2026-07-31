@@ -62,8 +62,9 @@ import (
 // MeasurementDeviceReconciler reconciles a MeasurementDevice
 type MeasurementDeviceReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Paths  md.Paths
+	Scheme    *runtime.Scheme
+	Paths     md.Paths
+	Namespace string
 }
 
 func (r *MeasurementDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -92,6 +93,7 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 		return ctrl.Result{}, err
 	}
+	r.Namespace = measurementDevice.GetNamespace()
 	l = l.WithValues("generation", measurementDevice.GetGeneration())
 	ctx = log.IntoContext(ctx, l)
 
@@ -359,7 +361,7 @@ func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Contex
 
 func (r *MeasurementDeviceReconciler) getSnmpExporterDeployment(ctx context.Context) (*appsv1.Deployment, error) {
 	var deploy appsv1.Deployment
-	if err := r.Get(ctx, client.ObjectKey{Name: "chantico-snmp", Namespace: "chantico"}, &deploy); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: "chantico-snmp", Namespace: r.Namespace}, &deploy); err != nil {
 		return nil, err
 	}
 	return &deploy, nil

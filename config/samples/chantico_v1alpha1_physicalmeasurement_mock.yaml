@@ -5,8 +5,6 @@ metadata:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
   name: physicalmeasurement-pdu1-out
-  namespace: chantico
 spec:
-  ip: chantico-snmp-mock.chantico.svc.cluster.local:1161
+  ip: chantico-snmp-mock:1161
   measurementDevice: tno
-
