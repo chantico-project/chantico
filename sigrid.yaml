@@ -1,9 +1,11 @@
 languages:
-- name: Docker
-- name: Go
-- name: Html
+  - name: Docker
+  - name: Go
+  - name: Html
 exclude:
   - ".*/api/v1alpha1/zz_generated[.]deepcopy[.]go"
+component_base_dirs:
+  - "internal"
 components:
   - name: datacenterresource
     include:
@@ -22,6 +24,7 @@ components:
       - ".*/internal/physicalmeasurement/.*"
 dependencychecker:
   blocklist:
-  - .*tno.*
+    - .*tno.*
 thirdpartyfindings:
   enabled: true
+
