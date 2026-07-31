@@ -24,6 +24,6 @@ jobs:
       - name: Upload Sigrid CI output as artifact
         uses: actions/upload-artifact@v7
         with:
-          name: sigridci-ci-output
-          path: sigridci-ci-output/
+          name: sigrid-ci-output
+          path: sigrid-ci-output/
           if-no-files-found: warn
