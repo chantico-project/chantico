@@ -2,7 +2,6 @@ apiVersion: chantico-project.github.io/v1alpha1
 kind: MeasurementDevice
 metadata:
   name: tno-2
-  namespace: {{ .Release.Namespace }}
 spec:
   auth:
     community: public
