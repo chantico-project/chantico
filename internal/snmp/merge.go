@@ -2,6 +2,7 @@ package snmp
 
 import (
 	"bytes"
+	"chantico/internal/filestore"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -73,7 +74,8 @@ func readPerDeviceSnmpConfigs(dir string) (map[string][]byte, error) {
 		if !strings.HasPrefix(name, "snmp-") || filepath.Ext(name) != ".yaml" {
 			continue
 		}
-		content, err := os.ReadFile(filepath.Join(dir, name))
+		vfs := filestore.VolumeFileStore{}
+		content, err := vfs.Read(filepath.Join(dir, name))
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", name, err)
 		}

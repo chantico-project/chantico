@@ -26,6 +26,7 @@ import (
 
 	chantico "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
+	"chantico/internal/filestore"
 	ph "chantico/internal/patch"
 	sm "chantico/internal/statemachine"
 
@@ -86,7 +87,8 @@ func WriteRuleFile(
 	}
 
 	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
-	if err := os.WriteFile(rulePath, data, 0644); err != nil {
+	vfs := filestore.VolumeFileStore{}
+	if err := vfs.Write(rulePath, data, 0644); err != nil {
 		log.Printf("Failed to write rule file: %v", err)
 		SetValidationError(dataCenterResource, err, "")
 		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
