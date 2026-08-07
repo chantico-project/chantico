@@ -45,15 +45,7 @@ func WriteTargetFile(
 	target := CreateFileSDTarget(physicalMeasurement.Spec.MeasurementDevice, physicalMeasurement.Spec.Ip, physicalMeasurement.Name)
 
 	volumePath := config.ValidatedEnv.VolumeLocation
-	targetsDir := filepath.Join(volumePath, prometheusTargetsDir)
-	if err := os.MkdirAll(targetsDir, 0777); err != nil {
-		physicalMeasurement.Status.State = StateFailed
-		physicalMeasurement.Status.ErrorMessage = err.Error()
-		l.Error(err, "Failed to create targets directory")
-		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
-	}
-
-	targetPath := filepath.Join(targetsDir, physicalMeasurement.Name+".json")
+	targetPath := filepath.Join(volumePath, prometheusTargetsDir, physicalMeasurement.Name+".json")
 	if err := WriteFileSDTargets(targetPath, []FileSDTarget{target}); err != nil {
 		physicalMeasurement.Status.State = StateFailed
 		physicalMeasurement.Status.ErrorMessage = err.Error()

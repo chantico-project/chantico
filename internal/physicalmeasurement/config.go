@@ -1,8 +1,8 @@
 package physicalmeasurement
 
 import (
+	"chantico/internal/filestore"
 	"encoding/json"
-	"os"
 )
 
 // FileSDTarget represents a single target group in Prometheus file_sd_configs format.
@@ -35,12 +35,14 @@ func WriteFileSDTargets(path string, targets []FileSDTarget) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	vfs := filestore.VolumeFileStore{}
+	return vfs.Write(path, data, 0644)
 }
 
 // LoadFileSDTargets reads and parses a file_sd_configs JSON file.
 func LoadFileSDTargets(path string) ([]FileSDTarget, error) {
-	data, err := os.ReadFile(path)
+	vfs := filestore.VolumeFileStore{}
+	data, err := vfs.Read(path)
 	if err != nil {
 		return nil, err
 	}
