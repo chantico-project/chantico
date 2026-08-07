@@ -112,7 +112,7 @@ func loadConfig(get envGetter) (config, error) {
 
 	if kubeconfigPath := get("KUBECONFIG"); kubeconfigPath != "" {
 		if !pathExists(kubeconfigPath) {
-			errs = append(errs, fmt.Errorf("Kubeconfig not found at %s", kubeconfigPath))
+			errs = append(errs, fmt.Errorf("kubeconfig not found at %s", kubeconfigPath))
 		} else {
 			cfg.KubeconfigPath = kubeconfigPath
 		}

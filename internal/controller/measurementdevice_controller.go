@@ -44,7 +44,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	util "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -120,7 +119,7 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 }
 
 func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	if measurementDevice.ObjectMeta.GetDeletionTimestamp() == nil {
+	if measurementDevice.GetDeletionTimestamp() == nil {
 		return steps.Continue()
 	}
 
@@ -235,7 +234,7 @@ func (r *MeasurementDeviceReconciler) createGeneratorJob(
 	if err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to build SNMP Generator job: %w", err))
 	}
-	if err := controllerutil.SetControllerReference(measurementDevice, job, r.Scheme); err != nil {
+	if err := util.SetControllerReference(measurementDevice, job, r.Scheme); err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to set controller reference for SNMP Generator job: %w", err))
 	}
 	if err := r.Create(ctx, job); err != nil {
