@@ -75,7 +75,7 @@ the graph does not yet include any output power resources such as heat reuse. As
 such, this is an initial vision for the data center resource graph that Chantico 
 managed and monitors.
 
-![](../puml/data-center-resource-graph.png)
+![](../../puml/data-center-resource-graph.png)
 
 ## Energy accounting
 

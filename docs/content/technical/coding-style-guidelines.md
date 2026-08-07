@@ -1,6 +1,6 @@
 ---
 title: "Development & Coding style guidelines"
-weight: 25
+weight: 30
 main:
   parent: technical
 ---

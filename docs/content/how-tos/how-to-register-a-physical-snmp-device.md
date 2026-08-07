@@ -24,7 +24,6 @@ In our First use-case (see `goal.md`) this corresponds to the `createPDU1` and `
     namespace: chantico
   spec:
     ip: 10.5.1.1
-    serviceId: dee263f8-50e0-11f0-8cb5-00155d8a81e1 # This can be any type of UUID
     measurementDevice:  schleifenbauer-out # This has to be a currently valid MeasurementDevice name
   ```
   1. Apply the yaml file
