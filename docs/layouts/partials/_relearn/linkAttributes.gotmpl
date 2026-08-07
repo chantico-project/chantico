@@ -116,16 +116,8 @@
 
 {{- $href := .url -}}
 
-{{- $ugly := .page.Site.Params.uglyURLs | default false -}}
-{{- if $ugly -}}
-  {{- if (strings.HasSuffix $href "/") -}}
-    {{- /* ugly URLs: link to index.html inside the directory */ -}}
-    {{- $href = printf "%sindex.html" $href -}}
-  {{- end -}}
-{{- else -}}
-  {{- /* pretty URLs: directory style URL */ -}}
-  {{- $href = strings.TrimSuffix "index.html" $href -}}
-{{- end -}}
+{{- /* pretty URLs: directory style URL */ -}}
+{{- $href = strings.TrimSuffix "index.html" $href -}}
 {{- $attributes = merge $attributes (dict "href" $href) }}
 {{- $attributes = merge $attributes (dict "download" $effects.download) }}
 {{- $attributes = merge $attributes (dict "target" $effects.target) }}
