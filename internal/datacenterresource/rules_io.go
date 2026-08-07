@@ -72,13 +72,6 @@ func WriteRuleFile(
 	}
 
 	volumePath := config.ValidatedEnv.VolumeLocation
-	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
-	if err := os.MkdirAll(rulesDir, 0777); err != nil {
-		log.Printf("Failed to create rules directory: %v", err)
-		SetValidationError(dataCenterResource, err, "")
-		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
-	}
-
 	data, err := yaml.Marshal(ruleFile)
 	if err != nil {
 		log.Printf("Failed to marshal rule file: %v", err)
@@ -86,7 +79,7 @@ func WriteRuleFile(
 		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
 	}
 
-	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
+	rulePath := filepath.Join(volumePath, prometheusRulesDir, dataCenterResource.Name+".yml")
 	vfs := filestore.VolumeFileStore{}
 	if err := vfs.Write(rulePath, data, 0644); err != nil {
 		log.Printf("Failed to write rule file: %v", err)

@@ -21,7 +21,7 @@ func TestVolumeFileStore_Write(t *testing.T) {
 	}{
 		{"simple write", "test.txt", []byte("Hello world!"), 0o666, false},
 		{"empty file write", "test2.txt", []byte{}, 0o666, false},
-		{"empty file write", "i/do/not/exist/test.txt", []byte{}, 0o666, true},
+		{"empty file write", "i/do/not/exist/test.txt", []byte{}, 0o666, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
