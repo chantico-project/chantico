@@ -23,7 +23,6 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	chantico "chantico/api/v1alpha1"
@@ -187,11 +186,6 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 		return steps.Continue()
 	}
 
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0777); err != nil {
-		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to create directory %s: %w", dir, err))
-	}
-
 	if err := vfs.Write(path, desired, 0777); err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to write generator file: %w", err))
 	}
@@ -209,10 +203,6 @@ func desiredGeneratorConfig(measurementDevice *chantico.MeasurementDevice) ([]by
 }
 
 func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	if err := os.MkdirAll(r.Paths.SNMPDir(), 0777); err != nil {
-		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to create SNMP config directory %s: %w", r.Paths.SNMPDir(), err))
-	}
-
 	jobs, err := r.getOwnedJobs(ctx, measurementDevice)
 	if err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to get owned SNMP Generator jobs: %w", err))
@@ -310,10 +300,6 @@ func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Contex
 	if bytes.Equal(existing, merged) {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionConfig, metav1.ConditionTrue, chantico.ReasonSynced, "Merged SNMP file is up to date.")
 		return steps.Continue()
-	}
-
-	if err := os.MkdirAll(filepath.Dir(path), 0777); err != nil {
-		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to create merged SNMP dir %s: %w", filepath.Dir(path), err))
 	}
 
 	if err := vfs.Write(path, merged, 0777); err != nil {
