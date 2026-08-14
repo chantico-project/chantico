@@ -54,7 +54,7 @@ func (a *app) Run() error {
 	ctxInterrupt, stopInterrupt := SignalHandling()
 	defer stopInterrupt()
 
-	httpServer := http.New(t, k, a.cfg.Port)
+	httpServer := http.New(t, k, a.cfg.Port, 10*time.Second)
 	httpServerErrChannel := make(chan error, 1)
 	go httpServer.Run(httpServerErrChannel)
 

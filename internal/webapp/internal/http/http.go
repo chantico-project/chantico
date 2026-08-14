@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"chantico/internal/webapp/internal/graph"
 	"chantico/internal/webapp/internal/html"
@@ -16,7 +17,7 @@ type HTTPServer struct {
 	port   int
 }
 
-func New(r *html.TemplateRenderer, k *kubernetes.KubernetesClient, port int) *HTTPServer {
+func New(r *html.TemplateRenderer, k *kubernetes.KubernetesClient, port int, readHeaderTimeout time.Duration) *HTTPServer {
 	h := &Handler{
 		renderer:   r,
 		kubernetes: k,
@@ -25,8 +26,9 @@ func New(r *html.TemplateRenderer, k *kubernetes.KubernetesClient, port int) *HT
 	mux.HandleFunc("GET /", h.HomePage)
 
 	server := &http.Server{
-		Addr:    ":" + strconv.Itoa(port),
-		Handler: mux,
+		Addr:              ":" + strconv.Itoa(port),
+		Handler:           mux,
+		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
 	return &HTTPServer{
