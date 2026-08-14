@@ -13,7 +13,7 @@ make up a data center can be related to each other. Each component that can be
 monitored, aggregated or allocated energy-wise is represented as 
 a `DataCenterResource` custom resource. The relationships between these 
 resources define how energy flows from one resource to another. Together, the 
-resourcesand their relationships form a graph. Once the graph is completely 
+resources and their relationships form a graph. Once the graph is completely 
 constructed, it allows for accounting all the energy usage in a data center.
 
 One important property of the graph is that it is represented as a directed 

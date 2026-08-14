@@ -22,7 +22,7 @@ metrics. An SNMP device is a physical device that can be monitored for energy
 usage, such as a PDU or a bare metal server. Each brand or version of a device 
 may support different SNMP versions and different categories of management data 
 to expose. For such systems, there often exist vendor-provided, proprietary 
-files that describe how to access particular fields. This files are known as 
+files that describe how to access particular fields. These files are known as 
 Management Information Base (MIB) files. From the hierarchy described in the MIB 
 file, it is possible to deduce a range of object identifiers (OIDs) that are 
 relevant for energy usage monitoring, such as PDU outlet power or voltage, or 
@@ -35,7 +35,7 @@ need to correspond to some field in the MIB file. They could refer to a specific
 OID, but more commonly they refer to a name of a field or table in the MIB file. 
 The SNMP exporter can translate such field names, also known as *walks*, into 
 the corresponding OIDs. The SNMP exporter can then configure itself to perform 
-"bulk walk" queries to effieiciently obtain the most recent measurement value 
+"bulk walk" queries to effieciently obtain the most recent measurement value 
 for the desired metrics.
 
 ## Fields
