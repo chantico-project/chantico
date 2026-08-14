@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -30,8 +31,9 @@ type MeasurementDeviceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Walks []string           `yaml:"walks" json:"walks"`
-	Auth  snmp.GeneratorAuth `yaml:"auth" json:"auth"`
+	Walks    []string                  `yaml:"walks" json:"walks"`
+	Auth     snmp.GeneratorAuth        `yaml:"auth" json:"auth"`
+	AuthFrom *corev1.SecretKeySelector `yaml:"authFrom" json:"authFrom"`
 }
 
 // MeasurementDeviceStatus defines the observed state of MeasurementDevice
