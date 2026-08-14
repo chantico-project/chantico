@@ -5,11 +5,10 @@ metadata:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
   name: physicalmeasurement-pdu1-out
-  namespace: chantico
 spec:
   ip: 10.5.1.1
-  serviceId: dee263f8-50e0-11f0-8cb5-00155d8a81e1
-  measurementDevice:  schleifenbauer-pdu
+
+  measurementDevice: schleifenbauer-pdu
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: PhysicalMeasurement
@@ -18,8 +17,6 @@ metadata:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
   name: physicalmeasurement-pdu2-out
-  namespace: chantico
 spec:
   ip: 10.5.1.2
-  serviceId: e272b694-50e0-11f0-8038-00155d8a81e1
-  measurementDevice:  schleifenbauer-pdu
+  measurementDevice: schleifenbauer-pdu

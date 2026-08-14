@@ -60,6 +60,12 @@ type DataCenterResourceSpec struct {
 	// timeseries is produced directly by hardware / an exporter.
 	// +optional
 	EnergyMetric string `json:"energyMetric,omitempty"`
+
+	// ServiceId is the identifier of the service that this resource belongs to.
+	// Define on a resource to make it part of a service, or make a separate
+	// data center resource with service type with parent resources.
+	// +optional
+	ServiceId string `json:"serviceId"`
 }
 
 // DataCenterResourceStatus defines the observed state of DataCenterResource.

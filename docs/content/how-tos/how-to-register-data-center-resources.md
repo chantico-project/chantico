@@ -27,7 +27,7 @@ To create data center resources, have a look at
 
 1. Apply the file to your cluster:
   ```sh
-kubectl apply -f config/samples/chantico_v1alpha1_datacenterresource.yaml
+kubectl apply -n chantico -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 ```
 1. Edit the file to add a parent to one of the PDUs:
   ```yaml
@@ -38,7 +38,6 @@ metadata:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
   name: datacenterresource-pdu2
-  namespace: chantico
 spec:
   type: pdu
   parents:
@@ -48,7 +47,7 @@ spec:
 ```
 1. Apply the file again:
   ```sh
-kubectl apply -f config/samples/chantico_v1alpha1_datacenterresource.yaml
+kubectl apply -n chantico -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 ```
 1. Check the resource:
   ```sh

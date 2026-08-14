@@ -3,13 +3,14 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.6.5
+VERSION ?= 0.12.0
 
 # Image REPOSITORY_URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
 CHANTICO_DATA_PATH ?= .chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
+CHANTICO_NAMESPACE ?= chantico
 
 LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
 LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
@@ -115,12 +116,12 @@ cluster-clean: cluster-down cluster-delete-mount ## Delete Kind cluster and volu
 .PHONY: cluster-configure
 cluster-configure: sync-deployment-crds ## Configure cluster with namespace, helm installation and snmp mock
 # 	idempotent function to create namespace
-	$(KUBECTL) create namespace chantico --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 # 	idempotent helm installation
 	helm upgrade --install chantico ./chart/ \
-		--namespace chantico \
+		--namespace $(CHANTICO_NAMESPACE) \
 		--set controller.include=false \
-    	--set securityContext.runAsUser="$(shell id -u)" \
+		--set securityContext.runAsUser="$(shell id -u)" \
 		--set securityContext.runAsGroup="$(shell id -g)" \
 		--set persistentVolumeClaimName=$(CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME) \
 		--set pvc.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
@@ -133,14 +134,15 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace, hel
 		--set snmp.service.type="NodePort" \
 		--set filebrowser.service.type="NodePort" \
 		--set prometheus.service.type="NodePort" \
-		--set victoriaMetrics.service.type="NodePort"
+		--set victoriaMetrics.service.type="NodePort" \
+		--set grafana.service.type="NodePort"
 	
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
 	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
 	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
-	$(KUBECTL) apply -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
-	$(KUBECTL) apply -f dev/k8s/snmp-mock-deployment.yaml
-	$(KUBECTL) apply -f dev/k8s/snmp-mock-service.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-deployment.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-service.yaml
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
@@ -231,9 +233,25 @@ else
     MUFFET_VERBOSE_FLAG :=
 endif
 
+DOCS_PUML = $(wildcard docs/static/puml/*.puml)
+DOCS_PNG = $(DOCS_PUML:%.puml=%.png)
+
+define plantuml-cmd
+if command -v plantuml >/dev/null 2>&1; then \
+	echo "Running plantuml natively..."; \
+	plantuml $(1); \
+else \
+	echo "Running plantuml in docker..."; \
+	docker run --rm -v "$(CURDIR):$(CURDIR)" -w "$(CURDIR)" plantuml/plantuml $(1); \
+fi
+endef
+
+docs/static/puml/%.png: docs/static/puml/%.puml
+	$(call plantuml-cmd,-t png $<)
+
 
 .PHONY: docs-build
-docs-build: doc2go hugo ## Build the documentation
+docs-build: doc2go hugo $(DOCS_PNG) ## Build the documentation
 	@echo "Generating api reference with doc2go..."
 	@$(DOC2GO) -embed -highlight classes:monokai \
 		-basename _index.html \
@@ -265,6 +283,7 @@ docs-test: muffet ## Runs tests against documentation (requires documentation to
 	@echo "Running tests..."
 	@$(MUFFET) $(MUFFET_VERBOSE_FLAG) --include="http://localhost:$(DOCS_PORT)/chantico" http://localhost:$(DOCS_PORT)/chantico/index.html
 	@echo "All tests successful"
+
 
 ##@ Deployment
 

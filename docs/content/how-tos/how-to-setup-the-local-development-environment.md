@@ -33,6 +33,7 @@ export CHANTICO_PROMETHEUS_SERVICE_HOST="localhost"
 export CHANTICO_PROMETHEUS_SERVICE_PORT="19090"
 export CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME="chantico-persistent-volume-claim"
 export CHANTICO_DATA_PATH=".chantico-persistent-volume"
+export CHANTICO_NAMESPACE="chantico" # optional
 ```
 
 The controller will run locally on your computer. The controller will talk to a Kubernetes cluster (typically KinD) and other dependencies like a timeseries database. Everything will therefore run inside the Kubernetes cluster, except for the controller, when developing. A typical flow is:
@@ -50,6 +51,8 @@ You should now have access to:
 - [Filebrowser](http://localhost:18888) - username and password are both `admin`
 - [Prometheus](http://localhost:19090)
 - [SNMP Exporter](http://localhost:19116)
+- [VictoriaMetrics](http://localhost:18428)
+- [Grafana](http://localhost:13000) - username and password are both `admin`
 
 
 #### Running a demo

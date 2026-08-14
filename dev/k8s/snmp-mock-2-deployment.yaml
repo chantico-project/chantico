@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: chantico-snmp-mock-2
-  namespace: chantico
   labels:
     app: chantico-snmp-mock-2
 spec:

@@ -10,23 +10,34 @@ main:
 The idea behind chantico is to use the kubernetes control plane as a basis to have a fully declarative approach to the energy domain control.
 To make this happen Chantico is built as a [kubernetes controller](https://kubernetes.io/docs/concepts/architecture/controller/) operating over a set [custom resources](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/).
 
+Aside from the controller, additional components are deployed to provide a complete solution for the energy domain. The components can be enabled or disabled during installation.
+
 ### Components
 
 #### chantico-filebrowser
 
 The `chantico-filebrowser` is a kubernetes deployment living in the `chantico` namespace.
-It allows to add configuration files via drag and drop (e.g. uploading MIB files for the registration of a PDU).
+It hosts a [File Browser](https://filebrowser.org/) instance that allows to add configuration files via drag and drop (e.g. uploading MIB files for the registration of a PDU).
 
 #### chantico-snmp
 
 The `chantico-snmp` is a kubernetes deployment living in the `chantico` namespace.
-It hosts an `snmp_exporter` instance that query devices using the SNMP format and exposes a prometheus compatible format.
+It hosts a [Prometheus SNMP Exporter](https://github.com/prometheus/snmp_exporter) instance that query devices using the SNMP format and exposes a prometheus compatible format.
 
 #### chantico-prometheus
 
 The `chantico-snmp` is a kubernetes service living in the `chantico` namespace.
-It hosts an `prometheus` that scrapes devices via `chantico-snmp`.
+It hosts a [Prometheus](https://prometheus.io/) deployment that scrapes devices via `chantico-snmp`.
 
+#### chantico-victoriametrics
+
+The `chantico-victoriametrics` is a kubernetes service living in the `chantico` namespace.
+It hosts a [VictoriaMetrics](https://victoriametrics.com/) instance that stores the metrics scraped by `chantico-prometheus` for long-term retention.
+
+#### chantico-grafana
+
+The `chantico-grafana` is a kubernetes service living in the `chantico` namespace.
+It hosts a [Grafana](https://grafana.com/) instance that allows to visualize the metrics stored in `chantico-prometheus` and `chantico-victoriametrics` to provide a user-facing dashboard for reporting and analysis of the metrics out of the energy domain.
 
 ## Technical choices
 
@@ -41,14 +52,9 @@ This is why we use [plantuml](https://plantuml.com/) to write diagrams, as its t
 
 To seamlessly interoperate with kubernetes the [go](https://go.dev/) programming language was chosen.
 
-#### Go code
-
-To avoid the [short-comings](https://en.wikipedia.org/wiki/Object%E2%80%93relational_impedance_mismatch) of ORMs an approach based on generating idiomatic go code directly from annotated SQL queries have been prefered.
-To do this we use the [sqlc](https://sqlc.dev/) library.
-
 ### That does not work on my machine
 
-To avoid the "it does not work" on my machine we provide a [nix-flake](https://wiki.nixos.org/wiki/Flakes) to set-up your development environment.
+To avoid the "it does not work" on my machine, consider using [nix-flake](https://wiki.nixos.org/wiki/Flakes) to set-up your development environment.
 Although this is not strictly required this is encouraged to work on the project.
 
 ### Testing
@@ -56,7 +62,7 @@ Although this is not strictly required this is encouraged to work on the project
 #### Philosophy
 
 **Chantico** is designed to serve as the glue between many components that run on and depend on Kubernetes.
-Because of this, integration and end-to-end testing can be costly and significantly slow down the development cycle—due to long-running CI jobs and the complexity of setting up a proper development environment.
+Because of this, integration and end-to-end testing can be costly and significantly slow down the development cycle, due to long-running CI jobs and the complexity of setting up a proper development environment.
 
 To address bugs that go beyond the scope of unit testing, we aim to invest in robust automatic logging that will be explained in its own section.
 
@@ -69,11 +75,11 @@ To keep testing lightweight and efficient, we follow these rules regarding what 
 
 **Disallowed in tests:**
 - Spinning up a Kubernetes instance
-- Spinning up service instances (e.g., PostgreSQL, etc.)
+- Spinning up service instances
 
 #### Table-Driven Testing
 
-In line with Go’s philosophy of simplicity, we use the standard `testing` package from the Go library.
+In line with Go's philosophy of simplicity, we use the standard `testing` package from the Go library.
 When appropriate, we design tests using **table-driven testing**, following this format:
 
 ```go
@@ -123,6 +129,6 @@ Coming soon.
 
 ### CI/CD
 
-We use Github CI to build Docker images for Chantico components, including the manager, Goose for Postgres migrations and SNMP mock.
-Additionally, formatting, tests and coverage are run. Pages are also deployed Github CI.
+We use GitHub CI to build Docker images for Chantico components, including the manager and SNMP mock.
+Additionally, formatting, tests and coverage are run. Pages are also deployed via GitHub CI.
 

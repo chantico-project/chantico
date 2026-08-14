@@ -32,8 +32,12 @@ func New(kubeconfigPath string) (*KubernetesClient, error) {
 	}
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
-	v1alpha1.AddToScheme(scheme)
+	if err := corev1.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+	if err := v1alpha1.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
 
 	k, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {

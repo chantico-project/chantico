@@ -1,6 +1,6 @@
 ---
 title: "Energy Accounting via Prometheus Recording Rules"
-weight: 30
+weight: 35
 ---
 
 This document describes the energy accounting feature implemented in the
@@ -158,19 +158,19 @@ PhysicalMeasurement.
 The second mock simulates a second PDU on NodePort 31162:
 
 ```bash
-kubectl apply -f dev/k8s/snmp-mock-2-deployment.yaml
-kubectl apply -f dev/k8s/snmp-mock-2-service.yaml
+kubectl apply -n chantico -f dev/k8s/snmp-mock-2-deployment.yaml
+kubectl apply -n chantico -f dev/k8s/snmp-mock-2-service.yaml
 ```
 
 ### 3. Apply the Custom Resources for the demo
 
 ```bash
 # MeasurementDevice + PhysicalMeasurement
-kubectl apply -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
-kubectl apply -f config/samples/chantico_v1alpha1_physicalmeasurement_mock2.yaml
+kubectl apply -n chantico -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
+kubectl apply -n chantico -f config/samples/chantico_v1alpha1_physicalmeasurement_mock2.yaml
 
 # DataCenterResources: PDU1, PDU2, and bare metal (BM)
-kubectl apply -f config/samples/chantico_v1alpha1_datacenterresource.yaml
+kubectl apply -n chantico -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 ```
 
 The sample file defines:

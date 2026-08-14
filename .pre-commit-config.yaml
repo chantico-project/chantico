@@ -8,4 +8,7 @@ repos:
       - id: go-test-mod
       - id: go-vet-mod
       - id: go-fmt
-      - id: golangci-lint-pkg
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.12.2
+    hooks:
+      - id: golangci-lint

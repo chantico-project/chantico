@@ -93,7 +93,6 @@ func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, da
 	if dataCenterResource.DeletionTimestamp == nil {
 		return steps.Continue()
 	}
-
 	l := log.FromContext(ctx)
 
 	volumePath := config.ValidatedEnv.VolumeLocation
@@ -188,7 +187,7 @@ func (r *DataCenterResourceReconciler) ValidateDataCenterResource(ctx context.Co
 	physicalMeasurements := &chantico.PhysicalMeasurementList{}
 	_ = r.List(ctx, physicalMeasurements, listOptions...)
 
-	visited, err, involvedResource := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
+	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
 		dcr.SetValidationError(dataCenterResource, err, involvedResource)

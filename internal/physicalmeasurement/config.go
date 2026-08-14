@@ -17,13 +17,14 @@ type FileSDTarget struct {
 // CreateFileSDTarget creates a file_sd_configs target entry for a PhysicalMeasurement.
 // The labels __param_module and __param_auth are used by the SNMP exporter relabel
 // configs in prometheus.yml to route scrapes through the correct SNMP module.
-func CreateFileSDTarget(deviceId string, ip string) FileSDTarget {
+func CreateFileSDTarget(deviceId string, ip string, name string) FileSDTarget {
 	return FileSDTarget{
 		Targets: []string{ip},
 		Labels: map[string]string{
 			"__param_module": deviceId,
 			"__param_auth":   deviceId,
 			"job":            deviceId,
+			"name":           name,
 		},
 	}
 }

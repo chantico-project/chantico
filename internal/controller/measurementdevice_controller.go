@@ -44,7 +44,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	util "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -62,8 +61,9 @@ import (
 // MeasurementDeviceReconciler reconciles a MeasurementDevice
 type MeasurementDeviceReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Paths  md.Paths
+	Scheme    *runtime.Scheme
+	Paths     md.Paths
+	Namespace string
 }
 
 func (r *MeasurementDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -92,6 +92,7 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 		return ctrl.Result{}, err
 	}
+	r.Namespace = measurementDevice.GetNamespace()
 	l = l.WithValues("generation", measurementDevice.GetGeneration())
 	ctx = log.IntoContext(ctx, l)
 
@@ -118,7 +119,7 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 }
 
 func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	if measurementDevice.ObjectMeta.GetDeletionTimestamp() == nil {
+	if measurementDevice.GetDeletionTimestamp() == nil {
 		return steps.Continue()
 	}
 
@@ -233,7 +234,7 @@ func (r *MeasurementDeviceReconciler) createGeneratorJob(
 	if err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to build SNMP Generator job: %w", err))
 	}
-	if err := controllerutil.SetControllerReference(measurementDevice, job, r.Scheme); err != nil {
+	if err := util.SetControllerReference(measurementDevice, job, r.Scheme); err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to set controller reference for SNMP Generator job: %w", err))
 	}
 	if err := r.Create(ctx, job); err != nil {
@@ -359,7 +360,7 @@ func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Contex
 
 func (r *MeasurementDeviceReconciler) getSnmpExporterDeployment(ctx context.Context) (*appsv1.Deployment, error) {
 	var deploy appsv1.Deployment
-	if err := r.Get(ctx, client.ObjectKey{Name: "chantico-snmp", Namespace: "chantico"}, &deploy); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: "chantico-snmp", Namespace: r.Namespace}, &deploy); err != nil {
 		return nil, err
 	}
 	return &deploy, nil

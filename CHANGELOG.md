@@ -1,3 +1,55 @@
+## 0.12.0 (2026-07-31)
+
+#### Feature
+
+* Allow deployment in different namespace (#192) (ba7f9963)
+
+#### Documentation
+
+* Add explanation about DCO. (#180) (94199026)
+
+#### Chores
+
+* **docs:** Update documentation for milestone 2 (#184) (24e62522)
+* **deps:** bump github.com/google/cel-go from 0.28.0 to 0.29.0 (#186) (340dc96c)
+* **deps:** bump google.golang.org/grpc from 1.80.0 to 1.82.1 (#185) (0b0fe64f)
+* **docs:** select which mib to provide to snmp generator (#170) (aa9619bb)
+
+## 0.11.0 (2026-07-23)
+
+#### Feature
+
+* Track prometheus scraping interval and add panel on timeliness (#177) (42a40548)
+
+## 0.10.0 (2026-07-20)
+
+#### Feature
+
+* Add sigrid.yaml config file. (#179) (ab0e340d)
+
+## 0.9.0 (2026-07-14)
+
+#### Feature
+
+* Front-end with metrics (#161) (96c5da72)
+
+## 0.8.0 (2026-07-14)
+
+#### Feature
+
+* Sigrid publish and pull-request CI (#174) (a389845b)
+
+## 0.7.0 (2026-07-14)
+
+#### Feature
+
+* Perform relabeling to track which service a resource belongs to (#166) (237a6d29)
+
+#### Chores
+
+* **deps:** bump golang.org/x/net from 0.53.0 to 0.55.0 (#172) (01ad34c9)
+* Disable docker build for dependabot due to missing tokens (50759d71)
+
 ## 0.6.5 (2026-07-07)
 
 #### Bug Fixes
