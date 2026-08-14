@@ -66,7 +66,7 @@ func WriteRuleFile(
 	// If there are no rules to write (e.g. root node with no children),
 	// clean up any stale rule file and return.
 	if ruleFile == nil {
-		deleteRuleFileFromDisk(dataCenterResource.Name)
+		DeleteRuleFileFromDisk(dataCenterResource.Name)
 		return nil
 	}
 

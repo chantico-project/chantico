@@ -48,7 +48,7 @@ func TestSanitizeMetricName(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			result := sanitizeMetricName(tc.input)
+			result := SanitizeMetricName(tc.input)
 			if result != tc.expected {
 				t.Errorf("sanitizeMetricName(%q) = %q, want %q", tc.input, result, tc.expected)
 			}

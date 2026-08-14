@@ -90,6 +90,10 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
+	if dataCenterResource.DeletionTimestamp == nil {
+		return steps.Continue()
+	}
+
 	l := log.FromContext(ctx)
 
 	volumePath := config.ValidatedEnv.VolumeLocation
