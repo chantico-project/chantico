@@ -25,6 +25,10 @@ components:
 dependencychecker:
   blocklist:
     - .*tno.*
+  transitive: true
 thirdpartyfindings:
   enabled: true
-
+  exclude:
+    - ".*/.*_test[.].go"
+    - ".*/.*mock.*.yaml"
+    - ".*/testdata/.*[.]json"
