@@ -54,7 +54,15 @@ func (a *app) Run() error {
 	ctxInterrupt, stopInterrupt := SignalHandling()
 	defer stopInterrupt()
 
-	httpServer := http.New(t, k, a.cfg.Port, 10*time.Second)
+	handler := &http.HTTPServerHandler{
+		Renderer:   t,
+		Kubernetes: k,
+	}
+	config := &http.HTTPServerConfig{
+		Port:              a.cfg.Port,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	httpServer := http.New(handler, config)
 	httpServerErrChannel := make(chan error, 1)
 	go httpServer.Run(httpServerErrChannel)
 
