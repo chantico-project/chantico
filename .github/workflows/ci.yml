@@ -68,13 +68,13 @@ jobs:
           go tool cover -func coverage.out
           gocover-cobertura < coverage.out > coverage.xml
 
-      - name: Upload reports
-        uses: actions/upload-artifact@v7
+      - name: Upload coverage report
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-code-coverage@v1
         with:
-          name: test-reports
-          path: |
-            report.json
-            coverage.xml
+          file: coverage.xml
+          language: Go
+          label: code-coverage/gotest
 
   invoke-docker:
     if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
