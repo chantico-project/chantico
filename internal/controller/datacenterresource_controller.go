@@ -6,8 +6,6 @@ import (
 	"chantico/internal/steps"
 	"context"
 	"errors"
-	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -86,6 +84,8 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 	return steps.Run(ctx, dataCenterResource,
 		r.reconcileDeletion,
 		r.ensureFinalizerIsSet,
+		r.reconcileRuleFile,
+		r.reconcileValidation,
 	)
 }
 
@@ -93,6 +93,11 @@ func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, da
 	if dataCenterResource.DeletionTimestamp == nil {
 		return steps.Continue()
 	}
+
+	if !util.ContainsFinalizer(dataCenterResource, chantico.DataCenterResourceGraphFinalizer) {
+		return steps.Stop()
+	}
+
 	l := log.FromContext(ctx)
 
 	volumePath := config.ValidatedEnv.VolumeLocation
@@ -104,44 +109,9 @@ func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, da
 	if err != nil && !os.IsNotExist(err) {
 		return steps.Error(err)
 	}
-	reloadPrometheus(ctx)
-	return steps.Stop()
-}
+	dcr.ReloadPrometheus(ctx)
 
-func (r *DataCenterResourceReconciler) reconcileRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
-	ruleFile := dcr.BuildRuleFile(dataCenterResource)
-
-	// If there are no rules to write (e.g. root node with no children),
-	// clean up any stale rule file and return.
-	if ruleFile == nil {
-		dcr.DeleteRuleFileFromDisk(dataCenterResource.Name)
-		return steps.Stop()
-	}
-
-	volumePath := config.ValidatedEnv.VolumeLocation
-	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
-	if err := os.MkdirAll(rulesDir, 0777); err != nil {
-		// log.Printf("Failed to create rules directory: %v", err)
-		dcr.SetValidationError(dataCenterResource, err, "")
-		return steps.Error(err)
-	}
-
-	data, err := yaml.Marshal(ruleFile)
-	if err != nil {
-		// log.Printf("Failed to marshal rule file: %v", err)
-		dcr.SetValidationError(dataCenterResource, err, "")
-		return steps.Error(err)
-	}
-
-	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
-	if err := os.WriteFile(rulePath, data, 0644); err != nil {
-		// log.Printf("Failed to write rule file: %v", err)
-		dcr.SetValidationError(dataCenterResource, err, "")
-		return steps.Error(err)
-	}
-
-	// log.Printf("Wrote recording rule file %s for resource %s\n", rulePath, dataCenterResource.Name)
-	reloadPrometheus(ctx)
+	util.RemoveFinalizer(dataCenterResource, chantico.DataCenterResourceGraphFinalizer)
 	return steps.Stop()
 }
 
@@ -153,34 +123,44 @@ func (r *DataCenterResourceReconciler) ensureFinalizerIsSet(ctx context.Context,
 	return steps.Stop()
 }
 
-// reloadPrometheus sends a POST to the Prometheus /-/reload endpoint so that
-// newly written (or deleted) rule files are picked up.  Requires Prometheus to
-// be started with --web.enable-lifecycle.
-func reloadPrometheus(ctx context.Context) {
+func (r *DataCenterResourceReconciler) reconcileRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
 	l := log.FromContext(ctx)
-	host := config.ValidatedEnv.PrometheusServiceHost
-	port := config.ValidatedEnv.PrometheusServicePort
-	url := fmt.Sprintf("http://%s:%s/-/reload", host, port)
-	resp, err := http.Post(url, "", nil)
+	ruleFile := dcr.BuildRuleFile(dataCenterResource)
+
+	if ruleFile == nil {
+		l.Info("No rule file found")
+		dcr.DeleteRuleFileFromDisk(dataCenterResource.Name)
+		return steps.Stop()
+	}
+
+	volumePath := config.ValidatedEnv.VolumeLocation
+	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
+	if err := os.MkdirAll(rulesDir, 0777); err != nil {
+		dcr.SetValidationError(dataCenterResource, err, "")
+		return steps.Error(err)
+	}
+
+	data, err := yaml.Marshal(ruleFile)
 	if err != nil {
-		l.Error(err, "Failed to reload Prometheus")
-		return
+		dcr.SetValidationError(dataCenterResource, err, "")
+		return steps.Error(err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		l.Info("Prometheus reload returned status", "status", resp.StatusCode)
-		return
+
+	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
+	if err := os.WriteFile(rulePath, data, 0644); err != nil {
+		dcr.SetValidationError(dataCenterResource, err, "")
+		return steps.Error(err)
 	}
-	l.Info("Prometheus configuration reloaded")
+
+	l.Info("Wrote recording rule file", "file", rulePath, "resource", dataCenterResource.Name)
+	dcr.ReloadPrometheus(ctx)
+	return steps.Stop()
 }
 
-func (r *DataCenterResourceReconciler) ValidateDataCenterResource(ctx context.Context, req ctrl.Request) ([]chantico.DataCenterResource, error) {
+func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
 	l := log.FromContext(ctx)
 
-	dataCenterResource := &chantico.DataCenterResource{}
-	_ = r.Get(ctx, req.NamespacedName, dataCenterResource)
-
-	listOptions := []client.ListOption{client.InNamespace(req.NamespacedName.Namespace)}
+	listOptions := []client.ListOption{client.InNamespace(dataCenterResource.Namespace)}
 	dataCenterResources := &chantico.DataCenterResourceList{}
 	_ = r.List(ctx, dataCenterResources, listOptions...)
 
@@ -191,7 +171,7 @@ func (r *DataCenterResourceReconciler) ValidateDataCenterResource(ctx context.Co
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
 		dcr.SetValidationError(dataCenterResource, err, involvedResource)
-		return visited, err
+		return steps.Error(err)
 	} else {
 		l.Info("Clearing validation errors")
 		l.Info("Previous status", "status", dataCenterResource.Status)
@@ -202,7 +182,7 @@ func (r *DataCenterResourceReconciler) ValidateDataCenterResource(ctx context.Co
 		_ = r.List(ctx, children, append(listOptions, client.MatchingFields{"spec.parents": dataCenterResource.Name})...)
 		if dataCenterResource.Status.InvolvedResource != "" {
 			involved := &chantico.DataCenterResource{}
-			_ = r.Get(ctx, types.NamespacedName{Namespace: req.NamespacedName.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
+			_ = r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
 			visited = append(visited, *involved)
 		}
 		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited))
@@ -211,12 +191,12 @@ func (r *DataCenterResourceReconciler) ValidateDataCenterResource(ctx context.Co
 		items := MergeUnique(visited, references.Items, children.Items)
 
 		for _, item := range items {
-			r.ClearReferencedValidation(ctx, req, dataCenterResource, &item)
+			r.ClearReferencedValidation(ctx, dataCenterResource, &item)
 		}
 		dcr.ClearValidationError(dataCenterResource)
 		dataCenterResource.Status.State = dcr.StateEntry
 	}
-	return visited, nil
+	return steps.Continue()
 }
 
 func MergeUnique(
@@ -239,7 +219,6 @@ func MergeUnique(
 
 func (r *DataCenterResourceReconciler) ClearReferencedValidation(
 	ctx context.Context,
-	req ctrl.Request,
 	dataCenterResource *chantico.DataCenterResource,
 	referenced *chantico.DataCenterResource,
 ) {
