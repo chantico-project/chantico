@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	chantico "chantico/api/v1alpha1"
@@ -163,7 +164,7 @@ func (pm *PostMortem) SaveAndQuit() {
 	filename := fmt.Sprintf("%s/bugs/bug%d.md", config.ValidatedEnv.VolumeLocation, pm.Timestamp.UnixMicro())
 
 	vfs := filestore.VolumeFileStore{}
-	if err := vfs.Write(filename, []byte(pm.Markdown()), 0666); err != nil {
+	if err := vfs.Write(context.Background(), filename, strings.NewReader(pm.Markdown())); err != nil {
 		panic(fmt.Sprintf("Could not save postmortem at location %s\nPost mortem content:%s\n", filename, pm.Markdown()))
 	}
 

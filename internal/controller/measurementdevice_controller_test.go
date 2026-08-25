@@ -18,11 +18,13 @@ package controller
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
+	"chantico/internal/filestore"
 	md "chantico/internal/measurementdevice"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
@@ -55,9 +57,10 @@ func newReconciler(t *testing.T, root string, objs ...runtime.Object) *Measureme
 		WithRuntimeObjects(objs...).
 		Build()
 	return &MeasurementDeviceReconciler{
-		Client: c,
-		Scheme: scheme,
-		Paths:  md.NewPaths(root),
+		Client:          c,
+		Scheme:          scheme,
+		Paths:           md.NewPaths(root),
+		ConfigFilestore: filestore.VolumeFileStore{Root: ""},
 	}
 }
 
@@ -113,6 +116,16 @@ func TestWriteReconcileMergedSNMPFile(t *testing.T) {
 	writeFile(t, filepath.Join(r.Paths.SNMPDir(), "snmp-b.yaml"),
 		[]byte("auths: {bar: {version: 3}}\nmodules: {bar: {walk: [1.4]}}\n"))
 
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			t.Log(path)
+		}
+		return nil
+	})
+
 	measurementDevice := &chantico.MeasurementDevice{ObjectMeta: metav1.ObjectMeta{Name: "tno", Namespace: "chantico"}}
 	if res := r.reconcileMergedSNMPFile(context.Background(), measurementDevice); res.Action == steps.ActionError {
 		t.Fatalf("reconcileMergedSNMPFile errored: %v", res.Err)
@@ -122,7 +135,7 @@ func TestWriteReconcileMergedSNMPFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read merged file: %v", err)
 	}
-	merged, err := snmp.GetMergedSortedSNMPConfig(r.Paths.SNMPDir())
+	merged, err := snmp.GetMergedSortedSNMPConfig(r.ConfigFilestore, r.Paths.SNMPDir())
 	if err != nil {
 		t.Fatalf("get merged config: %v", err)
 	}

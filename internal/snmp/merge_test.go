@@ -1,6 +1,7 @@
 package snmp
 
 import (
+	"chantico/internal/filestore"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -89,7 +90,7 @@ func TestGetMergedSortedSNMPConfig(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "snmp-empty.yaml"), []byte(""))
 	writeFile(t, filepath.Join(dir, "other.txt"), []byte("ignored"))
 
-	merged, err := GetMergedSortedSNMPConfig(dir)
+	merged, err := GetMergedSortedSNMPConfig(filestore.VolumeFileStore{Root: ""}, dir)
 	if err != nil {
 		t.Fatalf("GetMergedSortedSNMPConfig: %v", err)
 	}
@@ -110,7 +111,8 @@ func TestGetMergedSortedSNMPConfig(t *testing.T) {
 }
 
 func TestGetMergedSortedSNMPConfigMissingDir(t *testing.T) {
-	merged, err := GetMergedSortedSNMPConfig(filepath.Join(t.TempDir(), "does-not-exist"))
+	dir := t.TempDir()
+	merged, err := GetMergedSortedSNMPConfig(filestore.VolumeFileStore{Root: ""}, filepath.Join(dir, "does-not-exist"))
 	if err != nil {
 		t.Fatalf("expected nil error for missing dir, got %v", err)
 	}
