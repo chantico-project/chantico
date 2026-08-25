@@ -1,7 +1,9 @@
 package physicalmeasurement
 
 import (
+	"bytes"
 	"chantico/internal/filestore"
+	"context"
 	"encoding/json"
 )
 
@@ -36,13 +38,12 @@ func WriteFileSDTargets(path string, targets []FileSDTarget) error {
 		return err
 	}
 	vfs := filestore.VolumeFileStore{}
-	return vfs.Write(path, data, 0644)
+	return vfs.Write(context.Background(), path, bytes.NewReader(data))
 }
 
 // LoadFileSDTargets reads and parses a file_sd_configs JSON file.
-func LoadFileSDTargets(path string) ([]FileSDTarget, error) {
-	vfs := filestore.VolumeFileStore{}
-	data, err := vfs.Read(path)
+func LoadFileSDTargets(filestore filestore.FileStore, path string) ([]FileSDTarget, error) {
+	data, err := filestore.ReadAll(context.Background(), path)
 	if err != nil {
 		return nil, err
 	}

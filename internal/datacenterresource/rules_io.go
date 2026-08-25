@@ -17,6 +17,7 @@ limitations under the License.
 package datacenterresource
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -81,7 +82,8 @@ func WriteRuleFile(
 
 	rulePath := filepath.Join(volumePath, prometheusRulesDir, dataCenterResource.Name+".yml")
 	vfs := filestore.VolumeFileStore{}
-	if err := vfs.Write(rulePath, data, 0644); err != nil {
+
+	if err := vfs.Write(ctx, rulePath, bytes.NewReader(data)); err != nil {
 		log.Printf("Failed to write rule file: %v", err)
 		SetValidationError(dataCenterResource, err, "")
 		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}

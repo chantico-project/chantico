@@ -2,7 +2,10 @@ package filestore
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,26 +19,32 @@ func TestVolumeFileStore_Write(t *testing.T) {
 		// Named input parameters for target function.
 		filename string
 		bytes    []byte
-		perm     os.FileMode
-		wantErr  bool
+		wantErr  error
 	}{
-		{"simple write", "test.txt", []byte("Hello world!"), 0o666, false},
-		{"empty file write", "test2.txt", []byte{}, 0o666, false},
-		{"empty file write", "i/do/not/exist/test.txt", []byte{}, 0o666, false},
+		{"simple write", "test.txt", []byte("Hello world!"), nil},
+		{"empty file write", "test2.txt", []byte{}, nil},
+		{"nested dir write", "i/do/not/exist/test.txt", []byte{}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: construct the receiver type.
 			var v VolumeFileStore
-			gotErr := v.Write(filepath.Join(tempDir, tt.filename), tt.bytes, tt.perm)
+			ctx := context.Background()
+			target := filepath.Join(tempDir, tt.filename)
+			gotErr := v.Write(ctx, target, bytes.NewReader(tt.bytes))
+			if !errors.Is(gotErr, tt.wantErr) {
+				t.Fatalf("Write() error = %v, want %v", gotErr, tt.wantErr)
+			}
 			if gotErr != nil {
-				if !tt.wantErr {
-					t.Errorf("Write() failed: %v", gotErr)
-				}
 				return
 			}
-			if tt.wantErr {
-				t.Fatal("Write() succeeded unexpectedly")
+
+			// Verify file content on disk.
+			got, err := os.ReadFile(target)
+			if err != nil {
+				t.Fatalf("reading written file failed: %v", err)
+			}
+			if !bytes.Equal(got, tt.bytes) {
+				t.Errorf("written content = %v, want %v", got, tt.bytes)
 			}
 		})
 	}
@@ -50,24 +59,25 @@ func TestVolumeFileStore_Read(t *testing.T) {
 		// Named input parameters for target function.
 		filename string
 		want     []byte
-		wantErr  bool
+		wantErr  error
 	}{
-		{"simple file content read", "testdata/mockfile.txt", []byte(mockFileContent), false},
-		// TODO: Add test cases.
+		{"simple file content read", "testdata/mockfile.txt", []byte(mockFileContent), nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: construct the receiver type.
 			var v VolumeFileStore
-			got, gotErr := v.Read(tt.filename)
+			ctx := context.Background()
+			rc, gotErr := v.Read(ctx, tt.filename)
+			if !errors.Is(gotErr, tt.wantErr) {
+				t.Fatalf("got error %v, want %v", gotErr, tt.wantErr)
+			}
 			if gotErr != nil {
-				if !tt.wantErr {
-					t.Errorf("Read() failed: %v", gotErr)
-				}
 				return
 			}
-			if tt.wantErr {
-				t.Fatal("Read() succeeded unexpectedly")
+			defer rc.Close()
+			got, err := io.ReadAll(rc)
+			if err != nil {
+				t.Fatalf("reading from Read() returned reader failed: %v", err)
 			}
 			if !bytes.Equal(got, tt.want) {
 				t.Errorf("Read() = %v, want %v", got, tt.want)
