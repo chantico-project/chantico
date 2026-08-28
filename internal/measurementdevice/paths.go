@@ -14,10 +14,12 @@ const (
 
 // Subdirectories under the chantico data volume.
 const (
-	generatorsSubdir = "snmp/generators"
-	snmpSubdir       = "snmp/yml"
-	mibsSubdir       = "snmp/mibs"
-	mergedSNMPFile   = "snmp.yml" // sits inside SNMPDir alongside per-device files
+	generatorsSubdir    = "snmp/generators"
+	snmpSubdir          = "snmp/yml"
+	mibsSubdir          = "snmp/mibs"
+	mergedSNMPFile      = "snmp.yml" // sits inside SNMPDir alongside per-device files
+	scrapeConfigsSubdir = "prometheus/scrape_configs"
+	targetsSubdir       = "prometheus/targets"
 )
 
 // This helper struct defines the read/write paths used by the SNMPGenerator controller.
@@ -27,14 +29,23 @@ type Paths struct {
 
 func NewPaths(root string) Paths { return Paths{Root: root} }
 
-func (l Paths) generatorsDir() string  { return filepath.Join(l.Root, generatorsSubdir) }
-func (l Paths) SNMPDir() string        { return filepath.Join(l.Root, snmpSubdir) }
-func (l Paths) MIBsDir() string        { return filepath.Join(l.Root, mibsSubdir) }
-func (l Paths) MergedSNMPFile() string { return filepath.Join(l.SNMPDir(), mergedSNMPFile) }
+func (l Paths) generatorsDir() string    { return filepath.Join(l.Root, generatorsSubdir) }
+func (l Paths) SNMPDir() string          { return filepath.Join(l.Root, snmpSubdir) }
+func (l Paths) MIBsDir() string          { return filepath.Join(l.Root, mibsSubdir) }
+func (l Paths) MergedSNMPFile() string   { return filepath.Join(l.SNMPDir(), mergedSNMPFile) }
+func (l Paths) ScrapeConfigsDir() string { return filepath.Join(l.Root, scrapeConfigsSubdir) }
 
 func (l Paths) GeneratorFile(uid types.UID) string {
 	return filepath.Join(l.generatorsDir(), fmt.Sprintf("generator-%s.yaml", uid))
 }
 func (l Paths) SNMPFile(uid types.UID) string {
 	return filepath.Join(l.SNMPDir(), fmt.Sprintf("snmp-%s.yaml", uid))
+}
+
+func (l Paths) ScrapeConfigFile(uid types.UID) string {
+	return filepath.Join(l.ScrapeConfigsDir(), fmt.Sprintf("scrape-config-%s.yml", uid))
+}
+
+func (l Paths) TargetsFile(uid types.UID) string {
+	return filepath.Join(l.Root, targetsSubdir, fmt.Sprintf("%s.json", uid))
 }

@@ -25,13 +25,26 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type MeasurementDeviceType string
+
+// Each type of measurement device relates to a prometheus scrape job in the prometheus configuration.
+const (
+	MeasurementDeviceTypeSNMP       MeasurementDeviceType = "snmp"
+	MeasurementDeviceTypePrometheus MeasurementDeviceType = "prometheus"
+)
+
+type PrometheusConfig struct {
+	Path string `yaml:"path" json:"path"`
+}
+
 // MeasurementDeviceSpec defines the desired state of MeasurementDevice
 type MeasurementDeviceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-
-	Walks []string           `yaml:"walks" json:"walks"`
-	Auth  snmp.GeneratorAuth `yaml:"auth" json:"auth"`
+	Type       MeasurementDeviceType `yaml:"type" json:"type"`
+	Walks      []string              `yaml:"walks,omitempty" json:"walks,omitempty"`
+	Auth       snmp.GeneratorAuth    `yaml:"auth,omitempty" json:"auth,omitempty"`
+	Prometheus PrometheusConfig      `yaml:"prometheus,omitempty" json:"prometheus,omitempty"`
 }
 
 // MeasurementDeviceStatus defines the observed state of MeasurementDevice

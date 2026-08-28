@@ -61,6 +61,7 @@ spec:
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/yml;
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/targets;
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/rules;
+            mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/scrape_configs;
             cat > /tmp/chantico-volume-mount/prometheus/yml/prometheus.yml <<'EOF'
             global:
               scrape_interval: 10s
@@ -76,20 +77,32 @@ spec:
               - job_name: prometheus
                 static_configs:
                   - targets: ['localhost:9090']
-              - job_name: snmp
-                file_sd_configs:
-                  - files:
-                      - /tmp/prometheus-volume/targets/*.json
-                    refresh_interval: 30s
-                metrics_path: /snmp
-                relabel_configs:
-                  - source_labels: [__address__]
-                    target_label: __param_target
-                  - source_labels: [__param_target]
-                    target_label: instance
-                  - target_label: __address__
-                    replacement: {{ .Values.snmpExporterAddress }}
+            scrape_config_files:
+            - /tmp/prometheus-volume/scrape_configs/*.yml
             EOF
+            # cat > /tmp/chantico-volume-mount/yml/scrape_configs/snmp.yml <<'EOF'
+            #   - job_name: snmp
+            #     file_sd_configs:
+            #       - files:
+            #           - /tmp/prometheus-volume/targets/snmp/*.json
+            #         refresh_interval: 30s
+            #     metrics_path: /snmp
+            #     relabel_configs:
+            #       - source_labels: [__address__]
+            #         target_label: __param_target
+            #       - source_labels: [__param_target]
+            #         target_label: instance
+            #       - target_label: __address__
+            #         replacement: {{ .Values.snmpExporterAddress }}
+            # EOF
+            # cat > /tmp/chantico-volume-mount/yml/scrape_configs/prometheus-direct.yml <<'EOF'
+            # - job_name: prometheus-direct
+            #   file_sd_configs:
+            #     - files:
+            #         - /tmp/prometheus-volume/targets/prometheus-direct/*.json
+            #       refresh_interval: 30s
+            #   metrics_path: /metrics
+            # EOF
             chmod -R 1777 /tmp/chantico-volume-mount/prometheus
         volumeMounts:
         - mountPath: "/tmp/chantico-volume-mount"

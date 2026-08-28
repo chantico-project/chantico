@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -33,18 +34,21 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	md "chantico/internal/measurementdevice"
+	"chantico/internal/prometheus"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
+	"chantico/internal/util"
 	"crypto/sha256"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
-	util "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	yaml "go.yaml.in/yaml/v2"
@@ -110,6 +114,7 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return steps.Run(ctx, measurementDevice,
 		r.reconcileDeletion,
 		r.ensureFinalizerIsSet,
+		r.reconcileScrapeJobFile,
 		r.reconcileGeneratorFile,
 		r.reconcileSNMPGeneratorJob,
 		r.reconcileSNMPFileContent,
@@ -123,7 +128,7 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 		return steps.Continue()
 	}
 
-	if !util.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
+	if !controllerutil.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
 		return steps.Stop()
 	}
 
@@ -156,16 +161,64 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 		return res
 	}
 
-	util.RemoveFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer)
+	controllerutil.RemoveFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer)
 	return steps.Stop()
 }
 
 func (r *MeasurementDeviceReconciler) ensureFinalizerIsSet(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	if util.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
+	if controllerutil.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
 		return steps.Continue()
 	}
-	util.AddFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer)
+	controllerutil.AddFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer)
 	return steps.Stop()
+}
+
+func (r *MeasurementDeviceReconciler) reconcileScrapeJobFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
+	if err := os.MkdirAll(r.Paths.ScrapeConfigsDir(), 0777); err != nil {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to write scrape config %s: %s", r.Paths.ScrapeConfigsDir(), err))
+	}
+	path := r.Paths.ScrapeConfigFile(measurementDevice.GetUID())
+
+	config := prometheus.ScrapeConfigFile{
+		ScrapeConfigs: []prometheus.ScrapeConfig{{
+			JobName:     measurementDevice.Name,
+			MetricsPath: &measurementDevice.Spec.Prometheus.Path,
+			FileSdConfigs: []prometheus.FileSdConfig{{
+				Files:           []string{fmt.Sprintf("/tmp/prometheus-volume/targets/prometheus-direct/*.json")},
+				RefreshInterval: ptr.To("30s"),
+			}},
+		}},
+	}
+	observed, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to read scrape config file %s: %w", path, err))
+	}
+
+	desired, err := yaml.Marshal(config)
+	if err != nil {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to marshal scrape config: %w", err))
+	}
+
+	if bytes.Equal(observed, desired) {
+		measurementDevice.UpdateStatusCondition(chantico.ConditionConfig, metav1.ConditionTrue, chantico.ReasonSynced, "Scrape config file is up to date.")
+		return steps.Continue()
+	}
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to create directory %s: %w", dir, err))
+	}
+
+	if err := os.WriteFile(path, desired, 0777); err != nil {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to write scrape config file: %w", err))
+	}
+
+	log.FromContext(ctx).Info("Scrape config file has been generated successfully.", "path", path)
+	measurementDevice.UpdateStatusCondition(chantico.ConditionConfig, metav1.ConditionTrue, chantico.ReasonFileWritten, "Scrape config file has been generated successfully.")
+
+	util.ReloadPrometheus()
+
+	return steps.Continue()
 }
 
 func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
@@ -234,7 +287,7 @@ func (r *MeasurementDeviceReconciler) createGeneratorJob(
 	if err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to build SNMP Generator job: %w", err))
 	}
-	if err := util.SetControllerReference(measurementDevice, job, r.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(measurementDevice, job, r.Scheme); err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to set controller reference for SNMP Generator job: %w", err))
 	}
 	if err := r.Create(ctx, job); err != nil {

@@ -74,13 +74,24 @@ spec:
                   version:
                     type: integer
                 type: object
+              prometheus:
+                properties:
+                  path:
+                    type: string
+                required:
+                - path
+                type: object
+              type:
+                description: |-
+                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                type: string
               walks:
                 items:
                   type: string
                 type: array
             required:
-            - auth
-            - walks
+            - type
             type: object
           status:
             description: MeasurementDeviceStatus defines the observed state of MeasurementDevice

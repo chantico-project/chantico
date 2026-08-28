@@ -18,9 +18,7 @@ package datacenterresource
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -28,31 +26,12 @@ import (
 	config "chantico/internal/configuration"
 	ph "chantico/internal/patch"
 	sm "chantico/internal/statemachine"
+	"chantico/internal/util"
 
 	"go.yaml.in/yaml/v2"
 )
 
 const prometheusRulesDir = "prometheus/rules"
-
-// reloadPrometheus sends a POST to the Prometheus /-/reload endpoint so that
-// newly written (or deleted) rule files are picked up.  Requires Prometheus to
-// be started with --web.enable-lifecycle.
-func reloadPrometheus() {
-	host := config.ValidatedEnv.PrometheusServiceHost
-	port := config.ValidatedEnv.PrometheusServicePort
-	url := fmt.Sprintf("http://%s:%s/-/reload", host, port)
-	resp, err := http.Post(url, "", nil)
-	if err != nil {
-		log.Printf("Failed to reload Prometheus: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("Prometheus reload returned status %d", resp.StatusCode)
-		return
-	}
-	log.Println("Prometheus configuration reloaded")
-}
 
 // WriteRuleFile writes a Prometheus recording rule file for this DataCenterResource.
 // The file is written to prometheus/rules/<name>.yml on the shared volume.
@@ -93,7 +72,7 @@ func WriteRuleFile(
 	}
 
 	log.Printf("Wrote recording rule file %s for resource %s\n", rulePath, dataCenterResource.Name)
-	reloadPrometheus()
+	util.ReloadPrometheus()
 	return nil
 }
 
@@ -104,7 +83,7 @@ func DeleteRuleFile(
 	dataCenterResource *chantico.DataCenterResource,
 ) *sm.ActionResult {
 	deleteRuleFileFromDisk(dataCenterResource.Name)
-	reloadPrometheus()
+	util.ReloadPrometheus()
 	return nil
 }
 
