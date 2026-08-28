@@ -277,7 +277,7 @@ func reloadPrometheus(ctx context.Context) error {
 	host := config.ValidatedEnv.PrometheusServiceHost
 	port := config.ValidatedEnv.PrometheusServicePort
 
-	if host != "localhost" || host != "chantico-prometheus" || host != "127.0.0.1" {
+	if host != "localhost" && host != "chantico-prometheus" && host != "127.0.0.1" {
 		return fmt.Errorf("Prometheus reload is only supported for localhost or chantico-prometheus service, but got host: %s", host)
 	}
 
