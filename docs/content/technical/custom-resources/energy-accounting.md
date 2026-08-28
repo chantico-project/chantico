@@ -46,7 +46,10 @@ type ParentRef struct {
 
 Each entry in `spec.parents` references a parent DataCenterResource by name
 and optionally carries a coefficient (a PromQL expression, usually a literal
-number like `"1"` or `"0.5"`).
+number like `"1"` or `"0.5"`). If no coefficient is provided, the child may
+instead have `energyMetric` set, in which case an alias rule is generated
+for the child. It should be impossible for a child to have both a parent
+with coefficients and `energyMetric` set.
 
 ### `DataCenterResourceSpec` (relevant fields)
 
