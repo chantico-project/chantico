@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -21,11 +22,11 @@ var StateMachine = sm.Machine[*chantico.PhysicalMeasurement]{
 	Actions: map[string][]sm.ActionFunction[*chantico.PhysicalMeasurement]{
 		StateInit: {
 			{Type: sm.ActionFunctionPure, Pure: sm.InitializeFinalizer[*chantico.PhysicalMeasurement]},
-			{Type: sm.ActionFunctionPure, Pure: WriteTargetFile},
+			{Type: sm.ActionFunctionIO, IO: WriteTargetFile},
 		},
 		StateRunning: {},
 		StateDelete: {
-			{Type: sm.ActionFunctionPure, Pure: DeleteTargetFile},
+			{Type: sm.ActionFunctionIO, IO: DeleteTargetFile},
 			{Type: sm.ActionFunctionPure, Pure: sm.RemoveFinalizer[*chantico.PhysicalMeasurement]},
 		},
 		StateFailed: {},
@@ -33,19 +34,50 @@ var StateMachine = sm.Machine[*chantico.PhysicalMeasurement]{
 	FailState: StateFailed,
 }
 
+func retrieveMeasurementDevice(ctx context.Context, kubernetesClient client.Client, physicalMeasurement *chantico.PhysicalMeasurement) (*chantico.MeasurementDevice, error) {
+	// Lookup the measurement device to determine which target type to use.
+	measurementDevice := &chantico.MeasurementDevice{}
+	key := client.ObjectKey{
+		Namespace: physicalMeasurement.Namespace,
+		Name:      physicalMeasurement.Spec.MeasurementDevice,
+	}
+
+	if err := kubernetesClient.Get(ctx, key, measurementDevice); err != nil {
+		return nil, err
+	}
+
+	return measurementDevice, nil
+}
+
+func constructTargetDir(measurementDevice chantico.MeasurementDevice) string {
+	volumePath := config.ValidatedEnv.VolumeLocation
+
+	targetsDir := filepath.Join(volumePath, prometheusTargetsDir, string(measurementDevice.GetUID()))
+
+	return targetsDir
+}
+
 // WriteTargetFile writes a file_sd_configs JSON target file for this PhysicalMeasurement.
 // The file is written to prometheus/targets/<name>.json.
 // Prometheus automatically detects changes to these files and updates its scrape targets.
 func WriteTargetFile(
 	ctx context.Context,
+	kubernetesClient client.Client,
 	physicalMeasurement *chantico.PhysicalMeasurement,
 ) *sm.ActionResult {
 	l := log.FromContext(ctx)
 
+	measurementDevice, err := retrieveMeasurementDevice(ctx, kubernetesClient, physicalMeasurement)
+	if err != nil {
+		physicalMeasurement.Status.State = StateFailed
+		physicalMeasurement.Status.ErrorMessage = err.Error()
+		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
+	}
+
 	target := CreateFileSDTarget(physicalMeasurement.Spec.MeasurementDevice, physicalMeasurement.Spec.Ip, physicalMeasurement.Name)
 
-	volumePath := config.ValidatedEnv.VolumeLocation
-	targetsDir := filepath.Join(volumePath, prometheusTargetsDir)
+	targetsDir := constructTargetDir(*measurementDevice)
+
 	if err := os.MkdirAll(targetsDir, 0777); err != nil {
 		physicalMeasurement.Status.State = StateFailed
 		physicalMeasurement.Status.ErrorMessage = err.Error()
@@ -53,7 +85,7 @@ func WriteTargetFile(
 		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
 	}
 
-	targetPath := filepath.Join(targetsDir, physicalMeasurement.Name+".json")
+	targetPath := filepath.Join(targetsDir, string(physicalMeasurement.GetUID())+".json")
 	if err := WriteFileSDTargets(targetPath, []FileSDTarget{target}); err != nil {
 		physicalMeasurement.Status.State = StateFailed
 		physicalMeasurement.Status.ErrorMessage = err.Error()
@@ -71,15 +103,24 @@ func WriteTargetFile(
 // Prometheus will automatically stop scraping the removed targets.
 func DeleteTargetFile(
 	ctx context.Context,
+	kubernetesClient client.Client,
 	physicalMeasurement *chantico.PhysicalMeasurement,
 ) *sm.ActionResult {
 	l := log.FromContext(ctx)
-	volumePath := config.ValidatedEnv.VolumeLocation
-	targetPath := filepath.Join(volumePath, prometheusTargetsDir, physicalMeasurement.Name+".json")
+
+	measurementDevice, err := retrieveMeasurementDevice(ctx, kubernetesClient, physicalMeasurement)
+	if err != nil {
+		physicalMeasurement.Status.State = StateFailed
+		physicalMeasurement.Status.ErrorMessage = err.Error()
+		l.Error(err, "Failed to look up MeasurementDevice when deleting target file.")
+		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
+	}
+
+	targetPath := filepath.Join(constructTargetDir(*measurementDevice), string(physicalMeasurement.GetUID())+".json")
 
 	l.Info("Deleting target file")
 
-	err := os.Remove(targetPath)
+	err = os.Remove(targetPath)
 	if err != nil && !os.IsNotExist(err) {
 		physicalMeasurement.Status.State = StateFailed
 		physicalMeasurement.Status.ErrorMessage = err.Error()
