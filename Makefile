@@ -18,6 +18,10 @@ LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 SNMP_MOCK_TAG ?= latest
 SNMP_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
 
+# Name of the kind cluster created by cluster-up, and the kube context it produces.
+KIND_CLUSTER_NAME ?= kind
+KIND_KUBE_CONTEXT ?= kind-$(KIND_CLUSTER_NAME)
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -155,8 +159,20 @@ build: manifests generate ## Build manager binary.
 	go build -o bin/manager cmd/operator/main.go
 
 .PHONY: run
-run: manifests generate ## Run a controller from your host.
+run: manifests generate check-kube-context ## Run a controller from your host.
 	go run ./cmd/operator/main.go
+
+.PHONY: check-kube-context
+check-kube-context: ## Warn and ask for confirmation if the current kube context isn't the local kind cluster's.
+	@current_ctx="$$($(KUBECTL) config current-context 2>/dev/null)"; \
+	if [ "$$current_ctx" != "$(KIND_KUBE_CONTEXT)" ]; then \
+		echo "Warning: current kube context '$$current_ctx' does not match the kind cluster context '$(KIND_KUBE_CONTEXT)'."; \
+		read -r -p "Continue anyway? [y/N] " reply < /dev/tty; \
+		case "$$reply" in \
+			[yY][eE][sS]|[yY]) ;; \
+			*) echo "Aborting."; exit 1 ;; \
+		esac; \
+	fi
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
