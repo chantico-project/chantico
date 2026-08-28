@@ -30,6 +30,7 @@ import (
 	sm "chantico/internal/statemachine"
 
 	"go.yaml.in/yaml/v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -38,7 +39,7 @@ const prometheusRulesDir = "prometheus/rules"
 // reloadPrometheus sends a POST to the Prometheus /-/reload endpoint so that
 // newly written (or deleted) rule files are picked up.  Requires Prometheus to
 // be started with --web.enable-lifecycle.
-func ReloadPrometheus(ctx context.Context) {
+func ReloadPrometheus(ctx context.Context) error {
 	l := log.FromContext(ctx)
 	host := config.ValidatedEnv.PrometheusServiceHost
 	port := config.ValidatedEnv.PrometheusServicePort
@@ -46,14 +47,15 @@ func ReloadPrometheus(ctx context.Context) {
 	resp, err := http.Post(url, "", nil)
 	if err != nil {
 		l.Error(err, "Failed to reload Prometheus")
-		return
+		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		l.Info("Prometheus reload returned status", "status", resp.StatusCode)
-		return
+		return fmt.Errorf("prometheus reload returned status %d", resp.StatusCode)
 	}
 	l.Info("Prometheus configuration reloaded")
+	return nil
 }
 
 // WriteRuleFile writes a Prometheus recording rule file for this DataCenterResource.
@@ -63,6 +65,7 @@ func WriteRuleFile(
 	ctx context.Context,
 	dataCenterResource *chantico.DataCenterResource,
 ) *sm.ActionResult {
+	l := log.FromContext(ctx)
 	ruleFile := BuildRuleFile(dataCenterResource)
 
 	// If there are no rules to write (e.g. root node with no children),
@@ -75,29 +78,25 @@ func WriteRuleFile(
 	volumePath := config.ValidatedEnv.VolumeLocation
 	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
 	if err := os.MkdirAll(rulesDir, 0777); err != nil {
-		l := log.FromContext(ctx)
 		l.Error(err, "Failed to create rules directory")
-		SetValidationError(dataCenterResource, err, "")
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to create directory "+rulesDir+": "+err.Error())
 		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
 	}
 
 	data, err := yaml.Marshal(ruleFile)
 	if err != nil {
-		l := log.FromContext(ctx)
 		l.Error(err, "Failed to marshal rule file")
-		SetValidationError(dataCenterResource, err, "")
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to marshal rule file: "+err.Error())
 		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
 	}
 
 	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
 	if err := os.WriteFile(rulePath, data, 0644); err != nil {
-		l := log.FromContext(ctx)
 		l.Error(err, "Failed to write rule file")
-		SetValidationError(dataCenterResource, err, "")
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to write rule file: "+err.Error())
 		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
 	}
 
-	l := log.FromContext(ctx)
 	l.Info("Wrote recording rule file", "file", rulePath, "resource", dataCenterResource.Name)
 	ReloadPrometheus(ctx)
 	return nil

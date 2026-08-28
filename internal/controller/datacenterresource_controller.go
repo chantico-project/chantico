@@ -16,6 +16,8 @@ import (
 	yaml "go.yaml.in/yaml/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -107,9 +109,14 @@ func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, da
 
 	err := os.Remove(rulePath)
 	if err != nil && !os.IsNotExist(err) {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
 		return steps.Error(err)
 	}
-	dcr.ReloadPrometheus(ctx)
+	err = dcr.ReloadPrometheus(ctx)
+	if err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Error reloading Prometheus: "+err.Error())
+		return steps.Error(err)
+	}
 
 	util.RemoveFinalizer(dataCenterResource, chantico.DataCenterResourceGraphFinalizer)
 	return steps.Stop()
@@ -136,25 +143,31 @@ func (r *DataCenterResourceReconciler) reconcileRuleFile(ctx context.Context, da
 	volumePath := config.ValidatedEnv.VolumeLocation
 	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
 	if err := os.MkdirAll(rulesDir, 0777); err != nil {
-		dcr.SetValidationError(dataCenterResource, err, "")
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to create directory "+rulesDir+": "+err.Error())
 		return steps.Error(err)
 	}
 
 	data, err := yaml.Marshal(ruleFile)
 	if err != nil {
-		dcr.SetValidationError(dataCenterResource, err, "")
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to marshal rule file: "+err.Error())
 		return steps.Error(err)
 	}
 
 	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
 	if err := os.WriteFile(rulePath, data, 0644); err != nil {
-		dcr.SetValidationError(dataCenterResource, err, "")
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to write rule file: "+err.Error())
 		return steps.Error(err)
 	}
 
 	l.Info("Wrote recording rule file", "file", rulePath, "resource", dataCenterResource.Name)
-	dcr.ReloadPrometheus(ctx)
-	return steps.Stop()
+	err = dcr.ReloadPrometheus(ctx)
+	if err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
+		return steps.Error(err)
+	}
+
+	dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Recording rule file applied successfully")
+	return steps.Continue()
 }
 
 func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
@@ -170,7 +183,8 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
-		dcr.SetValidationError(dataCenterResource, err, involvedResource)
+		dataCenterResource.Status.InvolvedResource = involvedResource
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ConditionReason(err.Error()), err.Error())
 		return steps.Error(err)
 	} else {
 		l.Info("Clearing validation errors")
@@ -188,18 +202,18 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited))
 		l.Info("Referencing resources", "resources", dcr.FormatResources(references.Items))
 		l.Info("Children", "children", dcr.FormatResources(children.Items))
-		items := MergeUnique(visited, references.Items, children.Items)
+		items := mergeUnique(visited, references.Items, children.Items)
 
 		for _, item := range items {
-			r.ClearReferencedValidation(ctx, dataCenterResource, &item)
+			r.clearReferencedValidation(ctx, dataCenterResource, &item)
 		}
-		dcr.ClearValidationError(dataCenterResource)
-		dataCenterResource.Status.State = dcr.StateEntry
+		dataCenterResource.Status.InvolvedResource = ""
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
 	}
 	return steps.Continue()
 }
 
-func MergeUnique(
+func mergeUnique(
 	lists ...[]chantico.DataCenterResource,
 ) []chantico.DataCenterResource {
 	seen := make(map[string]chantico.DataCenterResource)
@@ -217,15 +231,16 @@ func MergeUnique(
 	return result
 }
 
-func (r *DataCenterResourceReconciler) ClearReferencedValidation(
+func (r *DataCenterResourceReconciler) clearReferencedValidation(
 	ctx context.Context,
 	dataCenterResource *chantico.DataCenterResource,
 	referenced *chantico.DataCenterResource,
 ) {
+	referenced.GetConditions()
 	// Revalidate if previously failed or current item is being removed
-	if referenced.Status.State == dcr.StateValidationFailed || dataCenterResource.Status.State == dcr.StateDelete {
+	if meta.IsStatusConditionFalse(*referenced.GetConditions(), string(chantico.ConditionValidated)) || meta.IsStatusConditionFalse(*dataCenterResource.GetConditions(), string(chantico.ConditionValidated)) {
 		patch := ph.Initialize(ctx, r.Client, referenced)
-		dcr.ClearValidationError(referenced)
+		referenced.Status.InvolvedResource = ""
 		patch.PatchStatus()
 	}
 }

@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"chantico/internal/snmp"
-	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -83,25 +82,6 @@ const (
 	SNMPJobTimeout = 3 * time.Minute
 )
 
-type ConditionType string
-
-const (
-	ConditionJob            ConditionType = "Job"
-	ConditionConfig         ConditionType = "Config"
-	ConditionGeneratorFile  ConditionType = "GeneratorFile"
-	ConditionExporterReload ConditionType = "ExporterReload"
-)
-
-type ConditionReason string
-
-const (
-	ReasonPending     ConditionReason = "Pending"
-	ReasonFailed      ConditionReason = "Failed"
-	ReasonSucceeded   ConditionReason = "Succeeded"
-	ReasonFileWritten ConditionReason = "FileWritten"
-	ReasonSynced      ConditionReason = "Synced"
-)
-
 func (m *MeasurementDevice) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
 
 func (m *MeasurementDevice) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
@@ -111,15 +91,15 @@ func (m *MeasurementDevice) UpdateStatusCondition(t ConditionType, s metav1.Cond
 	})
 }
 
-func (m *MeasurementDevice) UpdateStatusJobCondition(condition *metav1.Condition) {
-	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
-		Type: string(ConditionJob), Status: condition.Status, Reason: condition.Reason, Message: condition.Message,
-		ObservedGeneration: m.GetGeneration(),
-	})
-}
+// func (m *MeasurementDevice) UpdateStatusJobCondition(condition *metav1.Condition) {
+// 	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
+// 		Type: string(ConditionJob), Status: condition.Status, Reason: condition.Reason, Message: condition.Message,
+// 		ObservedGeneration: m.GetGeneration(),
+// 	})
+// }
 
-func (m *MeasurementDevice) FailCondition(t ConditionType, format string, args ...any) error {
-	err := fmt.Errorf(format, args...)
-	m.UpdateStatusCondition(t, metav1.ConditionFalse, ReasonFailed, err.Error())
-	return err
-}
+// func (m *MeasurementDevice) FailCondition(t ConditionType, format string, args ...any) error {
+// 	err := fmt.Errorf(format, args...)
+// 	m.UpdateStatusCondition(t, metav1.ConditionFalse, ReasonFailed, err.Error())
+// 	return err
+// }
