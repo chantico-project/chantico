@@ -216,7 +216,7 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 }
 
 func (r *DataCenterResourceReconciler) reconcileReady(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
-	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "DataCenterResource is fully reconciled and ready")
+	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "Fully reconciled and ready")
 	return steps.Continue()
 }
 

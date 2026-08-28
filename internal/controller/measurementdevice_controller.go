@@ -384,7 +384,7 @@ func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Contex
 }
 
 func (r *MeasurementDeviceReconciler) reconcileReady(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	measurementDevice.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "MeasurementDevice is fully reconciled and ready")
+	measurementDevice.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "Fully reconciled and ready")
 	return steps.Continue()
 }
 
