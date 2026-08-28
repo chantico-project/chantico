@@ -149,9 +149,7 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, validationFailureReason(err), err.Error())
 		return steps.Error(err)
 	} else {
-		l.Info("Clearing validation errors")
-		l.Info("Previous status", "status", dataCenterResource.Status)
-
+		l.Info("Clearing validation errors", "status", dataCenterResource.Status)
 		references := &chantico.DataCenterResourceList{}
 		_ = r.List(ctx, references, append(listOptions, client.MatchingFields{"status.involvedResource": dataCenterResource.Name})...)
 		children := &chantico.DataCenterResourceList{}
@@ -161,9 +159,7 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 			_ = r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
 			visited = append(visited, *involved)
 		}
-		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited))
-		l.Info("Referencing resources", "resources", dcr.FormatResources(references.Items))
-		l.Info("Children", "children", dcr.FormatResources(children.Items))
+		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited), "references", dcr.FormatResources(references.Items), "children", dcr.FormatResources(children.Items))
 		items := mergeUnique(visited, references.Items, children.Items)
 
 		for _, item := range items {

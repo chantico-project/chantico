@@ -90,16 +90,3 @@ func (m *MeasurementDevice) UpdateStatusCondition(t ConditionType, s metav1.Cond
 		ObservedGeneration: m.GetGeneration(),
 	})
 }
-
-// func (m *MeasurementDevice) UpdateStatusJobCondition(condition *metav1.Condition) {
-// 	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
-// 		Type: string(ConditionJob), Status: condition.Status, Reason: condition.Reason, Message: condition.Message,
-// 		ObservedGeneration: m.GetGeneration(),
-// 	})
-// }
-
-// func (m *MeasurementDevice) FailCondition(t ConditionType, format string, args ...any) error {
-// 	err := fmt.Errorf(format, args...)
-// 	m.UpdateStatusCondition(t, metav1.ConditionFalse, ReasonFailed, err.Error())
-// 	return err
-// }

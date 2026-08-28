@@ -130,19 +130,6 @@ func (m *DataCenterResource) UpdateStatusCondition(t ConditionType, s metav1.Con
 	})
 }
 
-// func (m *DataCenterResource) UpdateStatusJobCondition(condition *metav1.Condition) {
-// 	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
-// 		Type: string(ConditionJob), Status: condition.Status, Reason: condition.Reason, Message: condition.Message,
-// 		ObservedGeneration: m.GetGeneration(),
-// 	})
-// }
-
-// func (m *DataCenterResource) FailCondition(t ConditionType, format string, args ...any) error {
-// 	err := fmt.Errorf(format, args...)
-// 	m.UpdateStatusCondition(t, metav1.ConditionFalse, ReasonFailed, err.Error())
-// 	return err
-// }
-
 // ParentNames returns a flat list of parent resource names, for use in
 // validation, indexing, and anywhere the full ParentRef is not needed.
 func (s *DataCenterResourceSpec) ParentNames() []string {
