@@ -276,6 +276,11 @@ func reloadPrometheus(ctx context.Context) error {
 	l := log.FromContext(ctx)
 	host := config.ValidatedEnv.PrometheusServiceHost
 	port := config.ValidatedEnv.PrometheusServicePort
+
+	if host != "localhost" || host != "chantico-prometheus" || host != "127.0.0.1" {
+		return fmt.Errorf("Prometheus reload is only supported for localhost or chantico-prometheus service, but got host: %s", host)
+	}
+
 	url := fmt.Sprintf("http://%s:%s/-/reload", host, port)
 	resp, err := http.Post(url, "", nil)
 	if err != nil {
