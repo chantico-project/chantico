@@ -87,7 +87,7 @@ func Validate(
 	resourcesMap := make(map[string]chantico.DataCenterResource)
 	visitedSet := make(map[string]bool)
 	for _, resource := range dataCenterResources {
-		if resource.Status.State != StateDelete {
+		if resource.DeletionTimestamp == nil {
 			resourcesMap[resource.ObjectMeta.Name] = resource
 		}
 		if dataCenterResource.Spec.ServiceId != "" && slices.Contains(resource.Spec.ParentNames(), dataCenterResource.Name) {
