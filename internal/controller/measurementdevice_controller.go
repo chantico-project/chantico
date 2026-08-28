@@ -28,6 +28,7 @@ import (
 	"strconv"
 
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
@@ -43,7 +44,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -147,11 +147,16 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 	filesToRemove := []string{
 		r.Paths.GeneratorFile(measurementDevice.GetUID()),
 		r.Paths.SNMPFile(measurementDevice.GetUID()),
+		r.Paths.ScrapeConfigFile(measurementDevice.GetUID()),
 	}
 	for _, path := range filesToRemove {
 		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Error while removing SNMP file %s: %w", path, err))
 		}
+	}
+
+	if err := os.RemoveAll(r.Paths.TargetsDir(measurementDevice.GetUID())); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Error while removing targets directory %s: %w", r.Paths.TargetsDir(measurementDevice.GetUID()), err))
 	}
 
 	if res := r.reconcileMergedSNMPFile(ctx, measurementDevice); res.Action == steps.ActionError {
@@ -173,22 +178,57 @@ func (r *MeasurementDeviceReconciler) ensureFinalizerIsSet(ctx context.Context, 
 	return steps.Stop()
 }
 
+func createServiceDiscoveryRegexp(measurementDevice *chantico.MeasurementDevice) string {
+	// TODO: Figure out how to do this since this is the path inside the Prometheus container, not the path where Chantio runs...
+	return fmt.Sprintf("/tmp/prometheus-volume/targets/%s/*.json", measurementDevice.GetUID())
+}
+
+func createScrapeConfig(measurementDevice *chantico.MeasurementDevice) (*prometheus.ScrapeConfig, error) {
+	switch measurementDevice.Spec.Type {
+	case chantico.MeasurementDeviceTypePrometheus:
+		config := &prometheus.ScrapeConfig{
+			JobName:     measurementDevice.Name,
+			MetricsPath: measurementDevice.Spec.Prometheus.Path,
+			FileSdConfigs: []prometheus.FileSdConfig{{
+				Files:           []string{createServiceDiscoveryRegexp(measurementDevice)},
+				RefreshInterval: "30s",
+			}},
+		}
+		return config, nil
+	case chantico.MeasurementDeviceTypeSNMP:
+		host := config.ValidatedEnv.SnmpExporterServiceHost
+		port := config.ValidatedEnv.SnmpExporterServicePort
+		config := &prometheus.ScrapeConfig{
+			JobName:     measurementDevice.Name,
+			MetricsPath: "/snmp", // Should this be configurable?
+			FileSdConfigs: []prometheus.FileSdConfig{{
+				Files:           []string{createServiceDiscoveryRegexp(measurementDevice)},
+				RefreshInterval: "30s",
+			}},
+			RelabelConfigs: []prometheus.RelabelConfig{
+				{SourceLabels: []string{"__address__"}, TargetLabel: "__param_target"},
+				{SourceLabels: []string{"__param_target"}, TargetLabel: "instance"},
+				{TargetLabel: "__address__", Replacement: fmt.Sprintf("%s:%s", host, port)},
+			},
+		}
+		return config, nil
+	default:
+		return nil, fmt.Errorf("unsupported measurement device type: %s", measurementDevice.Spec.Type)
+	}
+}
+
 func (r *MeasurementDeviceReconciler) reconcileScrapeJobFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
 	if err := os.MkdirAll(r.Paths.ScrapeConfigsDir(), 0777); err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to write scrape config %s: %s", r.Paths.ScrapeConfigsDir(), err))
 	}
 	path := r.Paths.ScrapeConfigFile(measurementDevice.GetUID())
 
-	config := prometheus.ScrapeConfigFile{
-		ScrapeConfigs: []prometheus.ScrapeConfig{{
-			JobName:     measurementDevice.Name,
-			MetricsPath: &measurementDevice.Spec.Prometheus.Path,
-			FileSdConfigs: []prometheus.FileSdConfig{{
-				Files:           []string{fmt.Sprintf("/tmp/prometheus-volume/targets/prometheus-direct/*.json")},
-				RefreshInterval: ptr.To("30s"),
-			}},
-		}},
+	scrapeConfig, err := createScrapeConfig(measurementDevice)
+	if err != nil {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to create scrape config: %w", err))
 	}
+	config := prometheus.ScrapeConfigFile{ScrapeConfigs: []prometheus.ScrapeConfig{*scrapeConfig}}
+
 	observed, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to read scrape config file %s: %w", path, err))
@@ -211,6 +251,11 @@ func (r *MeasurementDeviceReconciler) reconcileScrapeJobFile(ctx context.Context
 
 	if err := os.WriteFile(path, desired, 0777); err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to write scrape config file: %w", err))
+	}
+
+	targetsDir := r.Paths.TargetsDir(measurementDevice.GetUID())
+	if err := os.MkdirAll(targetsDir, 0777); err != nil && !errors.Is(err, fs.ErrExist) && !errors.Is(err, fs.ErrNotExist) {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to create targets directory %s: %w", targetsDir, err))
 	}
 
 	log.FromContext(ctx).Info("Scrape config file has been generated successfully.", "path", path)

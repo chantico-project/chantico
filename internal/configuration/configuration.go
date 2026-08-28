@@ -10,18 +10,22 @@ import (
 )
 
 const (
-	ChanticoVolumeLocationEnv        = "CHANTICO_DATA_PATH"
-	ChanticoVolumeClaimEnv           = "CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME"
-	ChanticoPrometheusServiceHostEnv = "CHANTICO_PROMETHEUS_SERVICE_HOST"
-	ChanticoPrometheusServicePortEnv = "CHANTICO_PROMETHEUS_SERVICE_PORT"
-	ValidateHostPortTimeout          = 5 * time.Second
+	ChanticoVolumeLocationEnv          = "CHANTICO_DATA_PATH"
+	ChanticoVolumeClaimEnv             = "CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME"
+	ChanticoPrometheusServiceHostEnv   = "CHANTICO_PROMETHEUS_SERVICE_HOST"
+	ChanticoPrometheusServicePortEnv   = "CHANTICO_PROMETHEUS_SERVICE_PORT"
+	ChanticoSnmpExporterServiceHostEnv = "CHANTICO_SNMP_EXPORTER_SERVICE_HOST"
+	ChanticoSnmpExporterServicePortEnv = "CHANTICO_SNMP_EXPORTER_SERVICE_PORT"
+	ValidateHostPortTimeout            = 5 * time.Second
 )
 
 type validatedEnv struct {
-	VolumeLocation        string
-	VolumeClaim           string
-	PrometheusServiceHost string
-	PrometheusServicePort string
+	VolumeLocation          string
+	VolumeClaim             string
+	PrometheusServiceHost   string
+	PrometheusServicePort   string
+	SnmpExporterServiceHost string
+	SnmpExporterServicePort string
 }
 
 var ValidatedEnv validatedEnv
@@ -55,6 +59,25 @@ func ValidateEnv() (validatedEnv, []error) {
 		errs = append(errs, err)
 	} else {
 		ret.PrometheusServicePort = prometheusServicePort
+	}
+
+	// TODO: The SNMP exporter vars probably need to be validated as well, but this creates a problem in dev
+	//       environments since this needs to be the host and port for inside the cluster due to its use by
+	//       prometheus. So for now, just set it to the env var values and don't validate. Could be a warning
+	//       since it could be that Chantico is running outside the cluster and the snmp-exporter is not
+	//       reachable from the host.
+	snmpExporterServiceHost, err := validateVar(ChanticoSnmpExporterServiceHostEnv, nil)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		ret.SnmpExporterServiceHost = snmpExporterServiceHost
+	}
+
+	snmpExporterServicePort, err := validateVar(ChanticoSnmpExporterServicePortEnv, nil)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		ret.SnmpExporterServicePort = snmpExporterServicePort
 	}
 
 	if ret.PrometheusServiceHost != "" && ret.PrometheusServicePort != "" {
@@ -94,6 +117,12 @@ func validateVar(varName string, extraTest func(string) error) (string, error) {
 	if value == "" {
 		return value, fmt.Errorf("environment variable %s is an empty string", varName)
 	}
+
+	// Bypass extra test if nil to avoid segmentation fault by calling a nil function pointer
+	if extraTest == nil {
+		return value, nil
+	}
+
 	if err := extraTest(value); err != nil {
 		fmt.Println(err)
 		return value, err

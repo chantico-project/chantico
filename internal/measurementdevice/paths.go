@@ -35,6 +35,10 @@ func (l Paths) MIBsDir() string          { return filepath.Join(l.Root, mibsSubd
 func (l Paths) MergedSNMPFile() string   { return filepath.Join(l.SNMPDir(), mergedSNMPFile) }
 func (l Paths) ScrapeConfigsDir() string { return filepath.Join(l.Root, scrapeConfigsSubdir) }
 
+func (l Paths) TargetsDir(scrapeConfigUid types.UID) string {
+	return filepath.Join(l.Root, targetsSubdir, string(scrapeConfigUid))
+}
+
 func (l Paths) GeneratorFile(uid types.UID) string {
 	return filepath.Join(l.generatorsDir(), fmt.Sprintf("generator-%s.yaml", uid))
 }
@@ -46,6 +50,6 @@ func (l Paths) ScrapeConfigFile(uid types.UID) string {
 	return filepath.Join(l.ScrapeConfigsDir(), fmt.Sprintf("scrape-config-%s.yml", uid))
 }
 
-func (l Paths) TargetsFile(uid types.UID) string {
-	return filepath.Join(l.Root, targetsSubdir, fmt.Sprintf("%s.json", uid))
+func (l Paths) TargetsFile(scrapeConfigUid types.UID, uid types.UID) string {
+	return filepath.Join(l.TargetsDir(scrapeConfigUid), fmt.Sprintf("%s.json", uid))
 }

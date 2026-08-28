@@ -5,6 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/name: chantico
 spec:
+  type: snmp
   auth:
     community: public
     version: 2
