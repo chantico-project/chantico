@@ -6,6 +6,8 @@ import (
 	"chantico/internal/steps"
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -109,13 +111,11 @@ func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, da
 
 	l.Info("Deleting rule file", "file", rulePath)
 
-	err := os.Remove(rulePath)
-	if err != nil && !os.IsNotExist(err) {
+	if err := deleteRuleFile(dataCenterResource); err != nil {
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
 		return steps.Error(err)
 	}
-	err = dcr.ReloadPrometheus(ctx)
-	if err != nil {
+	if err := reloadPrometheus(ctx); err != nil {
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Error reloading Prometheus: "+err.Error())
 		return steps.Error(err)
 	}
@@ -181,8 +181,16 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 
 	if ruleFile == nil {
 		l.Info("No rule file found")
-		dcr.DeleteRuleFileFromDisk(dataCenterResource.Name)
-		return steps.Stop()
+		if err := deleteRuleFile(dataCenterResource); err != nil {
+			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
+			return steps.Error(err)
+		}
+		if err := reloadPrometheus(ctx); err != nil {
+			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
+			return steps.Error(err)
+		}
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "No recording rule file required")
+		return steps.Continue()
 	}
 
 	volumePath := config.ValidatedEnv.VolumeLocation
@@ -205,7 +213,7 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 	}
 
 	l.Info("Wrote recording rule file", "file", rulePath, "resource", dataCenterResource.Name)
-	err = dcr.ReloadPrometheus(ctx)
+	err = reloadPrometheus(ctx)
 	if err != nil {
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
 		return steps.Error(err)
@@ -218,6 +226,15 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 func (r *DataCenterResourceReconciler) reconcileReady(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
 	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "Fully reconciled and ready")
 	return steps.Continue()
+}
+
+func deleteRuleFile(dataCenterResource *chantico.DataCenterResource) error {
+	volumePath := config.ValidatedEnv.VolumeLocation
+	rulePath := filepath.Join(volumePath, prometheusRulesDir, dataCenterResource.Name+".yml")
+	if err := os.Remove(rulePath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 func validationFailureReason(err error) chantico.ConditionReason {
@@ -258,4 +275,22 @@ func (r *DataCenterResourceReconciler) clearReferencedValidation(
 		referenced.Status.InvolvedResource = ""
 		patch.PatchStatus()
 	}
+}
+func reloadPrometheus(ctx context.Context) error {
+	l := log.FromContext(ctx)
+	host := config.ValidatedEnv.PrometheusServiceHost
+	port := config.ValidatedEnv.PrometheusServicePort
+	url := fmt.Sprintf("http://%s:%s/-/reload", host, port)
+	resp, err := http.Post(url, "", nil)
+	if err != nil {
+		l.Error(err, "Failed to reload Prometheus")
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		l.Info("Prometheus reload returned status", "status", resp.StatusCode)
+		return fmt.Errorf("prometheus reload returned status %d", resp.StatusCode)
+	}
+	l.Info("Prometheus configuration reloaded")
+	return nil
 }
