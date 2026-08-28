@@ -83,11 +83,13 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}()
 
+	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
 	return steps.Run(ctx, dataCenterResource,
 		r.reconcileDeletion,
 		r.ensureFinalizerIsSet,
-		r.reconcileRuleFile,
 		r.reconcileValidation,
+		r.reconcileWriteRuleFile,
+		r.reconcileReady,
 	)
 }
 
@@ -130,7 +132,50 @@ func (r *DataCenterResourceReconciler) ensureFinalizerIsSet(ctx context.Context,
 	return steps.Stop()
 }
 
-func (r *DataCenterResourceReconciler) reconcileRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
+func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
+	l := log.FromContext(ctx)
+
+	listOptions := []client.ListOption{client.InNamespace(dataCenterResource.Namespace)}
+	dataCenterResources := &chantico.DataCenterResourceList{}
+	_ = r.List(ctx, dataCenterResources, listOptions...)
+
+	physicalMeasurements := &chantico.PhysicalMeasurementList{}
+	_ = r.List(ctx, physicalMeasurements, listOptions...)
+
+	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
+	if err != nil {
+		l.Info("Setting validation error", "error", err)
+		dataCenterResource.Status.InvolvedResource = involvedResource
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, validationFailureReason(err), err.Error())
+		return steps.Error(err)
+	} else {
+		l.Info("Clearing validation errors")
+		l.Info("Previous status", "status", dataCenterResource.Status)
+
+		references := &chantico.DataCenterResourceList{}
+		_ = r.List(ctx, references, append(listOptions, client.MatchingFields{"status.involvedResource": dataCenterResource.Name})...)
+		children := &chantico.DataCenterResourceList{}
+		_ = r.List(ctx, children, append(listOptions, client.MatchingFields{"spec.parents": dataCenterResource.Name})...)
+		if dataCenterResource.Status.InvolvedResource != "" {
+			involved := &chantico.DataCenterResource{}
+			_ = r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
+			visited = append(visited, *involved)
+		}
+		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited))
+		l.Info("Referencing resources", "resources", dcr.FormatResources(references.Items))
+		l.Info("Children", "children", dcr.FormatResources(children.Items))
+		items := mergeUnique(visited, references.Items, children.Items)
+
+		for _, item := range items {
+			r.clearReferencedValidation(ctx, dataCenterResource, &item)
+		}
+		dataCenterResource.Status.InvolvedResource = ""
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
+	}
+	return steps.Continue()
+}
+
+func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
 	l := log.FromContext(ctx)
 	ruleFile := dcr.BuildRuleFile(dataCenterResource)
 
@@ -170,47 +215,17 @@ func (r *DataCenterResourceReconciler) reconcileRuleFile(ctx context.Context, da
 	return steps.Continue()
 }
 
-func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
-	l := log.FromContext(ctx)
-
-	listOptions := []client.ListOption{client.InNamespace(dataCenterResource.Namespace)}
-	dataCenterResources := &chantico.DataCenterResourceList{}
-	_ = r.List(ctx, dataCenterResources, listOptions...)
-
-	physicalMeasurements := &chantico.PhysicalMeasurementList{}
-	_ = r.List(ctx, physicalMeasurements, listOptions...)
-
-	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
-	if err != nil {
-		l.Info("Setting validation error", "error", err)
-		dataCenterResource.Status.InvolvedResource = involvedResource
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ConditionReason(err.Error()), err.Error())
-		return steps.Error(err)
-	} else {
-		l.Info("Clearing validation errors")
-		l.Info("Previous status", "status", dataCenterResource.Status)
-
-		references := &chantico.DataCenterResourceList{}
-		_ = r.List(ctx, references, append(listOptions, client.MatchingFields{"status.involvedResource": dataCenterResource.Name})...)
-		children := &chantico.DataCenterResourceList{}
-		_ = r.List(ctx, children, append(listOptions, client.MatchingFields{"spec.parents": dataCenterResource.Name})...)
-		if dataCenterResource.Status.InvolvedResource != "" {
-			involved := &chantico.DataCenterResource{}
-			_ = r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
-			visited = append(visited, *involved)
-		}
-		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited))
-		l.Info("Referencing resources", "resources", dcr.FormatResources(references.Items))
-		l.Info("Children", "children", dcr.FormatResources(children.Items))
-		items := mergeUnique(visited, references.Items, children.Items)
-
-		for _, item := range items {
-			r.clearReferencedValidation(ctx, dataCenterResource, &item)
-		}
-		dataCenterResource.Status.InvolvedResource = ""
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
-	}
+func (r *DataCenterResourceReconciler) reconcileReady(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
+	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "DataCenterResource is fully reconciled and ready")
 	return steps.Continue()
+}
+
+func validationFailureReason(err error) chantico.ConditionReason {
+	var missingResource dcr.ErrorResourceNotFound
+	if errors.As(err, &missingResource) {
+		return chantico.ReasonDependencyUnavailable
+	}
+	return chantico.ReasonInvalidSpec
 }
 
 func mergeUnique(

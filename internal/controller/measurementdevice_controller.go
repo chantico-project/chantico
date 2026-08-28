@@ -108,6 +108,7 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}()
 
+	measurementDevice.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
 	return steps.Run(ctx, measurementDevice,
 		r.reconcileDeletion,
 		r.ensureFinalizerIsSet,
@@ -116,6 +117,7 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		r.reconcileSNMPFileContent,
 		r.reconcileMergedSNMPFile,
 		r.reconcileExporterReload,
+		r.reconcileReady,
 	)
 }
 
@@ -131,7 +133,7 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 	log.FromContext(ctx).Info("Deleting MeasurementDevice files", "MeasurementDevice", measurementDevice.Name)
 	jobs, err := r.getOwnedJobs(ctx, measurementDevice)
 	if err != nil {
-		measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to get owned jobs: "+err.Error())
+		measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Failed to get owned jobs: "+err.Error())
 		return steps.Error(err)
 	}
 	for i := range jobs {
@@ -378,6 +380,11 @@ func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Contex
 
 	log.FromContext(ctx).Info("Triggered SNMP exporter reload", "hash", desiredHash)
 	measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "SNMP exporter deployment annotation updated to trigger reload.")
+	return steps.Continue()
+}
+
+func (r *MeasurementDeviceReconciler) reconcileReady(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
+	measurementDevice.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "MeasurementDevice is fully reconciled and ready")
 	return steps.Continue()
 }
 
