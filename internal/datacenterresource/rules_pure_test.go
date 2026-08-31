@@ -391,3 +391,49 @@ func TestBuildRecordingRules_ManyToOneParents(t *testing.T) {
 		t.Errorf("Expected expr %q, got %q", expectedExpr, rules[0].Expr)
 	}
 }
+
+func TestBuildRecordingRules_ParentNoAttribution(t *testing.T) {
+	// Parent with no coefficient, use EnergyMetric
+	bm := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+		Spec: chantico.DataCenterResourceSpec{
+			Type:         DataCenterResourceTypeBaremetal,
+			Parents:      []chantico.ParentRef{{Name: "pdu1"}},
+			EnergyMetric: "raw_prometheus_bm1",
+		},
+	}
+
+	rules := BuildRecordingRules(bm)
+	// Only 1 energy rule (no children)
+	if len(rules) != 1 {
+		t.Fatalf("Expected 1 rule, got %d", len(rules))
+	}
+
+	testExpectedRule(t, rules[0], ExpectedRule{
+		Record: "datacenter:bm1:energy_watts",
+		Expr:   "raw_prometheus_bm1",
+	})
+
+	// Parent with coefficient but specified EnergyMetric
+	// This is forbidden by a x-kubernetes-validation rule,
+	// but nice to know if this behaviour changes
+	bm = &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+		Spec: chantico.DataCenterResourceSpec{
+			Type:         DataCenterResourceTypeBaremetal,
+			Parents:      []chantico.ParentRef{{Name: "pdu1", Coefficient: "1.0"}},
+			EnergyMetric: "raw_prometheus_bm1",
+		},
+	}
+
+	rules = BuildRecordingRules(bm)
+	// Only 1 energy rule (no children)
+	if len(rules) != 1 {
+		t.Fatalf("Expected 1 rule, got %d", len(rules))
+	}
+
+	testExpectedRule(t, rules[0], ExpectedRule{
+		Record: "datacenter:bm1:energy_watts",
+		Expr:   "raw_prometheus_bm1",
+	})
+}

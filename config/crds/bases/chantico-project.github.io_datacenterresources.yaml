@@ -39,6 +39,9 @@ spec:
             type: object
           spec:
             description: spec defines the desired state of DataCenterResource
+            x-kubernetes-validations:
+                - rule: "!(has(self.energyMetric) && has(self.parents) && self.parents.exists(parent, has(parent.coefficient)))"
+                  message: "DataCenterResource cannot have both energyMetric and any parent with a coefficient"
             properties:
               energyMetric:
                 description: |-
