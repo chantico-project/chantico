@@ -71,6 +71,8 @@ func TestAllVarsOkay(t *testing.T) {
 	_ = os.Setenv(ChanticoVolumeLocationEnv, goodLocation)
 	_ = os.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
 	_ = os.Setenv(ChanticoPrometheusServicePortEnv, goodPort)
+	_ = os.Setenv(ChanticoSnmpExporterServiceHostEnv, goodUrl)
+	_ = os.Setenv(ChanticoSnmpExporterServicePortEnv, goodPort)
 
 	_, errs := ValidateEnv()
 
