@@ -132,6 +132,15 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 		return steps.Stop()
 	}
 
+	targetsDir := r.Paths.TargetsDir(measurementDevice.GetUID())
+	targets, err := os.ReadDir(targetsDir)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to read targets directory %s: %w", targetsDir, err))
+	}
+	if len(targets) > 0 {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Cannot delete MeasurementDevice: There are %d PhysicalMeasurement target(s) that are dependent on this MeasurementDevice. Delete the dependent PhysicalMeasurement resources first", len(targets)))
+	}
+
 	log.FromContext(ctx).Info("Deleting MeasurementDevice files", "MeasurementDevice", measurementDevice.Name)
 	jobs, err := r.getOwnedJobs(ctx, measurementDevice)
 	if err != nil {
@@ -155,9 +164,12 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 		}
 	}
 
-	if err := os.RemoveAll(r.Paths.TargetsDir(measurementDevice.GetUID())); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Error while removing targets directory %s: %w", r.Paths.TargetsDir(measurementDevice.GetUID()), err))
+	if err := os.RemoveAll(targetsDir); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Error while removing targets directory %s: %w", targetsDir, err))
 	}
+
+	// Scrape config file was removed above, so Prometheus must be reloaded to drop the stale job.
+	util.ReloadPrometheus()
 
 	if res := r.reconcileMergedSNMPFile(ctx, measurementDevice); res.Action == steps.ActionError {
 		return res

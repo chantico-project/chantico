@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -110,6 +111,11 @@ func DeleteTargetFile(
 
 	measurementDevice, err := retrieveMeasurementDevice(ctx, kubernetesClient, physicalMeasurement)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// MeasurementDevice (and its targets directory) is already gone, so there is nothing left to clean up.
+			l.Info("MeasurementDevice no longer exists, skipping target file deletion.")
+			return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
+		}
 		physicalMeasurement.Status.State = StateFailed
 		physicalMeasurement.Status.ErrorMessage = err.Error()
 		l.Error(err, "Failed to look up MeasurementDevice when deleting target file.")
