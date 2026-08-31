@@ -47,10 +47,6 @@ docs/hugo_stats.json
 # Macos
 .DS_Store
 
-# osv-scanner
-osv-scanner-report*.html
-osv-scanner-report*.json
-
 # semantic releaser
 .semrel/
 semantic-release

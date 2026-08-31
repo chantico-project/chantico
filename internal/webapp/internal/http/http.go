@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"chantico/internal/webapp/internal/graph"
 	"chantico/internal/webapp/internal/html"
@@ -16,22 +17,29 @@ type HTTPServer struct {
 	port   int
 }
 
-func New(r *html.TemplateRenderer, k *kubernetes.KubernetesClient, port int) *HTTPServer {
-	h := &Handler{
-		renderer:   r,
-		kubernetes: k,
-	}
+type HTTPServerHandler struct {
+	Renderer   *html.TemplateRenderer
+	Kubernetes *kubernetes.KubernetesClient
+}
+
+type HTTPServerConfig struct {
+	Port              int
+	ReadHeaderTimeout time.Duration
+}
+
+func New(h *HTTPServerHandler, config *HTTPServerConfig) *HTTPServer {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", h.HomePage)
 
 	server := &http.Server{
-		Addr:    ":" + strconv.Itoa(port),
-		Handler: mux,
+		Addr:              ":" + strconv.Itoa(config.Port),
+		Handler:           mux,
+		ReadHeaderTimeout: config.ReadHeaderTimeout,
 	}
 
 	return &HTTPServer{
 		server: server,
-		port:   port,
+		port:   config.Port,
 	}
 }
 
@@ -47,29 +55,24 @@ func (s HTTPServer) Stop(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-type Handler struct {
-	renderer   *html.TemplateRenderer
-	kubernetes *kubernetes.KubernetesClient
-}
-
-func (h *Handler) HomePage(w http.ResponseWriter, r *http.Request) {
+func (h *HTTPServerHandler) HomePage(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Handling home page request:", r.URL.Path)
 
-	nodes, err := h.kubernetes.GetDataCenterResources()
+	nodes, err := h.Kubernetes.GetDataCenterResources()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.renderer.RenderErrorPage(w, html.ErrorPageData{
-			Host:           h.kubernetes.Host,
-			CurrentContext: h.kubernetes.CurrentContext,
+		h.Renderer.RenderErrorPage(w, html.ErrorPageData{
+			Host:           h.Kubernetes.Host,
+			CurrentContext: h.Kubernetes.CurrentContext,
 			Error:          err.Error(),
 		})
 		return
 	}
 
 	m := graph.GenerateMermaidString(nodes)
-	h.renderer.RenderHomePage(w, html.HomePageData{
-		Host:           h.kubernetes.Host,
-		CurrentContext: h.kubernetes.CurrentContext,
+	h.Renderer.RenderHomePage(w, html.HomePageData{
+		Host:           h.Kubernetes.Host,
+		CurrentContext: h.Kubernetes.CurrentContext,
 		Diagram:        m,
 	})
 }

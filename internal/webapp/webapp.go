@@ -54,7 +54,15 @@ func (a *app) Run() error {
 	ctxInterrupt, stopInterrupt := SignalHandling()
 	defer stopInterrupt()
 
-	httpServer := http.New(t, k, a.cfg.Port)
+	handler := &http.HTTPServerHandler{
+		Renderer:   t,
+		Kubernetes: k,
+	}
+	config := &http.HTTPServerConfig{
+		Port:              a.cfg.Port,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	httpServer := http.New(handler, config)
 	httpServerErrChannel := make(chan error, 1)
 	go httpServer.Run(httpServerErrChannel)
 
@@ -112,7 +120,7 @@ func loadConfig(get envGetter) (config, error) {
 
 	if kubeconfigPath := get("KUBECONFIG"); kubeconfigPath != "" {
 		if !pathExists(kubeconfigPath) {
-			errs = append(errs, fmt.Errorf("Kubeconfig not found at %s", kubeconfigPath))
+			errs = append(errs, fmt.Errorf("kubeconfig not found at %s", kubeconfigPath))
 		} else {
 			cfg.KubeconfigPath = kubeconfigPath
 		}

@@ -18,6 +18,13 @@ jobs:
         with:
           customer: tno
           system: chantico
+          capability: maintainability,osh,security
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
           SIGRIDCI_GITHUB_COMMENT_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Upload Sigrid CI output as artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sigrid-ci-output
+          path: sigrid-ci-output/
+          if-no-files-found: warn

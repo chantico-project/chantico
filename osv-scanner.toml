@@ -1,5 +1,0 @@
-[[PackageOverrides]]
-name = "stdlib"
-ecosystem = "Go"
-license.override = ["BSD-3-Clause"]
-reason = "Go standard library is licensed under BSD-3-Clause. See https://go.dev/LICENSE"
