@@ -224,7 +224,6 @@ func TestReconcileDeletion(t *testing.T) {
 	if err := os.MkdirAll(targetsDir, 0777); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, r.Paths.TargetsFile(measurementDevice.UID, measurementDevice.UID), []byte("[]"))
 
 	// Start deletion of measurementDevice.
 	res := r.reconcileDeletion(context.Background(), measurementDevice)
@@ -262,6 +261,47 @@ func TestReconcileDeletion(t *testing.T) {
 	// Finalizer must have been removed.
 	if controllerutil.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
 		t.Fatalf("expected finalizer %q to be removed", chantico.SNMPUpdateFinalizer)
+	}
+}
+
+func TestReconcileDeletion_BlockedByDependentPhysicalMeasurement(t *testing.T) {
+	root := t.TempDir()
+
+	now := metav1.Now()
+	measurementDevice := &chantico.MeasurementDevice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "tno",
+			Namespace:         "chantico",
+			UID:               types.UID("dev-del-blocked"),
+			DeletionTimestamp: &now,
+			Finalizers:        []string{chantico.SNMPUpdateFinalizer},
+		},
+		Spec: chantico.MeasurementDeviceSpec{
+			Auth:  snmp.GeneratorAuth{},
+			Walks: []string{"1.3.6.1"},
+		},
+	}
+
+	r := newReconciler(t, root, measurementDevice)
+
+	// Simulate a PhysicalMeasurement target file still present in the targets dir.
+	targetsDir := r.Paths.TargetsDir(measurementDevice.UID)
+	if err := os.MkdirAll(targetsDir, 0777); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, r.Paths.TargetsFile(measurementDevice.UID, measurementDevice.UID), []byte("[]"))
+
+	res := r.reconcileDeletion(context.Background(), measurementDevice)
+	if res.Action != steps.ActionError {
+		t.Fatalf("expected Error, got %v", res.Action)
+	}
+
+	// Target file must not have been removed, and finalizer must remain.
+	if _, err := os.Stat(r.Paths.TargetsFile(measurementDevice.UID, measurementDevice.UID)); err != nil {
+		t.Fatalf("expected target file to remain, stat err = %v", err)
+	}
+	if !controllerutil.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
+		t.Fatalf("expected finalizer %q to remain", chantico.SNMPUpdateFinalizer)
 	}
 }
 
