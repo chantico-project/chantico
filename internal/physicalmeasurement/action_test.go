@@ -12,7 +12,21 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+// newFakeClient builds a fake client seeded with the given objects (e.g. MeasurementDevices
+// that WriteTargetFile/DeleteTargetFile look up to determine the target file path).
+func newFakeClient(t *testing.T, objs ...runtime.Object) client.Client {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	if err := chantico.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	return fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
+}
 
 func TestActionMap(t *testing.T) {
 	for state, stateActions := range StateMachine.Actions {
@@ -42,6 +56,10 @@ func TestActionMap(t *testing.T) {
 }
 
 func TestTargetFileAddition(t *testing.T) {
+	measurementDevice := &chantico.MeasurementDevice{
+		ObjectMeta: metav1.ObjectMeta{Name: "device-a", UID: "device-a-uid"},
+	}
+
 	testCases := map[string]struct {
 		physicalMeasurement *chantico.PhysicalMeasurement
 		expectedFiles       []string
@@ -58,7 +76,7 @@ func TestTargetFileAddition(t *testing.T) {
 				},
 			},
 			expectedFiles: []string{
-				"prometheus/targets/physical_measurement.json",
+				"prometheus/targets/device-a-uid/18ac6360-39e7-4ee3-a9b8-58992958e29a.json",
 			},
 		},
 	}
@@ -66,8 +84,9 @@ func TestTargetFileAddition(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			tmpDir := testCreateTmpDirectories(t)
+			kubernetesClient := newFakeClient(t, measurementDevice)
 
-			_ = WriteTargetFile(t.Context(), tc.physicalMeasurement)
+			_ = WriteTargetFile(t.Context(), kubernetesClient, tc.physicalMeasurement)
 
 			for _, expectedFile := range tc.expectedFiles {
 				absPath := filepath.Join(tmpDir, expectedFile)
@@ -107,6 +126,10 @@ func TestTargetFileAddition(t *testing.T) {
 }
 
 func TestTargetFileDeletion(t *testing.T) {
+	measurementDevice := &chantico.MeasurementDevice{
+		ObjectMeta: metav1.ObjectMeta{Name: "device-a", UID: "device-a-uid"},
+	}
+
 	testCases := map[string]struct {
 		beforeFiles         []string
 		physicalMeasurement *chantico.PhysicalMeasurement
@@ -114,12 +137,15 @@ func TestTargetFileDeletion(t *testing.T) {
 	}{
 		"target file deleted": {
 			beforeFiles: []string{
-				"prometheus/targets/physical_measurement.json",
+				"prometheus/targets/device-a-uid/18ac6360-39e7-4ee3-a9b8-58992958e29a.json",
 			},
 			physicalMeasurement: &chantico.PhysicalMeasurement{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:  "18ac6360-39e7-4ee3-a9b8-58992958e29a",
 					Name: "physical_measurement",
+				},
+				Spec: chantico.PhysicalMeasurementSpec{
+					MeasurementDevice: "device-a",
 				},
 			},
 			afterFiles: []string{},
@@ -129,12 +155,17 @@ func TestTargetFileDeletion(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			tmpDir := testCreateTmpDirectories(t)
+			kubernetesClient := newFakeClient(t, measurementDevice)
 
 			for _, f := range tc.beforeFiles {
-				_ = os.WriteFile(filepath.Join(tmpDir, f), []byte("[]"), 0755)
+				absPath := filepath.Join(tmpDir, f)
+				if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
+					t.Fatal(err)
+				}
+				_ = os.WriteFile(absPath, []byte("[]"), 0755)
 			}
 
-			_ = DeleteTargetFile(t.Context(), tc.physicalMeasurement)
+			_ = DeleteTargetFile(t.Context(), kubernetesClient, tc.physicalMeasurement)
 
 			for _, afterFile := range tc.afterFiles {
 				absPath := filepath.Join(tmpDir, afterFile)
@@ -161,11 +192,16 @@ func TestTargetFileDeletion(t *testing.T) {
 
 func TestMultipleTargetFiles(t *testing.T) {
 	testCases := map[string]struct {
+		measurementDevices   []*chantico.MeasurementDevice
 		physicalMeasurements []*chantico.PhysicalMeasurement
 		expectedFiles        int
-		expectedTargets      map[string]string // filename -> expected device module label
+		expectedTargets      map[string]string // "<deviceUID>/<pmUID>.json" -> expected device module label
 	}{
 		"two measurements for different devices": {
+			measurementDevices: []*chantico.MeasurementDevice{
+				{ObjectMeta: metav1.ObjectMeta{Name: "device-type-a", UID: "device-a-uid"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "device-type-b", UID: "device-b-uid"}},
+			},
 			physicalMeasurements: []*chantico.PhysicalMeasurement{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -190,11 +226,14 @@ func TestMultipleTargetFiles(t *testing.T) {
 			},
 			expectedFiles: 2,
 			expectedTargets: map[string]string{
-				"measurement-1.json": "device-type-a",
-				"measurement-2.json": "device-type-b",
+				"device-a-uid/uid-1.json": "device-type-a",
+				"device-b-uid/uid-2.json": "device-type-b",
 			},
 		},
 		"two measurements for same device": {
+			measurementDevices: []*chantico.MeasurementDevice{
+				{ObjectMeta: metav1.ObjectMeta{Name: "same-device", UID: "same-device-uid"}},
+			},
 			physicalMeasurements: []*chantico.PhysicalMeasurement{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -219,8 +258,8 @@ func TestMultipleTargetFiles(t *testing.T) {
 			},
 			expectedFiles: 2,
 			expectedTargets: map[string]string{
-				"measurement-1.json": "same-device",
-				"measurement-2.json": "same-device",
+				"same-device-uid/uid-1.json": "same-device",
+				"same-device-uid/uid-2.json": "same-device",
 			},
 		},
 	}
@@ -229,22 +268,28 @@ func TestMultipleTargetFiles(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tmpDir := testCreateTmpDirectories(t)
 
+			objs := make([]runtime.Object, len(tc.measurementDevices))
+			for i, md := range tc.measurementDevices {
+				objs[i] = md
+			}
+			kubernetesClient := newFakeClient(t, objs...)
+
 			for _, pm := range tc.physicalMeasurements {
-				WriteTargetFile(t.Context(), pm)
+				WriteTargetFile(t.Context(), kubernetesClient, pm)
 			}
 
 			targetsDir := filepath.Join(tmpDir, "prometheus/targets")
-			entries, err := os.ReadDir(targetsDir)
-			if err != nil {
-				t.Fatalf("Failed to read targets dir: %v", err)
-			}
-
 			jsonFiles := []string{}
-			for _, e := range entries {
-				if !e.IsDir() {
-					jsonFiles = append(jsonFiles, e.Name())
+			_ = filepath.Walk(targetsDir, func(path string, info fs.FileInfo, err error) error {
+				if path != targetsDir && !info.IsDir() {
+					rel, err := filepath.Rel(targetsDir, path)
+					if err != nil {
+						return err
+					}
+					jsonFiles = append(jsonFiles, rel)
 				}
-			}
+				return nil
+			})
 
 			if len(jsonFiles) != tc.expectedFiles {
 				t.Errorf("Expected %d files, got %d: %v", tc.expectedFiles, len(jsonFiles), jsonFiles)

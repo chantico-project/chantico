@@ -23,9 +23,13 @@ import (
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	md "chantico/internal/measurementdevice"
+	"chantico/internal/prometheus"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
+
+	yaml "go.yaml.in/yaml/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -211,6 +215,17 @@ func TestReconcileDeletion(t *testing.T) {
 	writeFile(t, r.Paths.GeneratorFile(measurementDevice.UID), []byte("auths: {}\n"))
 	writeFile(t, r.Paths.SNMPFile(measurementDevice.UID), []byte("auths: {}\nmodules: {}\n"))
 
+	// Create scrape config and targets dir to check that they are deleted correctly
+	if err := os.MkdirAll(r.Paths.ScrapeConfigsDir(), 0777); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, r.Paths.ScrapeConfigFile(measurementDevice.UID), []byte("scrape_configs: []\n"))
+	targetsDir := r.Paths.TargetsDir(measurementDevice.UID)
+	if err := os.MkdirAll(targetsDir, 0777); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, r.Paths.TargetsFile(measurementDevice.UID, measurementDevice.UID), []byte("[]"))
+
 	// Start deletion of measurementDevice.
 	res := r.reconcileDeletion(context.Background(), measurementDevice)
 	if res.Action == steps.ActionError {
@@ -220,11 +235,20 @@ func TestReconcileDeletion(t *testing.T) {
 		t.Fatalf("expected Stop, got %v", res.Action)
 	}
 
-	// Generator and SNMP config must be removed.
-	for _, p := range []string{r.Paths.GeneratorFile(measurementDevice.UID), r.Paths.SNMPFile(measurementDevice.UID)} {
+	// Generator, SNMP and scrape config files must be removed.
+	for _, p := range []string{
+		r.Paths.GeneratorFile(measurementDevice.UID),
+		r.Paths.SNMPFile(measurementDevice.UID),
+		r.Paths.ScrapeConfigFile(measurementDevice.UID),
+	} {
 		if _, err := os.Stat(p); !os.IsNotExist(err) {
 			t.Fatalf("expected %s to be removed, stat err = %v", p, err)
 		}
+	}
+
+	// Service discovery targets dir must be removed.
+	if _, err := os.Stat(targetsDir); !os.IsNotExist(err) {
+		t.Fatalf("expected targets dir %s to be removed, stat err = %v", targetsDir, err)
 	}
 
 	// Owned job must be deleted.
@@ -238,5 +262,127 @@ func TestReconcileDeletion(t *testing.T) {
 	// Finalizer must have been removed.
 	if controllerutil.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
 		t.Fatalf("expected finalizer %q to be removed", chantico.SNMPUpdateFinalizer)
+	}
+}
+
+func TestReconcileScrapeJobFile_Prometheus(t *testing.T) {
+	root := t.TempDir()
+	measurementDevice := &chantico.MeasurementDevice{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-exporter", Namespace: "chantico", UID: types.UID("prom-1")},
+		Spec: chantico.MeasurementDeviceSpec{
+			Type:       chantico.MeasurementDeviceTypePrometheus,
+			Prometheus: chantico.PrometheusConfig{Path: "/metrics"},
+		},
+	}
+	r := newReconciler(t, root, measurementDevice)
+
+	res := r.reconcileScrapeJobFile(context.Background(), measurementDevice)
+	if res.Action == steps.ActionError {
+		t.Fatalf("reconcileScrapeJobFile errored: %v", res.Err)
+	}
+
+	path := r.Paths.ScrapeConfigFile(measurementDevice.GetUID())
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("expected scrape config file %s: %v", path, err)
+	}
+
+	var parsed prometheus.ScrapeConfigFile
+	if err := yaml.Unmarshal(got, &parsed); err != nil {
+		t.Fatalf("unmarshal scrape config: %v", err)
+	}
+	if len(parsed.ScrapeConfigs) != 1 {
+		t.Fatalf("expected 1 scrape config, got %d", len(parsed.ScrapeConfigs))
+	}
+	sc := parsed.ScrapeConfigs[0]
+	if sc.JobName != "node-exporter" {
+		t.Errorf("expected job_name %q, got %q", "node-exporter", sc.JobName)
+	}
+	if sc.MetricsPath != "/metrics" {
+		t.Errorf("expected metrics_path %q, got %q", "/metrics", sc.MetricsPath)
+	}
+	if len(sc.RelabelConfigs) != 0 {
+		t.Errorf("expected no relabel_configs for prometheus type, got %d", len(sc.RelabelConfigs))
+	}
+
+	// Targets directory must have been created for service discovery.
+	if info, err := os.Stat(r.Paths.TargetsDir(measurementDevice.GetUID())); err != nil || !info.IsDir() {
+		t.Fatalf("expected targets dir to exist: %v", err)
+	}
+
+	// Second run should not have any effect since the file is the same
+	res = r.reconcileScrapeJobFile(context.Background(), measurementDevice)
+	if res.Action == steps.ActionError {
+		t.Fatalf("second reconcileScrapeJobFile errored: %v", res.Err)
+	}
+	second, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read after second run: %v", err)
+	}
+	if string(got) != string(second) {
+		t.Fatalf("file changed on idempotent run:\nfirst:  %q\nsecond: %q", got, second)
+	}
+
+	cond := meta.FindStatusCondition(measurementDevice.Status.Conditions, string(chantico.ConditionConfig))
+	if cond == nil || cond.Status != metav1.ConditionTrue {
+		t.Fatalf("expected ConditionConfig to be true, got %+v", cond)
+	}
+}
+
+func TestReconcileScrapeJobFile_SNMP(t *testing.T) {
+	config.ValidatedEnv.SnmpExporterServiceHost = "chantico-snmp"
+	config.ValidatedEnv.SnmpExporterServicePort = "9116"
+	t.Cleanup(func() {
+		config.ValidatedEnv.SnmpExporterServiceHost = ""
+		config.ValidatedEnv.SnmpExporterServicePort = ""
+	})
+
+	root := t.TempDir()
+	measurementDevice := &chantico.MeasurementDevice{
+		ObjectMeta: metav1.ObjectMeta{Name: "tno", Namespace: "chantico", UID: types.UID("snmp-1")},
+		Spec: chantico.MeasurementDeviceSpec{
+			Type:  chantico.MeasurementDeviceTypeSNMP,
+			Auth:  snmp.GeneratorAuth{},
+			Walks: []string{"1.3.6.1"},
+		},
+	}
+	r := newReconciler(t, root, measurementDevice)
+
+	res := r.reconcileScrapeJobFile(context.Background(), measurementDevice)
+	if res.Action == steps.ActionError {
+		t.Fatalf("reconcileScrapeJobFile errored: %v", res.Err)
+	}
+
+	got, err := os.ReadFile(r.Paths.ScrapeConfigFile(measurementDevice.GetUID()))
+	if err != nil {
+		t.Fatalf("expected scrape config file: %v", err)
+	}
+	var parsed prometheus.ScrapeConfigFile
+	if err := yaml.Unmarshal(got, &parsed); err != nil {
+		t.Fatalf("unmarshal scrape config: %v", err)
+	}
+	sc := parsed.ScrapeConfigs[0]
+	if sc.MetricsPath != "/snmp" {
+		t.Errorf("expected metrics_path %q, got %q", "/snmp", sc.MetricsPath)
+	}
+	wantReplacement := "chantico-snmp:9116"
+	found := false
+	for _, rc := range sc.RelabelConfigs {
+		if rc.TargetLabel == "__address__" && rc.Replacement == wantReplacement {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected relabel_config replacing __address__ with %q, got %+v", wantReplacement, sc.RelabelConfigs)
+	}
+}
+
+func TestCreateScrapeConfig_UnsupportedType(t *testing.T) {
+	measurementDevice := &chantico.MeasurementDevice{
+		ObjectMeta: metav1.ObjectMeta{Name: "bad"},
+		Spec:       chantico.MeasurementDeviceSpec{Type: "unknown"},
+	}
+	if _, err := createScrapeConfig(measurementDevice); err == nil {
+		t.Fatal("expected error for unsupported measurement device type")
 	}
 }
