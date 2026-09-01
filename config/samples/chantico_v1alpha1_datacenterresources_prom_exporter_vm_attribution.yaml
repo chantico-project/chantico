@@ -1,0 +1,40 @@
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: prometheus-mock-bm-1
+spec:
+  type: baremetal
+  energyMetric: rapl_consumed_energy_joules{domain="package_total",name="prom-exporter-mock"}
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  name: prometheus-mock-vm120
+spec:
+  type: vm
+  energyMetric: |
+    label_replace(
+      attributed_energy_joules{resource_consumer_kind="cgroup", resource_consumer_id=~"/qemu.slice/120\\.scope(/.*)?"},
+      "vmid",
+      "120",
+      "__name__",
+      ".*"
+    )
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  name: prometheus-mock-vm121
+spec:
+  type: vm
+  energyMetric: |
+    label_replace(
+      attributed_energy_joules{resource_consumer_kind="cgroup", resource_consumer_id=~"/qemu.slice/121\\.scope(/.*)?"},
+      "vmid",
+      "121",
+      "__name__",
+      ".*"
+    )

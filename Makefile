@@ -17,6 +17,8 @@ LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 
 SNMP_MOCK_TAG ?= latest
 SNMP_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
+PROMETHEUS_EXPORTER_MOCK_TAG ?= latest
+PROMETHEUS_EXPORTER_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-prometheus-exporter-mock:$(PROMETHEUS_EXPORTER_MOCK_TAG)
 
 # Name of the kind cluster created by cluster-up, and the kube context it produces.
 KIND_CLUSTER_NAME ?= kind
@@ -144,9 +146,15 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace, hel
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
 	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
 	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
+# TODO: Uncomment this when the prometheus exporter mock has been build and pushed to GHCR. It is currently not being built and pushed, so this will fail.
+# 	$(CONTAINER_TOOL) pull $(PROMETHEUS_EXPORTER_MOCK_IMAGE)
+# 	$(CONTAINER_TOOL) tag $(PROMETHEUS_EXPORTER_MOCK_IMAGE) chantico-prometheus-exporter-mock:latest
+	$(KIND) load docker-image chantico-prometheus-exporter-mock:latest --name kind
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-deployment.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-service.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/prometheus-exporter-mock-deployment.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/prometheus-exporter-mock-service.yaml
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?

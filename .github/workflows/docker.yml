@@ -35,14 +35,17 @@ jobs:
           if [ ! -z "${{ inputs.version }}" ]; then
             echo "controller=images/chantico" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
+            echo "prometheus_exporter=images/chantico-prometheus-exporter-mock" >> $GITHUB_OUTPUT
             echo "tag=v${{ inputs.version }}" >> $GITHUB_OUTPUT
           elif [ ! -z "${{ inputs.pr }}" ]; then
             echo "controller=images/chantico-pr" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock-pr" >> $GITHUB_OUTPUT
+            echo "prometheus_exporter=images/chantico-prometheus-exporter-mock-pr" >> $GITHUB_OUTPUT
             echo "tag=pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
           else
             echo "controller=images/chantico" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
+            echo "prometheus_exporter=images/chantico-prometheus-exporter-mock" >> $GITHUB_OUTPUT
             echo "tag=latest" >> $GITHUB_OUTPUT
           fi
 
@@ -68,3 +71,11 @@ jobs:
           file: ./Dockerfile.snmp-mock
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.snmp }}:${{ steps.meta.outputs.tag }}
+
+      - name: Build and push prom-exporter-mock
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.prom-exporter-mock
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.prometheus_exporter }}:${{ steps.meta.outputs.tag }}

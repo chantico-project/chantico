@@ -1,0 +1,10 @@
+apiVersion: chantico-project.github.io/v1alpha1
+kind: PhysicalMeasurement
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: prom-exporter-mock
+spec:
+  ip: chantico-prometheus-exporter-mock:9090
+  measurementDevice: prometheus-exporter-mock

@@ -1,0 +1,10 @@
+apiVersion: chantico-project.github.io/v1alpha1
+kind: MeasurementDevice
+metadata:
+  name: prometheus-exporter-mock
+  labels:
+    app.kubernetes.io/name: chantico
+spec:
+  type: prometheus
+  prometheus:
+    path: /metrics

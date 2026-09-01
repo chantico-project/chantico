@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chantico-prometheus-exporter-mock
+  labels:
+    app: chantico-prometheus-exporter-mock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chantico-prometheus-exporter-mock
+  template:
+    metadata:
+      labels:
+        app: chantico-prometheus-exporter-mock
+    spec:
+      containers:
+      - name: chantico-prometheus-exporter-mock
+        image: chantico-prometheus-exporter-mock:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 9090
+          protocol: TCP
+        env:
+        - name: MOCK_PROMETHEUS_HOST_NAME
+          value: "prometheus-mock-bm-1"
+        - name: MOCK_PROMETHEUS_VM_IDS
+          value: "120,121"
+        - name: MOCK_PROMETHEUS_PORT
+          value: "9090"
