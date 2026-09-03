@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"text/template"
 
 	chantico "chantico/api/v1alpha1"
 
@@ -97,12 +98,27 @@ func (r *EnergyAttributionTemplateReconciler) Reconcile(ctx context.Context, req
 
 	attributionTemplate.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
 	return steps.Run(ctx, attributionTemplate,
+		r.reconcileDeletion,
 		r.reconcileReady,
 	)
 
 }
 
+func (r *EnergyAttributionTemplateReconciler) reconcileDeletion(ctx context.Context, attributionTemplate *chantico.EnergyAttributionTemplate) steps.StepResult {
+	if attributionTemplate.GetDeletionTimestamp() == nil {
+		return steps.Continue()
+	}
+
+	return steps.Stop()
+}
+
 func (r *EnergyAttributionTemplateReconciler) reconcileReady(ctx context.Context, attributionTemplate *chantico.EnergyAttributionTemplate) steps.StepResult {
+	_, err := template.New(attributionTemplate.Name).Parse(attributionTemplate.Spec.Template)
+	if err != nil {
+		attributionTemplate.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionFalse, chantico.ReasonInvalidSpec, "Invalid template: "+err.Error())
+		return steps.Error(err)
+	}
+
 	attributionTemplate.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "Fully reconciled and ready")
 	return steps.Continue()
 }
