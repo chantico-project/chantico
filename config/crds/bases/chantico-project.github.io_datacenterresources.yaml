@@ -79,6 +79,22 @@ spec:
                         to the current node. It is a PromQL expression (often a literal
                         number) that will be written as a Prometheus recording rule.
                       type: string
+                    coefficientTemplate:
+                      properties:
+                        name:
+                          description: Name is the name of the CoefficientTemplate
+                            resource.
+                          type: string
+                        parameters:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            Parameters is a map of parameter names to values that will be used
+                            to fill in the template.
+                          type: object
+                      required:
+                      - name
+                      type: object
                     name:
                       description: Name is the name of the parent DataCenterResource.
                       type: string

@@ -21,6 +21,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type CoefficientTemplateRef struct {
+	// Name is the name of the CoefficientTemplate resource.
+	Name string `json:"name"`
+
+	// Parameters is a map of parameter names to values that will be used
+	// to fill in the template.
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
 // ParentRef references a parent DataCenterResource and optionally carries
 // the energy coefficient for the edge from that parent to this node.
 // The coefficient represents what fraction of the parent's energy is
@@ -33,7 +42,8 @@ type ParentRef struct {
 	// to the current node. It is a PromQL expression (often a literal
 	// number) that will be written as a Prometheus recording rule.
 	// +optional
-	Coefficient string `json:"coefficient,omitempty"`
+	Coefficient         string                 `json:"coefficient,omitempty"`
+	CoefficientTemplate CoefficientTemplateRef `json:"coefficientTemplate,omitempty"`
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource

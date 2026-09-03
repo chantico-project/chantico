@@ -16,11 +16,12 @@ const (
 
 func TestValidate(t *testing.T) {
 	testCases := map[string]struct {
-		Resource                 *chantico.DataCenterResource
-		Resources                []chantico.DataCenterResource
-		ExpectedVisited          []chantico.DataCenterResource
-		ExpectedError            error
-		ExpectedInvolvedResource string
+		Resource                   *chantico.DataCenterResource
+		Resources                  []chantico.DataCenterResource
+		EnergyAttributionTemplates []chantico.EnergyAttributionTemplate
+		ExpectedVisited            []chantico.DataCenterResource
+		ExpectedError              error
+		ExpectedInvolvedResource   string
 	}{
 		"creates resource if empty": {
 			Resource: &chantico.DataCenterResource{
@@ -325,11 +326,227 @@ func TestValidate(t *testing.T) {
 			ExpectedError:            ErrorUnknownType{Type: "perpetuummobile"},
 			ExpectedInvolvedResource: "",
 		},
+		"creates a resource with valid coefficient template": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					Parents: []chantico.ParentRef{{
+						Name: "bar",
+						CoefficientTemplate: chantico.CoefficientTemplateRef{
+							Name: "template",
+							Parameters: map[string]string{
+								"variable1": "1",
+								"variable2": "2",
+							},
+						},
+					}},
+				},
+			},
+			Resources: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			EnergyAttributionTemplates: []chantico.EnergyAttributionTemplate{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "template",
+				},
+				Spec: chantico.EnergyAttributionTemplateSpec{
+					Template:   "{{ .variable1 }} * {{ .variable2 }}",
+					Parameters: []string{"variable1", "variable2"},
+				},
+			}},
+			ExpectedVisited: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			ExpectedError: nil,
+		},
+		"creates a resource with a parameterless coefficient template": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					Parents: []chantico.ParentRef{{
+						Name: "bar",
+						CoefficientTemplate: chantico.CoefficientTemplateRef{
+							Name:       "template",
+							Parameters: map[string]string{},
+						},
+					}},
+				},
+			},
+			Resources: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			EnergyAttributionTemplates: []chantico.EnergyAttributionTemplate{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "template",
+				},
+				Spec: chantico.EnergyAttributionTemplateSpec{
+					Template:   "1",
+					Parameters: []string{},
+				},
+			}},
+			ExpectedVisited: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			ExpectedError: nil,
+		},
+		"gives an error if energy attribution template not found": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					Parents: []chantico.ParentRef{{
+						Name: "bar",
+						CoefficientTemplate: chantico.CoefficientTemplateRef{
+							Name:       "template",
+							Parameters: map[string]string{},
+						},
+					}},
+				},
+			},
+			Resources: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			EnergyAttributionTemplates: []chantico.EnergyAttributionTemplate{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "not-the-template",
+				},
+				Spec: chantico.EnergyAttributionTemplateSpec{
+					Template:   "{{ .variable }}",
+					Parameters: []string{"variable"},
+				},
+			}},
+			ExpectedVisited: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			ExpectedError: ErrorEnergyAttributionTemplateNotFound{
+				InvolvedResource: "template",
+			},
+		},
+		"gives an error due to missing coefficient template parameter": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					Parents: []chantico.ParentRef{{
+						Name: "bar",
+						CoefficientTemplate: chantico.CoefficientTemplateRef{
+							Name:       "template",
+							Parameters: map[string]string{},
+						},
+					}},
+				},
+			},
+			Resources: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			EnergyAttributionTemplates: []chantico.EnergyAttributionTemplate{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "template",
+				},
+				Spec: chantico.EnergyAttributionTemplateSpec{
+					Template:   "{{ .variable }}",
+					Parameters: []string{"variable"},
+				},
+			}},
+			ExpectedVisited: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			ExpectedError: ErrorMissingCoefficientTemplateParameter{
+				InvolvedResource: "bar",
+				Parameter:        "variable",
+			},
+		},
+		"gives an error if coefficient and coefficient template are both set": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					Parents: []chantico.ParentRef{{
+						Name:        "bar",
+						Coefficient: "0.5",
+						CoefficientTemplate: chantico.CoefficientTemplateRef{
+							Name: "template",
+						},
+					}},
+				},
+			},
+			Resources: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			ExpectedVisited: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypePDU,
+				},
+			}},
+			ExpectedError: ErrorCoefficientAndCoefficientTemplateSet{
+				InvolvedResource: "bar",
+			},
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			visited, involvedResource, err := Validate(tc.Resource, tc.Resources, []chantico.PhysicalMeasurement{})
+			visited, involvedResource, err := Validate(tc.Resource, tc.Resources, []chantico.PhysicalMeasurement{}, tc.EnergyAttributionTemplates)
 			if !reflect.DeepEqual(visited, tc.ExpectedVisited) || !errors.Is(err, tc.ExpectedError) || involvedResource != tc.ExpectedInvolvedResource {
 				t.Errorf("Validate(%#v, %#v) = %#v, %#v, want %#v, %#v\n)", tc.Resource, FormatResources(tc.Resources), FormatResources(visited), err, FormatResources(tc.ExpectedVisited), tc.ExpectedError)
 			}

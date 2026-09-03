@@ -142,7 +142,10 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 	physicalMeasurements := &chantico.PhysicalMeasurementList{}
 	_ = r.List(ctx, physicalMeasurements, listOptions...)
 
-	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
+	energyAttributionTemplates := &chantico.EnergyAttributionTemplateList{}
+	_ = r.List(ctx, energyAttributionTemplates, listOptions...)
+
+	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items, energyAttributionTemplates.Items)
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
 		dataCenterResource.Status.InvolvedResource = involvedResource
