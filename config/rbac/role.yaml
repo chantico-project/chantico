@@ -30,6 +30,7 @@ rules:
   - chantico-project.github.io
   resources:
   - datacenterresources
+  - energyattributiontemplate
   - measurementdevices
   - physicalmeasurements
   verbs:
@@ -50,6 +51,7 @@ rules:
   - chantico-project.github.io
   resources:
   - datacenterresources/status
+  - energyattributiontemplate/status
   - measurementdevices/status
   - physicalmeasurements/status
   verbs:
@@ -59,6 +61,7 @@ rules:
 - apiGroups:
   - chantico-project.github.io
   resources:
+  - energyattributiontemplate/finalizers
   - measurementdevices/finalizers
   - physicalmeasurements/finalizers
   verbs:

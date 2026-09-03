@@ -41,14 +41,14 @@ spec:
             description: EnergyAttributionTemplateSpec defines the desired state of
               EnergyAttributionTemplate
             properties:
-              parameteres:
+              parameters:
                 items:
                   type: string
                 type: array
               template:
                 type: string
             required:
-            - parameteres
+            - parameters
             - template
             type: object
           status:

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -72,3 +73,12 @@ func init() {
 const (
 	EnergyAttributionTemplateFinalizer = "energyattributiontemplate.chantico-project.github.io/finalizer"
 )
+
+func (m *EnergyAttributionTemplate) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+
+func (m *EnergyAttributionTemplate) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
+	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
+		Type: string(t), Status: s, Reason: string(reason), Message: msg,
+		ObservedGeneration: m.GetGeneration(),
+	})
+}
