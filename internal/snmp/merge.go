@@ -67,10 +67,10 @@ func readPerDeviceSnmpConfigs(filestore filestore.FileStore, dir string) (map[st
 	out := map[string][]byte{}
 	for _, name := range entries {
 		// Only per-device files: snmp-<uid>.yaml. Excludes the merged snmp.yml.
-		if !strings.HasPrefix(name, "snmp-") || filepath.Ext(name) != ".yaml" {
+		if !strings.HasPrefix(filepath.Base(name), "snmp-") || filepath.Ext(name) != ".yaml" {
 			continue
 		}
-		content, err := filestore.ReadAll(context.Background(), filepath.Join(dir, name))
+		content, err := filestore.ReadAll(context.Background(), filepath.Join(name))
 
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", name, err)

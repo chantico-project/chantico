@@ -17,16 +17,17 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"context"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
 	"chantico/internal/filestore"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
+
+	md "chantico/internal/measurementdevice"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -73,7 +74,8 @@ func newReconciler(t *testing.T, root string, objs ...runtime.Object) *Measureme
 	return &MeasurementDeviceReconciler{
 		Client:          c,
 		Scheme:          scheme,
-		ConfigFilestore: filestore.VolumeFileStore{Root: ""},
+		Namespace:       namespace,
+		ConfigFilestore: filestore.VolumeFileStore{Root: root},
 	}
 }
 
@@ -96,8 +98,9 @@ func TestWriteReconcileGeneratorFile(t *testing.T) {
 	if res.Action == steps.ActionError {
 		t.Fatalf("first reconcileGeneratorFile errored: %v", res.Err)
 	}
-	path := r.Paths.GeneratorFile(measurementDevice.GetUID())
-	first, err := os.ReadFile(path)
+	path := md.GeneratorFile(measurementDevice.GetUID())
+
+	first, err := r.ConfigFilestore.ReadAll(context.Background(), path)
 	if err != nil {
 		t.Fatalf("expected file %s: %v", path, err)
 	}
@@ -107,7 +110,7 @@ func TestWriteReconcileGeneratorFile(t *testing.T) {
 	if res.Action == steps.ActionError {
 		t.Fatalf("second reconcileGeneratorFile errored: %v", res.Err)
 	}
-	second, err := os.ReadFile(path)
+	second, err := r.ConfigFilestore.ReadAll(context.Background(), path)
 	if err != nil {
 		t.Fatalf("read after second run: %v", err)
 	}
@@ -121,34 +124,30 @@ func TestWriteReconcileMergedSNMPFile(t *testing.T) {
 	r := newReconciler(t, root)
 
 	// Seed two per-device files.
-	if err := os.MkdirAll(r.Paths.SNMPDir(), 0777); err != nil {
+	if err := os.MkdirAll(md.SnmpSubDir, 0777); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(r.Paths.SNMPDir(), "snmp-a.yaml"),
-		[]byte("auths: {foo: {version: 3}}\nmodules: {foo: {walk: [1.3]}}\n"))
-	writeFile(t, filepath.Join(r.Paths.SNMPDir(), "snmp-b.yaml"),
-		[]byte("auths: {bar: {version: 3}}\nmodules: {bar: {walk: [1.4]}}\n"))
-
-	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			t.Log(path)
-		}
-		return nil
-	})
+	writeFile(
+		t, r.ConfigFilestore,
+		md.SnmpFile(types.UID("a")),
+		[]byte("auths: {foo: {version: 3}}\nmodules: {foo: {walk: [1.3]}}\n"),
+	)
+	writeFile(
+		t, r.ConfigFilestore,
+		md.SnmpFile(types.UID("b")),
+		[]byte("auths: {bar: {version: 3}}\nmodules: {bar: {walk: [1.4]}}\n"),
+	)
 
 	measurementDevice := &chantico.MeasurementDevice{ObjectMeta: metav1.ObjectMeta{Name: "tno", Namespace: "chantico"}}
 	if res := r.reconcileMergedSNMPFile(context.Background(), measurementDevice); res.Action == steps.ActionError {
 		t.Fatalf("reconcileMergedSNMPFile errored: %v", res.Err)
 	}
 
-	got, err := os.ReadFile(r.Paths.MergedSNMPFile())
+	got, err := r.ConfigFilestore.ReadAll(context.Background(), md.SnmpMergedFile)
 	if err != nil {
 		t.Fatalf("read merged file: %v", err)
 	}
-	merged, err := snmp.GetMergedSortedSNMPConfig(r.ConfigFilestore, r.Paths.SNMPDir())
+	merged, err := snmp.GetMergedSortedSNMPConfig(r.ConfigFilestore, md.SnmpSubDir)
 	if err != nil {
 		t.Fatalf("get merged config: %v", err)
 	}
@@ -159,14 +158,14 @@ func TestWriteReconcileMergedSNMPFile(t *testing.T) {
 	}
 
 	// No leftover .tmp file from the atomic rename.
-	if _, err := os.Stat(r.Paths.MergedSNMPFile() + ".tmp"); !os.IsNotExist(err) {
+	if _, err := os.Stat(md.SnmpMergedFile + ".tmp"); !os.IsNotExist(err) {
 		t.Fatalf("temp file leaked: %v", err)
 	}
 }
 
-func writeFile(t *testing.T, path string, b []byte) {
+func writeFile(t *testing.T, r filestore.FileStore, path string, b []byte) {
 	t.Helper()
-	if err := os.WriteFile(path, b, 0777); err != nil {
+	if err := r.Write(context.Background(), path, bytes.NewReader(b)); err != nil {
 		t.Fatalf("write %s: %v", path, err)
 	}
 }
@@ -212,14 +211,8 @@ func TestReconcileDeletion(t *testing.T) {
 	r := newReconciler(t, root, measurementDevice, job, exporter)
 
 	// Seed the per-device files that deletion should remove.
-	if err := os.MkdirAll(r.Paths.SNMPDir(), 0777); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Dir(r.Paths.GeneratorFile(measurementDevice.UID)), 0777); err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, r.Paths.GeneratorFile(measurementDevice.UID), []byte("auths: {}\n"))
-	writeFile(t, r.Paths.SNMPFile(measurementDevice.UID), []byte("auths: {}\nmodules: {}\n"))
+	writeFile(t, r.ConfigFilestore, md.GeneratorFile(measurementDevice.UID), []byte("auths: {}\n"))
+	writeFile(t, r.ConfigFilestore, md.SnmpFile(measurementDevice.UID), []byte("auths: {}\nmodules: {}\n"))
 
 	// Start deletion of measurementDevice.
 	res := r.reconcileDeletion(context.Background(), measurementDevice)
@@ -231,7 +224,7 @@ func TestReconcileDeletion(t *testing.T) {
 	}
 
 	// Generator and SNMP config must be removed.
-	for _, p := range []string{r.Paths.GeneratorFile(measurementDevice.UID), r.Paths.SNMPFile(measurementDevice.UID)} {
+	for _, p := range []string{md.GeneratorFile(measurementDevice.UID), md.SnmpFile(measurementDevice.UID)} {
 		if _, err := os.Stat(p); !os.IsNotExist(err) {
 			t.Fatalf("expected %s to be removed, stat err = %v", p, err)
 		}
