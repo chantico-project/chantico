@@ -3,6 +3,7 @@ package filestore
 import (
 	"context"
 	"io"
+	"io/fs"
 	"os"
 	fp "path/filepath"
 
@@ -14,7 +15,7 @@ type VolumeFileStore struct {
 }
 
 func (v VolumeFileStore) Write(ctx context.Context, filepath string, r io.Reader) error {
-	dir := fp.Dir(fp.Join(v.Root, filepath))
+	dir := fp.Dir(v.Resolve(filepath))
 	if dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
@@ -25,12 +26,12 @@ func (v VolumeFileStore) Write(ctx context.Context, filepath string, r io.Reader
 	if err != nil {
 		return err
 	}
-	err = renameio.WriteFile(filepath, data, 0644)
+	err = renameio.WriteFile(v.Resolve(filepath), data, 0644)
 	return err
 }
 
 func (v VolumeFileStore) Read(ctx context.Context, filepath string) (io.ReadCloser, error) {
-	return os.Open(fp.Join(v.Root, filepath))
+	return os.Open(v.Resolve(filepath))
 }
 
 func (v VolumeFileStore) ReadAll(ctx context.Context, filepath string) ([]byte, error) {
@@ -42,14 +43,35 @@ func (v VolumeFileStore) ReadAll(ctx context.Context, filepath string) ([]byte, 
 	return io.ReadAll(rc)
 }
 
-func (v VolumeFileStore) CollectSubFiles(ctx context.Context, filepath string) ([]string, error) {
-	dirEntries, err := os.ReadDir(fp.Join(v.Root, filepath))
+func (v VolumeFileStore) CollectSubFiles(ctx context.Context, path string) ([]string, error) {
 	subPaths := []string{}
-	for _, entry := range dirEntries {
-		if entry.IsDir() {
-			continue
+
+	err := fp.WalkDir(v.Resolve(path), func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		subPaths = append(subPaths, entry.Name())
-	}
+		// honor context cancellation
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := fp.Rel(v.Root, path)
+		if err != nil {
+			return err
+		}
+		subPaths = append(subPaths, rel)
+		return nil
+	})
+
 	return subPaths, err
+}
+
+func (v VolumeFileStore) Resolve(subpaths ...string) string {
+	return fp.Join(append([]string{v.Root}, subpaths...)...)
+}
+
+func (v VolumeFileStore) Remove(ctx context.Context, filepath string) error {
+	return os.Remove(v.Resolve(filepath))
 }

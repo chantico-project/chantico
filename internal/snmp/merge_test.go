@@ -90,7 +90,7 @@ func TestGetMergedSortedSNMPConfig(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "snmp-empty.yaml"), []byte(""))
 	writeFile(t, filepath.Join(dir, "other.txt"), []byte("ignored"))
 
-	merged, err := GetMergedSortedSNMPConfig(filestore.VolumeFileStore{Root: ""}, dir)
+	merged, err := GetMergedSortedSNMPConfig(filestore.VolumeFileStore{Root: dir}, "")
 	if err != nil {
 		t.Fatalf("GetMergedSortedSNMPConfig: %v", err)
 	}
