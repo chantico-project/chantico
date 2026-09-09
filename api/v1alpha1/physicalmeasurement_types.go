@@ -25,14 +25,22 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type PhysicalMeasurementScrapeConfig string
+
+const (
+	PhysicalMeasurementScrapeConfigSnmp     PhysicalMeasurementScrapeConfig = "snmp"
+	PhysicalMeasurementScrapeConfigExporter PhysicalMeasurementScrapeConfig = "exporter"
+)
+
 // PhysicalMeasurementSpec defines the desired state of PhysicalMeasurement
 type PhysicalMeasurementSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Ip                string   `json:"ip"`
-	MeasurementDevice string   `json:"measurementDevice"`
-	ResourceIds       []string `json:"resourceIds,omitempty"`
+	Ip                string                          `json:"ip"`
+	MeasurementDevice string                          `json:"measurementDevice,omitempty"`
+	ResourceIds       []string                        `json:"resourceIds,omitempty"`
+	Type              PhysicalMeasurementScrapeConfig `json:"type,omitempty"`
 }
 
 // PhysicalMeasurementStatus defines the observed state of PhysicalMeasurement

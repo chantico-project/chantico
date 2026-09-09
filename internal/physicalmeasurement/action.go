@@ -14,6 +14,11 @@ import (
 
 const prometheusTargetsDir = "prometheus/targets"
 
+var prometheusTargetsSubdirMap = map[chantico.PhysicalMeasurementScrapeConfig]string{
+	chantico.PhysicalMeasurementScrapeConfigSnmp:     "snmp",
+	chantico.PhysicalMeasurementScrapeConfigExporter: "exporter",
+}
+
 // ActionMap defines the actions to execute for each state.
 // With file_sd_configs, Prometheus automatically watches the target files
 // for changes — no explicit reload or config merging is needed.
@@ -45,7 +50,15 @@ func WriteTargetFile(
 	target := CreateFileSDTarget(physicalMeasurement.Spec.MeasurementDevice, physicalMeasurement.Spec.Ip, physicalMeasurement.Name)
 
 	volumePath := config.ValidatedEnv.VolumeLocation
-	targetsDir := filepath.Join(volumePath, prometheusTargetsDir)
+
+	subdir, ok := prometheusTargetsSubdirMap[physicalMeasurement.Spec.Type]
+	if !ok {
+		physicalMeasurement.Status.State = StateFailed
+		physicalMeasurement.Status.ErrorMessage = "Unknown PhysicalMeasurement type: " + string(physicalMeasurement.Spec.Type)
+		l.Error(nil, "Unknown PhysicalMeasurement type", "type", physicalMeasurement.Spec.Type)
+		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
+	}
+	targetsDir := filepath.Join(volumePath, prometheusTargetsDir, subdir)
 	if err := os.MkdirAll(targetsDir, 0777); err != nil {
 		physicalMeasurement.Status.State = StateFailed
 		physicalMeasurement.Status.ErrorMessage = err.Error()
@@ -75,7 +88,7 @@ func DeleteTargetFile(
 ) *sm.ActionResult {
 	l := log.FromContext(ctx)
 	volumePath := config.ValidatedEnv.VolumeLocation
-	targetPath := filepath.Join(volumePath, prometheusTargetsDir, physicalMeasurement.Name+".json")
+	targetPath := filepath.Join(volumePath, prometheusTargetsDir, prometheusTargetsSubdirMap[physicalMeasurement.Spec.Type], physicalMeasurement.Name+".json")
 
 	l.Info("Deleting target file")
 
