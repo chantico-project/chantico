@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	util "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -41,6 +42,8 @@ const prometheusRulesDir = "prometheus/rules"
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=datacenterresources/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // DataCenterResourceReconciler reconciles a DataCenterResource object
 type DataCenterResourceReconciler struct {
@@ -52,6 +55,8 @@ func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chantico.DataCenterResource{}).
 		Owns(&batchv1.Job{}).
+		// Watch config maps for updates. Only trigger reconciliation if the configmap is referenced in either coefficient or energyMetric template
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.dataCenterResourcesForConfigMap)).
 		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 1}). // Race conditions might occur when multiple generator jobs run simultaneously, so only allow one at a time.
 		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
 			log := mgr.GetLogger().WithName("DataCenterResourceController")
@@ -61,6 +66,39 @@ func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			return log
 		}).
 		Complete(r)
+}
+
+func (r *DataCenterResourceReconciler) dataCenterResourcesForConfigMap(ctx context.Context, configMap client.Object) []reconcile.Request {
+	dataCenterResources := &chantico.DataCenterResourceList{}
+	if err := r.List(ctx, dataCenterResources, client.InNamespace(configMap.GetNamespace())); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to list DataCenterResources for ConfigMap", "configMap", configMap.GetName(), "namespace", configMap.GetNamespace())
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0, len(dataCenterResources.Items))
+	for _, dataCenterResource := range dataCenterResources.Items {
+		if !dataCenterResourceReferencesConfigMap(&dataCenterResource, configMap.GetName()) {
+			continue
+		}
+		requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{
+			Namespace: dataCenterResource.Namespace,
+			Name:      dataCenterResource.Name,
+		}})
+	}
+	return requests
+}
+
+// Check if either energyMetricFrom or parent.CoefficientFrom references this configmap.
+func dataCenterResourceReferencesConfigMap(dataCenterResource *chantico.DataCenterResource, configMapName string) bool {
+	if dataCenterResource.Spec.EnergyMetricFrom.ConfigMapKeyRef.Name == configMapName {
+		return true
+	}
+	for _, parent := range dataCenterResource.Spec.Parents {
+		if parent.CoefficientFrom.ConfigMapKeyRef.Name == configMapName {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
