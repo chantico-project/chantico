@@ -147,9 +147,9 @@ func main() {
 	}
 
 	if err = (&controller.MeasurementDeviceReconciler{
-		Client:          mgr.GetClient(),
-		Scheme:          mgr.GetScheme(),
-		ConfigFilestore: filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation},
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Filestore: filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)
