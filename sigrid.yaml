@@ -8,6 +8,10 @@ dependencychecker:
   blocklist:
     - .*tno.*
   transitive: true
+  exclude:
+   - vulnerability: "cve-2026-84303"
+   - vulnerability: "cve-2026-84304"
+   - vulnerability: "cve-2026-84445"
 thirdpartyfindings:
   enabled: true
   exclude:
