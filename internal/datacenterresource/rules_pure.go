@@ -18,6 +18,7 @@ package datacenterresource
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -101,6 +102,15 @@ func BuildRecordingRules(
 	return rules
 }
 
+func buildSharedLabels(dataCenterResource *chantico.DataCenterResource) map[string]string {
+	return map[string]string{
+		"serviceId": dataCenterResource.Spec.ServiceId,
+		"name":      dataCenterResource.Name,
+		"type":      dataCenterResource.Spec.Type,
+		"parents":   strings.Join(dataCenterResource.Spec.ParentNames(), ","),
+	}
+}
+
 // buildEnergyAliasRule creates a recording rule for root nodes that aliases
 // the raw energy metric (e.g. tnoPduPowerValue{instance="..."}) to the
 // canonical datacenter:<name>:energy_watts name. This allows children to
@@ -113,12 +123,18 @@ func BuildEnergyAliasRule(
 	if len(dataCenterResource.Spec.Parents) > 0 {
 		return nil
 	}
+
+	// Construct the initial set of labels for the recording rule.
+	labels := map[string]string{
+		// "customLabel": "exampleValue",
+	}
+	// Add the defaults from the shared labels based on the resouce spec.
+	maps.Copy(labels, buildSharedLabels(dataCenterResource))
+
 	return &RecordingRule{
 		Record: EnergyMetricName(dataCenterResource.Name),
 		Expr:   dataCenterResource.Spec.EnergyMetric,
-		Labels: map[string]string{
-			"serviceId": dataCenterResource.Spec.ServiceId,
-		},
+		Labels: labels,
 	}
 }
 
@@ -179,15 +195,22 @@ func BuildEnergyRule(
 	for _, parentName := range parentNames {
 		coeffMetric := CoefficientMetricName(parentName, dataCenterResource.Name)
 		parentEnergyMetric := EnergyMetricName(parentName)
-		terms = append(terms, fmt.Sprintf("%s * on() %s", coeffMetric, parentEnergyMetric))
+		// the `max()` function call ensure that we only get one series,
+		// since label changes in the parent energy timeseries could otherwise result in multiple series.
+		terms = append(terms, fmt.Sprintf("%s * on() max(%s)", coeffMetric, parentEnergyMetric))
 	}
+
+	// Construct the initial set of labels for the recording rule.
+	labels := map[string]string{
+		// "customLabel": "exampleValue",
+	}
+	// Merge the shared labels into the initial set of labels.
+	maps.Copy(labels, buildSharedLabels(dataCenterResource))
 
 	return &RecordingRule{
 		Record: EnergyMetricName(dataCenterResource.Name),
 		Expr:   strings.Join(terms, " + "),
-		Labels: map[string]string{
-			"serviceId": dataCenterResource.Spec.ServiceId,
-		},
+		Labels: labels,
 	}
 }
 
