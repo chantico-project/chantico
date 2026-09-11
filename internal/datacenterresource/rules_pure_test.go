@@ -18,6 +18,7 @@ package datacenterresource
 
 import (
 	chantico "chantico/api/v1alpha1"
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,31 @@ func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
 		if val, ok := rule.Labels["serviceId"]; !ok || val != expected.ServiceIdLabel {
 			t.Errorf("Expected serviceId label = %q, got %q", expected.ServiceIdLabel, val)
 		}
+	}
+}
+
+func TestBuildSharedLabels(t *testing.T) {
+	resource := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+		Spec: chantico.DataCenterResourceSpec{
+			Type:      DataCenterResourceTypeBaremetal,
+			ServiceId: "3d88f471-674f-4446-9de2-54e5faa2c951",
+			Parents: []chantico.ParentRef{
+				{Name: "pdu1"},
+				{Name: "pdu2"},
+			},
+		},
+	}
+
+	expected := map[string]string{
+		"serviceId": "3d88f471-674f-4446-9de2-54e5faa2c951",
+		"name":      "bm1",
+		"type":      DataCenterResourceTypeBaremetal,
+		"parents":   "pdu1,pdu2",
+	}
+
+	if labels := buildSharedLabels(resource); !reflect.DeepEqual(labels, expected) {
+		t.Errorf("buildSharedLabels() = %#v, want %#v", labels, expected)
 	}
 }
 
@@ -215,7 +241,7 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 	// Last should be the energy rule
 	testExpectedRule(t, rules[2], ExpectedRule{
 		Record: "datacenter:bm1:energy_watts",
-		Expr:   "coefficient_pdu1_bm1 * on() datacenter:pdu1:energy_watts + coefficient_pdu2_bm1 * on() datacenter:pdu2:energy_watts",
+		Expr:   "coefficient_pdu1_bm1 * on() max(datacenter:pdu1:energy_watts) + coefficient_pdu2_bm1 * on() max(datacenter:pdu2:energy_watts)",
 	})
 }
 
@@ -238,7 +264,7 @@ func TestBuildRecordingRules_LeafNode(t *testing.T) {
 
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record:         "datacenter:vm1:energy_watts",
-		Expr:           "coefficient_bm1_vm1 * on() datacenter:bm1:energy_watts",
+		Expr:           "coefficient_bm1_vm1 * on() max(datacenter:bm1:energy_watts)",
 		ServiceIdLabel: "a479357a-2680-4577-8ffe-5105e634c836",
 	})
 }
@@ -342,7 +368,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	if len(vm1Rules) != 2 {
 		t.Fatalf("VM1: expected 2 rules, got %d", len(vm1Rules))
 	}
-	expectedExpr := "coefficient_bm1_vm1 * on() datacenter:bm1:energy_watts"
+	expectedExpr := "coefficient_bm1_vm1 * on() max(datacenter:bm1:energy_watts)"
 	if vm1Rules[1].Expr != expectedExpr {
 		t.Errorf("VM1: expected expr %q, got %q", expectedExpr, vm1Rules[1].Expr)
 	}
@@ -363,7 +389,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	if len(vm2Rules) != 2 {
 		t.Fatalf("VM2: expected 2 rules, got %d", len(vm2Rules))
 	}
-	expectedExpr = "coefficient_bm1_vm2 * on() datacenter:bm1:energy_watts"
+	expectedExpr = "coefficient_bm1_vm2 * on() max(datacenter:bm1:energy_watts)"
 	if vm2Rules[1].Expr != expectedExpr {
 		t.Errorf("VM2: expected expr %q, got %q", expectedExpr, vm2Rules[1].Expr)
 	}
@@ -386,7 +412,7 @@ func TestBuildRecordingRules_ManyToOneParents(t *testing.T) {
 	}
 
 	// Parents should be sorted in the expression
-	expectedExpr := "coefficient_pdu1_bm1 * on() datacenter:pdu1:energy_watts + coefficient_pdu2_bm1 * on() datacenter:pdu2:energy_watts"
+	expectedExpr := "coefficient_pdu1_bm1 * on() max(datacenter:pdu1:energy_watts) + coefficient_pdu2_bm1 * on() max(datacenter:pdu2:energy_watts)"
 	if rules[0].Expr != expectedExpr {
 		t.Errorf("Expected expr %q, got %q", expectedExpr, rules[0].Expr)
 	}
