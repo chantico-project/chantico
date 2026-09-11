@@ -278,7 +278,7 @@ $(DOCS_CHANGELOG_OUTPUT_PATH): CHANGELOG.md
 docs-sources: docs-png docs-api docs-changelog
 
 .PHONY: docs-build
-docs-build: docs-sources
+docs-build: docs-sources hugo
 	@echo "Building docs with Hugo..."
 	@$(HUGO) build --source $(DOCS_DIRECTORY)
 
@@ -286,7 +286,7 @@ docs-build: docs-sources
 docs-serve: docs-build docs-serve-only ## Build and run the documentation
 
 .PHONY: docs-serve-only
-docs-serve-only: ## Run the documentation
+docs-serve-only: hugo ## Run the documentation
 	$(HUGO) server serve --source $(DOCS_DIRECTORY) --port $(DOCS_PORT)
 
 .PHONY: docs-test 
