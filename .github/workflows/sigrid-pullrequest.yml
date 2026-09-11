@@ -18,7 +18,17 @@ jobs:
         with:
           customer: tno
           system: chantico
-          capability: maintainability,osh,security
+          capability: maintainability,osh
+        env:
+          SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
+          SIGRIDCI_GITHUB_COMMENT_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Sigrid CI (security)
+        uses: Software-Improvement-Group/sigridci@main
+        continue-on-error: true
+        with:
+          customer: tno
+          system: chantico
+          capability: security
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
           SIGRIDCI_GITHUB_COMMENT_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
