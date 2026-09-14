@@ -43,7 +43,12 @@ type RuleFile struct {
 	Groups []RuleGroup `yaml:"groups"`
 }
 
+// CoefficientMetricName is the Prometheus metric name for energy coefficients in the case where
+// the device has parent(s) and the energy is a factor of the parent's energy.
 const CoefficientMetricName = "chantico_energy_coefficient"
+
+// EnergyMetricName is the Prometheus metric name for the energy timeseries of a DataCenterResource.
+// This metric comes from the rules generated in this file.
 const EnergyMetricName = "chantico_energy_watts"
 
 // EnergyMetricQuery returns the Prometheus query for a DataCenterResource's energy timeseries.
@@ -132,7 +137,12 @@ func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map
 	}
 
 	if dataCenterResource.Spec.AdditionalLabels != nil {
-		labels = applyAdditionalLabels(labels, dataCenterResource.Spec.AdditionalLabels)
+		additionalLabels := make(map[string]string)
+		for _, envVar := range dataCenterResource.Spec.AdditionalLabels {
+			// TODO: Allow resolving of variables from configmap or secret
+			additionalLabels[envVar.Name] = envVar.Value
+		}
+		labels = applyAdditionalLabels(labels, additionalLabels)
 	}
 
 	return labels

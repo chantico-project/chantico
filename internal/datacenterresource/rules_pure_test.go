@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -117,8 +118,8 @@ func TestBuildSharedLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
 				Spec: chantico.DataCenterResourceSpec{
 					Type: DataCenterResourceTypeBaremetal,
-					AdditionalLabels: map[string]string{
-						"customLabel": "exampleValue",
+					AdditionalLabels: []v1.EnvVar{
+						{Name: "customLabel", Value: "exampleValue"},
 					},
 				},
 			},
@@ -134,8 +135,8 @@ func TestBuildSharedLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
 				Spec: chantico.DataCenterResourceSpec{
 					Type: DataCenterResourceTypeBaremetal,
-					AdditionalLabels: map[string]string{
-						"resource": "customResource",
+					AdditionalLabels: []v1.EnvVar{
+						{Name: "resource", Value: "customResource"},
 					},
 				},
 			},
@@ -150,8 +151,8 @@ func TestBuildSharedLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
 				Spec: chantico.DataCenterResourceSpec{
 					Type: DataCenterResourceTypeBaremetal,
-					AdditionalLabels: map[string]string{
-						"extraLabel": "additional",
+					AdditionalLabels: []v1.EnvVar{
+						{Name: "extraLabel", Value: "additional"},
 					},
 				},
 			},
