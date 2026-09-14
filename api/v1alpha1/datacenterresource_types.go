@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -69,7 +70,7 @@ type DataCenterResourceSpec struct {
 	// AdditionalLabels are applied directly to the prometheus time series for this resource to
 	// add additional identification information. If they conflict with existing labels, they will be overwritten.
 	// +optional
-	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
+	AdditionalLabels []v1.EnvVar `json:"additionalLabels,omitempty"`
 }
 
 // DataCenterResourceStatus defines the observed state of DataCenterResource.
