@@ -22,8 +22,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"strconv"
 
 	chantico "chantico/api/v1alpha1"
@@ -32,6 +30,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	"chantico/internal/filestore"
 	md "chantico/internal/measurementdevice"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
@@ -62,8 +61,8 @@ import (
 type MeasurementDeviceReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
-	Paths     md.Paths
 	Namespace string
+	Filestore filestore.FileStore
 }
 
 func (r *MeasurementDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -140,11 +139,11 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 	}
 
 	filesToRemove := []string{
-		r.Paths.GeneratorFile(measurementDevice.GetUID()),
-		r.Paths.SNMPFile(measurementDevice.GetUID()),
+		md.GeneratorFile(measurementDevice.GetUID()),
+		md.SnmpFile(measurementDevice.GetUID()),
 	}
 	for _, path := range filesToRemove {
-		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if err := r.Filestore.Remove(ctx, path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Error while removing SNMP file %s: %w", path, err))
 		}
 	}
@@ -169,10 +168,24 @@ func (r *MeasurementDeviceReconciler) ensureFinalizerIsSet(ctx context.Context, 
 }
 
 func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	path := r.Paths.GeneratorFile(measurementDevice.GetUID())
+	path := md.GeneratorFile(measurementDevice.GetUID())
 
-	observed, err := os.ReadFile(path)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	observed, err := r.Filestore.ReadAll(ctx, path)
+
+	if err != nil {
+		// If the generator file does not exist yet, create it with the desired content.
+		if errors.Is(err, fs.ErrNotExist) {
+			desired, derr := desiredGeneratorConfig(measurementDevice)
+			if derr != nil {
+				return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to marshal generator config: %w", derr))
+			}
+			if werr := r.Filestore.Write(ctx, path, bytes.NewReader(desired)); werr != nil {
+				return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to write generator file: %w", werr))
+			}
+			log.FromContext(ctx).Info("Generator file has been generated successfully.", "path", path)
+			measurementDevice.UpdateStatusCondition(chantico.ConditionGeneratorFile, metav1.ConditionTrue, chantico.ReasonFileWritten, "Generator file has been generated successfully.")
+			return steps.Continue()
+		}
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to read generator file %s: %w", path, err))
 	}
 
@@ -186,13 +199,8 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 		return steps.Continue()
 	}
 
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0777); err != nil {
-		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to create directory %s: %w", dir, err))
-	}
-
-	if err := os.WriteFile(path, desired, 0777); err != nil {
-		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to write generator file: %w", err))
+	if err := r.Filestore.Write(ctx, path, bytes.NewReader(desired)); err != nil {
+		return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to write generator file at path: %w", err))
 	}
 
 	log.FromContext(ctx).Info("Generator file has been generated successfully.", "path", path)
@@ -208,10 +216,6 @@ func desiredGeneratorConfig(measurementDevice *chantico.MeasurementDevice) ([]by
 }
 
 func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	if err := os.MkdirAll(r.Paths.SNMPDir(), 0777); err != nil {
-		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to create SNMP config directory %s: %w", r.Paths.SNMPDir(), err))
-	}
-
 	jobs, err := r.getOwnedJobs(ctx, measurementDevice)
 	if err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionJob, "Failed to get owned SNMP Generator jobs: %w", err))
@@ -274,8 +278,8 @@ func (r *MeasurementDeviceReconciler) evaluateGeneratorJob(ctx context.Context, 
 }
 
 func (r *MeasurementDeviceReconciler) reconcileSNMPFileContent(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	path := r.Paths.SNMPFile(measurementDevice.GetUID())
-	config, err := os.ReadFile(path)
+	path := md.SnmpFile(measurementDevice.GetUID())
+	config, err := r.Filestore.ReadAll(context.Background(), path)
 	if err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to read SNMP file %s: %w", path, err))
 	}
@@ -294,13 +298,13 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPFileContent(ctx context.Conte
 }
 
 func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	merged, err := snmp.GetMergedSortedSNMPConfig(r.Paths.SNMPDir())
+	merged, err := snmp.GetMergedSortedSNMPConfig(r.Filestore, md.SnmpSubDir)
 	if err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to read SNMP configs: %w", err))
 	}
 
-	path := r.Paths.MergedSNMPFile()
-	existing, err := os.ReadFile(path)
+	path := md.SnmpMergedFile
+	existing, err := r.Filestore.ReadAll(context.Background(), path)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to read merged SNMP file: %w", err))
 	}
@@ -309,11 +313,7 @@ func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Contex
 		return steps.Continue()
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0777); err != nil {
-		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to create merged SNMP dir %s: %w", filepath.Dir(path), err))
-	}
-
-	if err := os.WriteFile(path, merged, 0777); err != nil {
+	if err := r.Filestore.Write(ctx, path, bytes.NewReader(merged)); err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to write merged SNMP file %s: %w", path, err))
 	}
 
@@ -322,7 +322,7 @@ func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Contex
 }
 
 func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
-	merged, err := os.ReadFile(r.Paths.MergedSNMPFile())
+	merged, err := r.Filestore.ReadAll(ctx, md.SnmpMergedFile)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			measurementDevice.UpdateStatusCondition(chantico.ConditionExporterReload, metav1.ConditionUnknown, chantico.ReasonPending, "Merged SNMP file does not exist yet.")

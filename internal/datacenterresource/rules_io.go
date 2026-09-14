@@ -17,6 +17,7 @@ limitations under the License.
 package datacenterresource
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -26,6 +27,7 @@ import (
 
 	chantico "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
+	"chantico/internal/filestore"
 	ph "chantico/internal/patch"
 	sm "chantico/internal/statemachine"
 
@@ -71,13 +73,6 @@ func WriteRuleFile(
 	}
 
 	volumePath := config.ValidatedEnv.VolumeLocation
-	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
-	if err := os.MkdirAll(rulesDir, 0777); err != nil {
-		log.Printf("Failed to create rules directory: %v", err)
-		SetValidationError(dataCenterResource, err, "")
-		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
-	}
-
 	data, err := yaml.Marshal(ruleFile)
 	if err != nil {
 		log.Printf("Failed to marshal rule file: %v", err)
@@ -85,8 +80,10 @@ func WriteRuleFile(
 		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
 	}
 
-	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
-	if err := os.WriteFile(rulePath, data, 0644); err != nil {
+	rulePath := filepath.Join(volumePath, prometheusRulesDir, dataCenterResource.Name+".yml")
+	vfs := filestore.VolumeFileStore{}
+
+	if err := vfs.Write(ctx, rulePath, bytes.NewReader(data)); err != nil {
 		log.Printf("Failed to write rule file: %v", err)
 		SetValidationError(dataCenterResource, err, "")
 		return &sm.ActionResult{PatchType: ph.PatchResourceStatus}
