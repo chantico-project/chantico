@@ -100,17 +100,42 @@ func BuildRecordingRules(
 	return rules
 }
 
-func buildSharedLabels(dataCenterResource *chantico.DataCenterResource) map[string]string {
+func applyAdditionalLabels(base map[string]string, labels map[string]string) map[string]string {
+	for k, v := range labels {
+		if _, exists := base[k]; !exists {
+			base[k] = v
+		}
+	}
+	return base
+}
+
+func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map[string]string) map[string]string {
 	parents := []string{}
 	for _, name := range dataCenterResource.Spec.ParentNames() {
 		parents = append(parents, name)
 	}
-	return map[string]string{
-		"serviceId": dataCenterResource.Spec.ServiceId,
-		"resource":  dataCenterResource.Name,
-		"type":      dataCenterResource.Spec.Type,
-		"parents":   strings.Join(parents, ","),
+	labels := map[string]string{
+		"resource": dataCenterResource.Name,
+		"type":     dataCenterResource.Spec.Type,
 	}
+
+	if dataCenterResource.Spec.ServiceId != "" {
+		labels["serviceId"] = dataCenterResource.Spec.ServiceId
+	}
+
+	if len(dataCenterResource.Spec.Parents) > 0 {
+		labels["parents"] = strings.Join(parents, ",")
+	}
+
+	if base != nil {
+		labels = applyAdditionalLabels(labels, base)
+	}
+
+	if dataCenterResource.Spec.AdditionalLabels != nil {
+		labels = applyAdditionalLabels(labels, dataCenterResource.Spec.AdditionalLabels)
+	}
+
+	return labels
 }
 
 // buildEnergyAliasRule creates a recording rule for root nodes that aliases
@@ -127,11 +152,12 @@ func BuildEnergyAliasRule(
 	}
 
 	// Construct the initial set of labels for the recording rule.
-	labels := map[string]string{
+	baseLabels := map[string]string{
 		// "customLabel": "exampleValue",
 	}
+
 	// Add the defaults from the shared labels based on the resouce spec.
-	maps.Copy(labels, buildSharedLabels(dataCenterResource))
+	labels := buildSharedLabels(dataCenterResource, baseLabels)
 
 	return &RecordingRule{
 		Record: EnergyMetricName,
@@ -199,7 +225,7 @@ func BuildEnergyRule(
 		// "customLabel": "exampleValue",
 	}
 	// Merge the shared labels into the initial set of labels.
-	maps.Copy(labels, buildSharedLabels(dataCenterResource))
+	maps.Copy(labels, buildSharedLabels(dataCenterResource, labels))
 
 	// Construct the Prometheus aggregation expression for the energy recording rule.
 	expr := fmt.Sprintf(

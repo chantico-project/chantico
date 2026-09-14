@@ -65,6 +65,11 @@ type DataCenterResourceSpec struct {
 	// data center resource with service type with parent resources.
 	// +optional
 	ServiceId string `json:"serviceId"`
+
+	// AdditionalLabels are applied directly to the prometheus time series for this resource to
+	// add additional identification information. If they conflict with existing labels, they will be overwritten.
+	// +optional
+	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
 }
 
 // DataCenterResourceStatus defines the observed state of DataCenterResource.

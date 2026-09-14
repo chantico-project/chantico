@@ -45,27 +45,133 @@ func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
 }
 
 func TestBuildSharedLabels(t *testing.T) {
-	resource := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
-		Spec: chantico.DataCenterResourceSpec{
-			Type:      DataCenterResourceTypeBaremetal,
-			ServiceId: "3d88f471-674f-4446-9de2-54e5faa2c951",
-			Parents: []chantico.ParentRef{
-				{Name: "pdu1"},
-				{Name: "pdu2"},
+	testCases := map[string]struct {
+		resource    *chantico.DataCenterResource
+		extraLabels map[string]string
+		expected    map[string]string
+	}{
+		"basic case": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource": "bm1",
+				"type":     DataCenterResourceTypeBaremetal,
+			},
+		},
+		"with extra labels": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+				},
+			},
+			extraLabels: map[string]string{
+				"customLabel": "exampleValue",
+			},
+			expected: map[string]string{
+				"resource":    "bm1",
+				"type":        DataCenterResourceTypeBaremetal,
+				"customLabel": "exampleValue",
+			},
+		},
+		"with parents": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					Parents: []chantico.ParentRef{
+						{Name: "pdu1"},
+						{Name: "pdu2"},
+					},
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource": "bm1",
+				"type":     DataCenterResourceTypeBaremetal,
+				"parents":  "pdu1,pdu2",
+			},
+		},
+		"with serviceId": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:      DataCenterResourceTypeBaremetal,
+					ServiceId: "3d88f471-674f-4446-9de2-54e5faa2c951",
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource":  "bm1",
+				"serviceId": "3d88f471-674f-4446-9de2-54e5faa2c951",
+				"type":      DataCenterResourceTypeBaremetal,
+			},
+		},
+		"with additional labels": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					AdditionalLabels: map[string]string{
+						"customLabel": "exampleValue",
+					},
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource":    "bm1",
+				"type":        DataCenterResourceTypeBaremetal,
+				"customLabel": "exampleValue",
+			},
+		},
+		"with conflicing labels": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					AdditionalLabels: map[string]string{
+						"resource": "customResource",
+					},
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource": "bm1",
+				"type":     DataCenterResourceTypeBaremetal,
+			},
+		},
+		"with extra label conflic takes presedence": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					AdditionalLabels: map[string]string{
+						"extraLabel": "additional",
+					},
+				},
+			},
+			extraLabels: map[string]string{
+				"extraLabel": "extra",
+			},
+			expected: map[string]string{
+				"resource":   "bm1",
+				"extraLabel": "extra",
+				"type":       DataCenterResourceTypeBaremetal,
 			},
 		},
 	}
 
-	expected := map[string]string{
-		"serviceId": "3d88f471-674f-4446-9de2-54e5faa2c951",
-		"resource":  "bm1",
-		"type":      DataCenterResourceTypeBaremetal,
-		"parents":   "pdu1,pdu2",
-	}
-
-	if labels := buildSharedLabels(resource); !reflect.DeepEqual(labels, expected) {
-		t.Errorf("buildSharedLabels() = %#v, want %#v", labels, expected)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if labels := buildSharedLabels(tc.resource, tc.extraLabels); !reflect.DeepEqual(labels, tc.expected) {
+				t.Errorf("buildSharedLabels() = %#v, want %#v", labels, tc.expected)
+			}
+		})
 	}
 }
 
