@@ -62,7 +62,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "label_replace(\r\n  {__name__=~\"datacenter:datacenterresource_pdu.+:energy_watts\"},\r\n  \"resource\",\r\n  \"$1\",\r\n  \"__name__\",\r\n  \"datacenter:datacenterresource_(pdu.+):energy_watts\"\r\n)",
+          "expr": "chantico_energy_watts{type=\"pdu\"}",
           "instant": true,
           "legendFormat": "{{resource}}",
           "refId": "A"
@@ -111,7 +111,8 @@
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "expr": "sum({__name__=~\"datacenter:datacenterresource_pdu.+:energy_watts\"})",
+          "editorMode": "code",
+          "expr": "sum(chantico_energy_watts{type=\"pdu\"})",
           "instant": true,
           "legendFormat": "total",
           "refId": "A"
@@ -224,7 +225,7 @@
           "expr": "prometheus_target_interval_length_seconds{interval=\"10s\", quantile=\"0.99\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "__auto",
+          "legendFormat": "{{resource}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -305,22 +306,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "label_replace(\r\n  {__name__=~\"datacenter:datacenterresource_pdu.+:energy_watts\"},\r\n  \"resource\",\r\n  \"$1\",\r\n  \"__name__\",\r\n  \"datacenter:datacenterresource_(pdu.+):energy_watts\"\r\n)",
+          "expr": "chantico_energy_watts{type=\"pdu\"}",
           "legendFormat": "{{resource}}",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "PDU power consumption over time",
-      "transformations": [
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "datacenter:(.+):energy_watts",
-            "renamePattern": "$1"
-          }
-        }
-      ],
       "type": "timeseries"
     },
     {
@@ -399,8 +391,8 @@
             "uid": "chantico-victoriametrics"
           },
           "editorMode": "code",
-          "expr": "label_replace(\r\n  {__name__=~\"datacenter:datacenterresource_.+bm.+:energy_watts\"},\r\n  \"resource\",\r\n  \"$1\",\r\n  \"__name__\",\r\n  \"datacenter:datacenterresource_(.+bm.+):energy_watts\"\r\n)",
-          "legendFormat": "{{resource}}",
+          "expr": "chantico_energy_watts{type=\"baremetal\"}",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
