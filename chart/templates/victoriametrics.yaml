@@ -89,7 +89,7 @@ spec:
             # resulting timeseries contains one data point per minute regardless
             # of how frequently Prometheus scraped and forwarded the raw data.
             #
-            # Pattern matched: datacenter:*:energy_watts  (all energy accounting
+            # Pattern matched: chantico_energy_watts  (all energy accounting
             # metrics written by Chantico's Prometheus recording rules).
             #
             # The downsampled series carry an extra label `resolution="1m"` so
@@ -102,10 +102,10 @@ spec:
               - name: energy_downsample_1m
                 interval: 1m
                 rules:
-                  - record: datacenter:energy_watts:avg1m
+                  - record: chantico_energy_watts:avg1m
                     expr: >
                       label_replace(
-                        avg_over_time({__name__=~"datacenter:.+:energy_watts"}[1m]),
+                        avg_over_time({__name__=~"chantico_energy_watts"}[1m]),
                         "resolution", "1m", "", ""
                       )
             EOF
