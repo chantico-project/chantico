@@ -3,6 +3,8 @@ package controller
 import (
 	"bytes"
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
+	dcr "chantico/internal/datacenterresource"
 	ph "chantico/internal/patch"
 	"chantico/internal/steps"
 	"context"
@@ -12,9 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"text/template"
-
-	config "chantico/internal/configuration"
-	dcr "chantico/internal/datacenterresource"
 
 	"github.com/go-logr/logr"
 	yaml "go.yaml.in/yaml/v2"
