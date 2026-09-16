@@ -35,18 +35,42 @@ Prometheus.
 
 ## Data Model
 
+### `TemplateFrom`
+
+```go
+type TemplateConfigMapKeyRef struct {
+  Name string `json:"name"`
+  Key  string `json:"key,omitempty"`
+}
+
+type TemplateFrom struct {
+  ConfigMapKeyRef TemplateConfigMapKeyRef `json:"configMapKeyRef"`
+  Parameters      []corev1.EnvVar         `json:"parameters,omitempty"`
+}
+```
+
+`TemplateConfigMapKeyRef.Name` identifies a ConfigMap which contains the template, and the `TemplateConfigMapKeyRef.Key` identifies the specific key within that ConfigMap. The `TemplateFrom.Parameters` field provides values for the template's placeholders.
+
+When a template ConfigMap is updated, Chantico reconciles every
+DataCenterResource in the same namespace that references it through
+`energyMetricFrom` or `coefficientFrom`.
+
 ### `ParentRef`
 
 ```go
 type ParentRef struct {
-    Name        string `json:"name"`
-    Coefficient string `json:"coefficient,omitempty"`
+  Name            string       `json:"name"`
+  Coefficient     string       `json:"coefficient,omitempty"`
+  CoefficientFrom TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 ```
 
 Each entry in `spec.parents` references a parent DataCenterResource by name
 and optionally carries a coefficient (a PromQL expression, usually a literal
-number like `"1"` or `"0.5"`).
+number like `"1"` or `"0.5"`). 
+
+If a coefficient expression is reused across many resources, the `coefficientFrom` 
+can load a PromQL template from a ConfigMap and render it with named parameters.
 
 ### `DataCenterResourceSpec` (relevant fields)
 
@@ -54,6 +78,15 @@ number like `"1"` or `"0.5"`).
 |---|---|---|
 | `parents` | `[]ParentRef` | Parent resources with optional coefficients |
 | `energyMetric` | `string` | Raw Prometheus metric expression for root nodes (e.g. `tnoPduPowerValue{job="tno"}`) |
+| `energyMetricFrom` | `TemplateFrom` | ConfigMap-backed, parameterized alternative to `energyMetric` |
+
+`TemplateFrom` identifies `configMapKeyRef.name` and `configMapKeyRef.key`,
+then supplies template values through `parameters`. Templates use Go template
+syntax such as `{{ .vmid }}`. Parameter entries follow the Kubernetes `EnvVar`
+shape and support the use of a `value`, `valueFrom.configMapKeyRef`, and
+`valueFrom.secretKeyRef`. See [How to register
+data center resources]({{% relref "how-tos/how-to-register-data-center-resources.md" %}})
+for examples.
 
 ### Example CRs
 

@@ -58,6 +58,54 @@ kubectl describe -n chantico datacenterresource datacenterresource-pdu2
 1. Revert your changes and apply the file again, to check that the validation 
    message disappears.
 
+## Reuse PromQL with ConfigMap templates
+
+Use a ConfigMap template when the same PromQL expression is needed for more
+than one resource and only a few labels or values differ. Chantico reads the
+template from the ConfigMap in the same namespace as the `DataCenterResource`,
+renders it using Go template syntax (the same syntax as Helm), and uses the 
+result as the metric or coefficient expression.
+
+1. Create a ConfigMap with the PromQL expression under a named key. Template
+   values use the parameter name, for example `{{ .job }}`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tno-pdu-energy-metric-template
+  namespace: chantico
+data:
+  template: |
+    tnoPduPowerValue{job="{{ .job }}"}
+```
+2. Reference the template from `spec.energyMetricFrom`. Each entry in `parameters` 
+supplies a template value by name:
+
+```yaml
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  name: datacenterresource-pdu1
+  namespace: chantico
+spec:
+  type: pdu
+  energyMetricFrom:
+    configMapKeyRef:
+      name: tno-pdu-energy-metric-template
+      key: template
+    parameters:
+      - name: job
+        value: tno
+```
+
+Parameter values can be provided directly with `value`, or loaded with
+`valueFrom.configMapKeyRef` or `valueFrom.secretKeyRef`. All resources 
+referenced must be in the same namespace as the DataCenterResource. 
+IN case of a missing parameter or an invalid key reference, the resource 
+will not reconcile. Errors will be attached to the DataCenterResource 
+which can be checked with `kubectl describe`.
+
 ## Future steps
 
 The current state of the data center resource may change in a future 
