@@ -160,10 +160,6 @@ spec:
                   - type
                   type: object
                 type: array
-              errorMessage:
-                type: string
-              errorType:
-                type: string
               involvedResource:
                 type: string
               updateGeneration:
