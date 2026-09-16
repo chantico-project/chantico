@@ -18,23 +18,21 @@ package controller
 
 import (
 	"context"
-
-	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"errors"
 
 	chantico "chantico/api/v1alpha1"
-	ph "chantico/internal/patch"
-	pm "chantico/internal/physicalmeasurement"
-)
+	"chantico/internal/steps"
 
-// PhysicalMeasurementReconciler reconciles a PhysicalMeasurement object
-type PhysicalMeasurementReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
-}
+	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/cluster-api/util/patch"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	util "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	log "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+)
 
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/status,verbs=get;update;patch
@@ -42,26 +40,12 @@ type PhysicalMeasurementReconciler struct {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 
-func (r *PhysicalMeasurementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	physicalMeasurement := &chantico.PhysicalMeasurement{}
-	err := r.Get(ctx, req.NamespacedName, physicalMeasurement)
-	if err != nil {
-		return ctrl.Result{}, nil
-	}
-
-	patch := ph.Initialize(ctx, r.Client, physicalMeasurement)
-	pm.UpdateState(physicalMeasurement)
-	patch.PatchStatus()
-
-	result := pm.StateMachine.ExecuteActions(ctx, r.Client, physicalMeasurement, patch)
-	if result != nil && result.Result != nil && (result.Requeue || result.RequeueAfter > 0) {
-		return *result.Result, nil
-	}
-	return ctrl.Result{}, nil
-
+// PhysicalMeasurementReconciler reconciles a PhysicalMeasurement object
+type PhysicalMeasurementReconciler struct {
+	client.Client
+	Scheme *runtime.Scheme
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *PhysicalMeasurementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chantico.PhysicalMeasurement{}).
@@ -73,4 +57,65 @@ func (r *PhysicalMeasurementReconciler) SetupWithManager(mgr ctrl.Manager) error
 			return log
 		}).
 		Complete(r)
+}
+
+func (r *PhysicalMeasurementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
+	l := log.FromContext(ctx)
+
+	physicalMeasurement := &chantico.PhysicalMeasurement{}
+	err := r.Get(ctx, req.NamespacedName, physicalMeasurement)
+	if err != nil {
+		return ctrl.Result{}, nil
+	}
+	l = l.WithValues("generation", physicalMeasurement.GetGeneration())
+	ctx = log.IntoContext(ctx, l)
+
+	// Patches the changes to the MeasurementDevice at the end of reconciliation. This updates the observedGeneration and conditions in the status.
+	patcher, err := patch.NewHelper(physicalMeasurement, r.Client)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	defer func() {
+		if err := patcher.Patch(ctx, physicalMeasurement, patch.WithStatusObservedGeneration{}); err != nil {
+			reterr = errors.Join(reterr, err)
+		}
+	}()
+
+	physicalMeasurement.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
+	return steps.Run(ctx, physicalMeasurement,
+		r.reconcileDeletion,
+		r.ensureFinalizerIsSet,
+		r.reconcileTargetFile,
+		r.reconcileReady,
+	)
+}
+
+func (r *PhysicalMeasurementReconciler) reconcileDeletion(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
+	if physicalMeasurement.GetDeletionTimestamp() == nil {
+		return steps.Continue()
+	}
+
+	if !util.ContainsFinalizer(physicalMeasurement, chantico.PhysicalMeasurementFinalizer) {
+		return steps.Stop()
+	}
+
+	util.RemoveFinalizer(physicalMeasurement, chantico.PhysicalMeasurementFinalizer)
+	return steps.Stop()
+}
+
+func (r *PhysicalMeasurementReconciler) ensureFinalizerIsSet(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
+	if util.ContainsFinalizer(physicalMeasurement, chantico.PhysicalMeasurementFinalizer) {
+		return steps.Continue()
+	}
+	util.AddFinalizer(physicalMeasurement, chantico.PhysicalMeasurementFinalizer)
+	return steps.Stop()
+}
+
+func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
+	return steps.Stop()
+}
+
+func (r *PhysicalMeasurementReconciler) reconcileReady(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
+	physicalMeasurement.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "Reconciliation completed successfully")
+	return steps.Continue()
 }
