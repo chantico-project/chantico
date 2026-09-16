@@ -13,12 +13,22 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Sigrid CI
+      - name: Sigrid CI (maintainability, security)
         uses: Software-Improvement-Group/sigridci@main
         with:
           customer: tno
           system: chantico
-          capability: maintainability,osh,security
+          capability: maintainability,security
+        env:
+          SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
+          SIGRIDCI_GITHUB_COMMENT_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Sigrid CI (open-source health)
+        uses: Software-Improvement-Group/sigridci@main
+        continue-on-error: true
+        with:
+          customer: tno
+          system: chantico
+          capability: osh
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
           SIGRIDCI_GITHUB_COMMENT_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

@@ -37,7 +37,8 @@ jobs:
 
       - name: Build and run documentation
         run: |
-          make docs-serve &
+          make docs-sources
+          make docs-serve-only &
 
           echo "Waiting for Hugo server on port ${{ env.DOCS_PORT }}..."
           TIMEOUT=180
