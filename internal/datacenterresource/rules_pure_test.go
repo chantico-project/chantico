@@ -18,8 +18,10 @@ package datacenterresource
 
 import (
 	chantico "chantico/api/v1alpha1"
+	"reflect"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,6 +42,137 @@ func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
 		if val, ok := rule.Labels["serviceId"]; !ok || val != expected.ServiceIdLabel {
 			t.Errorf("Expected serviceId label = %q, got %q", expected.ServiceIdLabel, val)
 		}
+	}
+}
+
+func TestBuildSharedLabels(t *testing.T) {
+	testCases := map[string]struct {
+		resource    *chantico.DataCenterResource
+		extraLabels map[string]string
+		expected    map[string]string
+	}{
+		"basic case": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource": "bm1",
+				"type":     DataCenterResourceTypeBaremetal,
+			},
+		},
+		"with extra labels": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+				},
+			},
+			extraLabels: map[string]string{
+				"customLabel": "exampleValue",
+			},
+			expected: map[string]string{
+				"resource":    "bm1",
+				"type":        DataCenterResourceTypeBaremetal,
+				"customLabel": "exampleValue",
+			},
+		},
+		"with parents": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					Parents: []chantico.ParentRef{
+						{Name: "pdu1"},
+						{Name: "pdu2"},
+					},
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource": "bm1",
+				"type":     DataCenterResourceTypeBaremetal,
+				"parents":  "pdu1,pdu2",
+			},
+		},
+		"with serviceId": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:      DataCenterResourceTypeBaremetal,
+					ServiceId: "3d88f471-674f-4446-9de2-54e5faa2c951",
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource":  "bm1",
+				"serviceId": "3d88f471-674f-4446-9de2-54e5faa2c951",
+				"type":      DataCenterResourceTypeBaremetal,
+			},
+		},
+		"with additional labels": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					AdditionalLabels: []v1.EnvVar{
+						{Name: "customLabel", Value: "exampleValue"},
+					},
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource":    "bm1",
+				"type":        DataCenterResourceTypeBaremetal,
+				"customLabel": "exampleValue",
+			},
+		},
+		"with conflicing labels": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					AdditionalLabels: []v1.EnvVar{
+						{Name: "resource", Value: "customResource"},
+					},
+				},
+			},
+			extraLabels: nil,
+			expected: map[string]string{
+				"resource": "bm1",
+				"type":     DataCenterResourceTypeBaremetal,
+			},
+		},
+		"with extra label conflic takes presedence": {
+			resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: DataCenterResourceTypeBaremetal,
+					AdditionalLabels: []v1.EnvVar{
+						{Name: "extraLabel", Value: "additional"},
+					},
+				},
+			},
+			extraLabels: map[string]string{
+				"extraLabel": "extra",
+			},
+			expected: map[string]string{
+				"resource":   "bm1",
+				"extraLabel": "extra",
+				"type":       DataCenterResourceTypeBaremetal,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if labels := buildSharedLabels(tc.resource, tc.extraLabels); !reflect.DeepEqual(labels, tc.expected) {
+				t.Errorf("buildSharedLabels() = %#v, want %#v", labels, tc.expected)
+			}
+		})
 	}
 }
 
@@ -76,32 +209,32 @@ func TestSanitizeMetricName(t *testing.T) {
 	}
 }
 
-func TestEnergyMetricName(t *testing.T) {
+func TestEnergyMetricQuery(t *testing.T) {
 	testCases := map[string]struct {
 		resourceName string
 		expected     string
 	}{
 		"simple": {
 			resourceName: "bm1",
-			expected:     "datacenter:bm1:energy_watts",
+			expected:     "chantico_energy_watts{resource=\"bm1\"}",
 		},
 		"with hyphens": {
 			resourceName: "datacenterresource-misd-gbm-01",
-			expected:     "datacenter:datacenterresource_misd_gbm_01:energy_watts",
+			expected:     "chantico_energy_watts{resource=\"datacenterresource-misd-gbm-01\"}",
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			result := EnergyMetricName(tc.resourceName)
+			result := EnergyMetricQuery(tc.resourceName)
 			if result != tc.expected {
-				t.Errorf("EnergyMetricName(%q) = %q, want %q", tc.resourceName, result, tc.expected)
+				t.Errorf("EnergyMetricQuery(%q) = %q, want %q", tc.resourceName, result, tc.expected)
 			}
 		})
 	}
 }
 
-func TestCoefficientMetricName(t *testing.T) {
+func TestCoefficientMetricQuery(t *testing.T) {
 	testCases := map[string]struct {
 		parentName string
 		childName  string
@@ -110,20 +243,20 @@ func TestCoefficientMetricName(t *testing.T) {
 		"simple": {
 			parentName: "bm1",
 			childName:  "vm1",
-			expected:   "coefficient_bm1_vm1",
+			expected:   `chantico_energy_coefficient{parent="bm1", child="vm1"}`,
 		},
 		"with hyphens": {
 			parentName: "datacenterresource-bm1",
 			childName:  "datacenterresource-vm1",
-			expected:   "coefficient_datacenterresource_bm1_datacenterresource_vm1",
+			expected:   `chantico_energy_coefficient{parent="datacenterresource-bm1", child="datacenterresource-vm1"}`,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			result := CoefficientMetricName(tc.parentName, tc.childName)
+			result := CoefficientMetricQuery(tc.parentName, tc.childName)
 			if result != tc.expected {
-				t.Errorf("CoefficientMetricName(%q, %q) = %q, want %q",
+				t.Errorf("CoefficientMetricQuery(%q, %q) = %q, want %q",
 					tc.parentName, tc.childName, result, tc.expected)
 			}
 		})
@@ -146,8 +279,8 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 		t.Fatalf("Expected 1 alias rule for root node, got %d rules", len(rules))
 	}
 	testExpectedRule(t, rules[0], ExpectedRule{
-		Record:         "datacenter:pdu1:energy_watts",
-		Expr:           "snmp_pdu1_power_watts",
+		Record:         "chantico_energy_watts",
+		Expr:           "sum(snmp_pdu1_power_watts)",
 		ServiceIdLabel: "3d88f471-674f-4446-9de2-54e5faa2c951",
 	})
 }
@@ -174,11 +307,11 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 
 	// Coefficient rules should be sorted by parent name
 	testExpectedRule(t, rules[0], ExpectedRule{
-		Record: "coefficient_pdu1_bm1",
+		Record: "chantico_energy_coefficient",
 		Expr:   "0.5",
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
-		Record: "coefficient_pdu2_bm1",
+		Record: "chantico_energy_coefficient",
 		Expr:   "0.5",
 	})
 }
@@ -204,18 +337,18 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 
 	// First two should be coefficient rules (sorted by parent name)
 	testExpectedRule(t, rules[0], ExpectedRule{
-		Record: "coefficient_pdu1_bm1",
+		Record: "chantico_energy_coefficient",
 		Expr:   "0.3",
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
-		Record: "coefficient_pdu2_bm1",
+		Record: "chantico_energy_coefficient",
 		Expr:   "0.7",
 	})
 
 	// Last should be the energy rule
 	testExpectedRule(t, rules[2], ExpectedRule{
-		Record: "datacenter:bm1:energy_watts",
-		Expr:   "coefficient_pdu1_bm1 * on() datacenter:pdu1:energy_watts + coefficient_pdu2_bm1 * on() datacenter:pdu2:energy_watts",
+		Record: "chantico_energy_watts",
+		Expr:   `sum(chantico_energy_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`,
 	})
 }
 
@@ -237,8 +370,8 @@ func TestBuildRecordingRules_LeafNode(t *testing.T) {
 	}
 
 	testExpectedRule(t, rules[0], ExpectedRule{
-		Record:         "datacenter:vm1:energy_watts",
-		Expr:           "coefficient_bm1_vm1 * on() datacenter:bm1:energy_watts",
+		Record:         "chantico_energy_watts",
+		Expr:           `sum(chantico_energy_coefficient{child="vm1"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`,
 		ServiceIdLabel: "a479357a-2680-4577-8ffe-5105e634c836",
 	})
 }
@@ -303,8 +436,8 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 		t.Fatalf("PDU1: expected 1 alias rule, got %d", len(pdu1Rules))
 	}
 	testExpectedRule(t, pdu1Rules[0], ExpectedRule{
-		Record: "datacenter:pdu1a:energy_watts",
-		Expr:   "snmp_pdu1a_power_watts",
+		Record: "chantico_energy_watts",
+		Expr:   "sum(snmp_pdu1a_power_watts)",
 	})
 
 	// BM1 with parent PDU1 (coefficient "1"), generates coefficient + energy
@@ -323,7 +456,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 		t.Fatalf("BM1: expected 2 rules, got %d", len(bm1Rules))
 	}
 	testExpectedRule(t, bm1Rules[0], ExpectedRule{
-		Record: "coefficient_pdu1a_bm1",
+		Record: "chantico_energy_coefficient",
 		Expr:   "1",
 	})
 
@@ -342,7 +475,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	if len(vm1Rules) != 2 {
 		t.Fatalf("VM1: expected 2 rules, got %d", len(vm1Rules))
 	}
-	expectedExpr := "coefficient_bm1_vm1 * on() datacenter:bm1:energy_watts"
+	expectedExpr := `sum(chantico_energy_coefficient{child="vm1"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`
 	if vm1Rules[1].Expr != expectedExpr {
 		t.Errorf("VM1: expected expr %q, got %q", expectedExpr, vm1Rules[1].Expr)
 	}
@@ -363,7 +496,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	if len(vm2Rules) != 2 {
 		t.Fatalf("VM2: expected 2 rules, got %d", len(vm2Rules))
 	}
-	expectedExpr = "coefficient_bm1_vm2 * on() datacenter:bm1:energy_watts"
+	expectedExpr = `sum(chantico_energy_coefficient{child="vm2"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`
 	if vm2Rules[1].Expr != expectedExpr {
 		t.Errorf("VM2: expected expr %q, got %q", expectedExpr, vm2Rules[1].Expr)
 	}
@@ -386,7 +519,7 @@ func TestBuildRecordingRules_ManyToOneParents(t *testing.T) {
 	}
 
 	// Parents should be sorted in the expression
-	expectedExpr := "coefficient_pdu1_bm1 * on() datacenter:pdu1:energy_watts + coefficient_pdu2_bm1 * on() datacenter:pdu2:energy_watts"
+	expectedExpr := `sum(chantico_energy_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`
 	if rules[0].Expr != expectedExpr {
 		t.Errorf("Expected expr %q, got %q", expectedExpr, rules[0].Expr)
 	}
