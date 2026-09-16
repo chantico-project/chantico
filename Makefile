@@ -249,9 +249,11 @@ endef
 docs/static/puml/%.png: docs/static/puml/%.puml
 	$(call plantuml-cmd,-t png $<)
 
+.PHONY: docs-png
+docs-png: $(DOCS_PNG) ## Generate PNGs from PlantUML files
 
-.PHONY: docs-build
-docs-build: doc2go hugo $(DOCS_PNG) ## Build the documentation
+.PHONY: docs-api
+docs-api: doc2go ## Generate API reference with doc2go
 	@echo "Generating api reference with doc2go..."
 	@$(DOC2GO) -embed -highlight classes:monokai \
 		-basename _index.html \
@@ -260,6 +262,10 @@ docs-build: doc2go hugo $(DOCS_PNG) ## Build the documentation
 		-rel-link-style directory \
 		-internal ./...
 
+.PHONY: docs-changelog
+docs-changelog: $(DOCS_CHANGELOG_OUTPUT_PATH) ## Generate changelog for docs
+
+$(DOCS_CHANGELOG_OUTPUT_PATH): CHANGELOG.md
 	@echo "Generating $(DOCS_CHANGELOG_OUTPUT_PATH)..."
 	@echo "$$DOCS_CHANGELOG_HEADER" > $(DOCS_CHANGELOG_OUTPUT_PATH)
 	@sed -E \
@@ -268,6 +274,11 @@ docs-build: doc2go hugo $(DOCS_PNG) ## Build the documentation
 	    -e "s|\(#([1-9][0-9]+)\)|([#\1]($(REPOSITORY_URL)/issues/\1))|" \
 		CHANGELOG.md >> $(DOCS_CHANGELOG_OUTPUT_PATH)
 
+.PHONY: docs-sources
+docs-sources: docs-png docs-api docs-changelog
+
+.PHONY: docs-build
+docs-build: docs-sources hugo
 	@echo "Building docs with Hugo..."
 	@$(HUGO) build --source $(DOCS_DIRECTORY)
 
@@ -275,7 +286,7 @@ docs-build: doc2go hugo $(DOCS_PNG) ## Build the documentation
 docs-serve: docs-build docs-serve-only ## Build and run the documentation
 
 .PHONY: docs-serve-only
-docs-serve-only: ## Run the documentation
+docs-serve-only: hugo ## Run the documentation
 	$(HUGO) server serve --source $(DOCS_DIRECTORY) --port $(DOCS_PORT)
 
 .PHONY: docs-test 
