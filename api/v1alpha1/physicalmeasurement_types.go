@@ -40,10 +40,8 @@ type PhysicalMeasurementSpec struct {
 type PhysicalMeasurementStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	JobName          string             `json:"jobName,omitempty"`
-	UpdateTime       string             `json:"updateTime,omitempty"`
-	UpdateGeneration int64              `json:"updateGeneration,omitempty"`
-	Conditions       []metav1.Condition `json:"conditions,omitempty"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

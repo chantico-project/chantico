@@ -162,11 +162,9 @@ spec:
                 type: array
               involvedResource:
                 type: string
-              updateGeneration:
+              observedGeneration:
                 format: int64
                 type: integer
-              updateTime:
-                type: string
             type: object
         required:
         - spec

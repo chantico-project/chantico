@@ -124,16 +124,12 @@ spec:
                   - type
                   type: object
                 type: array
-              jobName:
+              observedGeneration:
                 description: |-
                   INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
                   Important: Run "make" to regenerate code after modifying this file
-                type: string
-              updateGeneration:
                 format: int64
                 type: integer
-              updateTime:
-                type: string
             type: object
         type: object
     served: true

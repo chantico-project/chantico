@@ -72,10 +72,9 @@ type DataCenterResourceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	UpdateTime       string             `json:"updateTime,omitempty"`
-	UpdateGeneration int64              `json:"updateGeneration,omitempty"`
-	InvolvedResource string             `json:"involvedResource,omitempty"`
-	Conditions       []metav1.Condition `json:"conditions,omitempty"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	InvolvedResource   string             `json:"involvedResource,omitempty"`
+	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
