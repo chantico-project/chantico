@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,8 +40,6 @@ type ParentRef struct {
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
 	Type string `json:"type"`
 
@@ -73,16 +72,20 @@ type DataCenterResourceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	State            string `json:"state,omitempty"`
-	UpdateTime       string `json:"updateTime,omitempty"`
-	UpdateGeneration int64  `json:"updateGeneration,omitempty"`
-	ErrorMessage     string `json:"errorMessage,omitempty"`
-	ErrorType        string `json:"errorType,omitempty"`
-	InvolvedResource string `json:"involvedResource,omitempty"`
+	UpdateTime       string             `json:"updateTime,omitempty"`
+	UpdateGeneration int64              `json:"updateGeneration,omitempty"`
+	ErrorMessage     string             `json:"errorMessage,omitempty"`
+	ErrorType        string             `json:"errorType,omitempty"`
+	InvolvedResource string             `json:"involvedResource,omitempty"`
+	Conditions       []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[-1].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[-1].reason`
+// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.status.conditions[-1].type`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // DataCenterResource is the Schema for the datacenterresources API
 type DataCenterResource struct {
@@ -118,13 +121,14 @@ const (
 	DataCenterResourceGraphFinalizer = "datacenterresource.finalizer.chantico-project.github.io/graph"
 )
 
-func (r *DataCenterResource) GetState() string            { return r.Status.State }
-func (r *DataCenterResource) SetState(s string)           { r.Status.State = s }
-func (r *DataCenterResource) GetUpdateGeneration() int64  { return r.Status.UpdateGeneration }
-func (r *DataCenterResource) SetUpdateGeneration(g int64) { r.Status.UpdateGeneration = g }
-func (r *DataCenterResource) GetFinalizerName() string    { return DataCenterResourceGraphFinalizer }
-func (r *DataCenterResource) GetErrorMessage() string     { return r.Status.ErrorMessage }
-func (r *DataCenterResource) SetErrorMessage(msg string)  { r.Status.ErrorMessage = msg }
+func (m *DataCenterResource) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+
+func (m *DataCenterResource) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
+	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
+		Type: string(t), Status: s, Reason: string(reason), Message: msg,
+		ObservedGeneration: m.GetGeneration(),
+	})
+}
 
 // ParentNames returns a flat list of parent resource names, for use in
 // validation, indexing, and anywhere the full ParentRef is not needed.

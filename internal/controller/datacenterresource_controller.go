@@ -1,42 +1,37 @@
-/*
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
+	chantico "chantico/api/v1alpha1"
+	ph "chantico/internal/patch"
+	"chantico/internal/steps"
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+
+	config "chantico/internal/configuration"
+	dcr "chantico/internal/datacenterresource"
 
 	"github.com/go-logr/logr"
+	yaml "go.yaml.in/yaml/v2"
+	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
+	util "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	chantico "chantico/api/v1alpha1"
-	dcr "chantico/internal/datacenterresource"
-	ph "chantico/internal/patch"
 )
 
-// DataCenterResourceReconciler reconciles a DataCenterResource object
-type DataCenterResourceReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
-}
+const prometheusRulesDir = "prometheus/rules"
 
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=datacenterresources,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=datacenterresources/status,verbs=get;update;patch
@@ -44,77 +39,209 @@ type DataCenterResourceReconciler struct {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.4/pkg/reconcile
-func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// TODO(user): Rewrite controller to use step-based function logic and conditions
+// DataCenterResourceReconciler reconciles a DataCenterResource object
+type DataCenterResourceReconciler struct {
+	client.Client
+	Scheme *runtime.Scheme
+}
+
+func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&chantico.DataCenterResource{}).
+		Owns(&batchv1.Job{}).
+		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 1}). // Race conditions might occur when multiple generator jobs run simultaneously, so only allow one at a time.
+		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
+			log := mgr.GetLogger().WithName("DataCenterResourceController")
+			if req != nil {
+				log = log.WithValues("resource", req.Name)
+			}
+			return log
+		}).
+		Complete(r)
+}
+
+func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
 	l := log.FromContext(ctx)
 
 	dataCenterResource := &chantico.DataCenterResource{}
-	_ = r.Get(ctx, req.NamespacedName, dataCenterResource)
+	err := r.Get(ctx, req.NamespacedName, dataCenterResource)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+	l = l.WithValues("generation", dataCenterResource.GetGeneration())
+	ctx = log.IntoContext(ctx, l)
 
-	listOptions := []client.ListOption{client.InNamespace(req.Namespace)}
+	// Patches the changes to the DataCenterResource at the end of reconciliation. This updates the observedGeneration and conditions in the status.
+	patcher, err := patch.NewHelper(dataCenterResource, r.Client)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	defer func() {
+		if err := patcher.Patch(ctx, dataCenterResource, patch.WithStatusObservedGeneration{}); err != nil {
+			reterr = errors.Join(reterr, err)
+		}
+	}()
+
+	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
+	return steps.Run(ctx, dataCenterResource,
+		r.reconcileDeletion,
+		r.ensureFinalizerIsSet,
+		r.reconcileValidation,
+		r.reconcileWriteRuleFile,
+		r.reconcileReady,
+	)
+}
+
+func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
+	if dataCenterResource.DeletionTimestamp == nil {
+		return steps.Continue()
+	}
+
+	if !util.ContainsFinalizer(dataCenterResource, chantico.DataCenterResourceGraphFinalizer) {
+		return steps.Stop()
+	}
+
+	l := log.FromContext(ctx)
+
+	volumePath := config.ValidatedEnv.VolumeLocation
+	rulePath := filepath.Join(volumePath, prometheusRulesDir, dataCenterResource.Name+".yml")
+
+	l.Info("Deleting rule file", "file", rulePath)
+
+	if err := deleteRuleFile(dataCenterResource); err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
+		return steps.Error(err)
+	}
+	if err := reloadPrometheus(ctx); err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Error reloading Prometheus: "+err.Error())
+		return steps.Error(err)
+	}
+
+	util.RemoveFinalizer(dataCenterResource, chantico.DataCenterResourceGraphFinalizer)
+	return steps.Stop()
+}
+
+func (r *DataCenterResourceReconciler) ensureFinalizerIsSet(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
+	if util.ContainsFinalizer(dataCenterResource, chantico.DataCenterResourceGraphFinalizer) {
+		return steps.Continue()
+	}
+	util.AddFinalizer(dataCenterResource, chantico.DataCenterResourceGraphFinalizer)
+	return steps.Stop()
+}
+
+func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
+	l := log.FromContext(ctx)
+
+	listOptions := []client.ListOption{client.InNamespace(dataCenterResource.Namespace)}
 	dataCenterResources := &chantico.DataCenterResourceList{}
 	_ = r.List(ctx, dataCenterResources, listOptions...)
 
 	physicalMeasurements := &chantico.PhysicalMeasurementList{}
 	_ = r.List(ctx, physicalMeasurements, listOptions...)
 
-	patch := ph.Initialize(ctx, r.Client, dataCenterResource)
-
-	dcr.UpdateState(dataCenterResource)
-	_ = patch.PatchStatus()
-
-	result := dcr.StateMachine.ExecuteActions(ctx, r.Client, dataCenterResource, patch)
-	if result != nil && result.Result != nil && result.RequeueAfter > 0 {
-		return *result.Result, nil
-	}
-
-	// Perform validation and clear other visited node validation errors if needed
-	// This brings those into a reconciliation loop as well
 	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
-		dcr.SetValidationError(dataCenterResource, err, involvedResource)
+		dataCenterResource.Status.InvolvedResource = involvedResource
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, validationFailureReason(err), err.Error())
+		return steps.Error(err)
 	} else {
-		l.Info("Clearing validation errors")
-		l.Info("Previous status", "status", dataCenterResource.Status)
-
+		l.Info("Clearing validation errors", "status", dataCenterResource.Status)
 		references := &chantico.DataCenterResourceList{}
 		_ = r.List(ctx, references, append(listOptions, client.MatchingFields{"status.involvedResource": dataCenterResource.Name})...)
 		children := &chantico.DataCenterResourceList{}
 		_ = r.List(ctx, children, append(listOptions, client.MatchingFields{"spec.parents": dataCenterResource.Name})...)
 		if dataCenterResource.Status.InvolvedResource != "" {
 			involved := &chantico.DataCenterResource{}
-			_ = r.Get(ctx, types.NamespacedName{Namespace: req.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
+			_ = r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
 			visited = append(visited, *involved)
 		}
-		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited))
-		l.Info("Referencing resources", "resources", dcr.FormatResources(references.Items))
-		l.Info("Children", "children", dcr.FormatResources(children.Items))
-		items := MergeUnique(visited, references.Items, children.Items)
+		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited), "references", dcr.FormatResources(references.Items), "children", dcr.FormatResources(children.Items))
+		items := mergeUnique(visited, references.Items, children.Items)
 
 		for _, item := range items {
-			r.ClearReferencedValidation(ctx, req, dataCenterResource, &item)
+			r.clearReferencedValidation(ctx, dataCenterResource, &item)
 		}
-		dcr.ClearValidationError(dataCenterResource)
-		dataCenterResource.Status.State = dcr.StateEntry
+		dataCenterResource.Status.InvolvedResource = ""
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
 	}
-	_ = patch.PatchStatus()
-
-	// TODO(user): do something with the links here:
-	// perform operations to make the cluster state reflect the state specified by
-	// the user.
-	// Specifically: register in relational/graph db (or prometheus?) which datacenter resource
-	// is involved for which physical measurement
-
-	return ctrl.Result{}, nil
+	return steps.Continue()
 }
 
-func MergeUnique(
+func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
+	l := log.FromContext(ctx)
+	ruleFile := dcr.BuildRuleFile(dataCenterResource)
+
+	if ruleFile == nil {
+		l.Info("No rule file found")
+		if err := deleteRuleFile(dataCenterResource); err != nil {
+			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
+			return steps.Error(err)
+		}
+		if err := reloadPrometheus(ctx); err != nil {
+			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
+			return steps.Error(err)
+		}
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "No recording rule file required")
+		return steps.Continue()
+	}
+
+	volumePath := config.ValidatedEnv.VolumeLocation
+	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
+	if err := os.MkdirAll(rulesDir, 0777); err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to create directory "+rulesDir+": "+err.Error())
+		return steps.Error(err)
+	}
+
+	data, err := yaml.Marshal(ruleFile)
+	if err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to marshal rule file: "+err.Error())
+		return steps.Error(err)
+	}
+
+	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
+	if err := os.WriteFile(rulePath, data, 0644); err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to write rule file: "+err.Error())
+		return steps.Error(err)
+	}
+
+	l.Info("Wrote recording rule file", "file", rulePath, "resource", dataCenterResource.Name)
+	err = reloadPrometheus(ctx)
+	if err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
+		return steps.Error(err)
+	}
+
+	dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Recording rule file applied successfully")
+	return steps.Continue()
+}
+
+func (r *DataCenterResourceReconciler) reconcileReady(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
+	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "Fully reconciled and ready")
+	return steps.Continue()
+}
+
+func deleteRuleFile(dataCenterResource *chantico.DataCenterResource) error {
+	volumePath := config.ValidatedEnv.VolumeLocation
+	rulePath := filepath.Join(volumePath, prometheusRulesDir, dataCenterResource.Name+".yml")
+	if err := os.Remove(rulePath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func validationFailureReason(err error) chantico.ConditionReason {
+	var missingResource dcr.ErrorResourceNotFound
+	if errors.As(err, &missingResource) {
+		return chantico.ReasonDependencyUnavailable
+	}
+	return chantico.ReasonInvalidSpec
+}
+
+func mergeUnique(
 	lists ...[]chantico.DataCenterResource,
 ) []chantico.DataCenterResource {
 	seen := make(map[string]chantico.DataCenterResource)
@@ -132,51 +259,35 @@ func MergeUnique(
 	return result
 }
 
-func (r *DataCenterResourceReconciler) ClearReferencedValidation(
+func (r *DataCenterResourceReconciler) clearReferencedValidation(
 	ctx context.Context,
-	req ctrl.Request,
 	dataCenterResource *chantico.DataCenterResource,
 	referenced *chantico.DataCenterResource,
 ) {
+	referenced.GetConditions()
 	// Revalidate if previously failed or current item is being removed
-	if referenced.Status.State == dcr.StateValidationFailed || dataCenterResource.Status.State == dcr.StateDelete {
+	if meta.IsStatusConditionFalse(*referenced.GetConditions(), string(chantico.ConditionValidated)) || meta.IsStatusConditionFalse(*dataCenterResource.GetConditions(), string(chantico.ConditionValidated)) {
 		patch := ph.Initialize(ctx, r.Client, referenced)
-		dcr.ClearValidationError(referenced)
-		_ = patch.PatchStatus()
+		referenced.Status.InvolvedResource = ""
+		patch.PatchStatus()
 	}
 }
+func reloadPrometheus(ctx context.Context) error {
+	l := log.FromContext(ctx)
+	host := config.ValidatedEnv.PrometheusServiceHost
+	port := config.ValidatedEnv.PrometheusServicePort
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	ctx := context.Background()
-
-	// Create a one-to-many index for parent field
-	err := mgr.GetFieldIndexer().IndexField(
-		ctx,
-		&chantico.DataCenterResource{},
-		"spec.parents",
-		func(rawObj client.Object) []string {
-			dcr := rawObj.(*chantico.DataCenterResource)
-
-			if dcr.Spec.Parents == nil {
-				return nil
-			}
-			return dcr.Spec.ParentNames()
-		},
-	)
+	url := fmt.Sprintf("http://%s:%s/-/reload", host, port)
+	resp, err := http.Post(url, "", nil)
 	if err != nil {
+		l.Error(err, "Failed to reload Prometheus")
 		return err
 	}
-
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&chantico.DataCenterResource{}).
-		Named("datacenterresource").
-		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
-			log := mgr.GetLogger().WithName("DataCenterResourceController")
-			if req != nil {
-				log = log.WithValues("resource", req.Name)
-			}
-			return log
-		}).
-		Complete(r)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		l.Info("Prometheus reload returned status", "status", resp.StatusCode)
+		return fmt.Errorf("prometheus reload returned status %d", resp.StatusCode)
+	}
+	l.Info("Prometheus configuration reloaded")
+	return nil
 }

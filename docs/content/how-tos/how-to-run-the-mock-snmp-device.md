@@ -96,7 +96,7 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
     ```
 1. Wait for the SNMP generator job:
     ```bash
-    kubectl get jobs -n chantico | grep update-snmp
+    kubectl get jobs -n chantico -o wide | grep snmp-generator
 1. Create a `PhysicalMeasurement` pointing at the mock target:
     ```bash
     kubectl apply -n chantico -f ./config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
@@ -161,10 +161,10 @@ If all the resources are created correctly, you should see the following when qu
 
 ```bash
 $ kubectl get datacenterresource,measurementdevice,physicalmeasurement -n chantico
-NAME                                                                           AGE
-datacenterresource.chantico-project.github.io/datacenterresource-misd-gbm-01
-datacenterresource.chantico-project.github.io/datacenterresource-pdu1
-datacenterresource.chantico-project.github.io/datacenterresource-pdu2
+NAME                                                                           STATUS   REASON       TYPE      AGE
+datacenterresource.chantico-project.github.io/datacenterresource-misd-gbm-01   True     Reconciled   Applied   
+datacenterresource.chantico-project.github.io/datacenterresource-pdu1          True     Reconciled   Applied   
+datacenterresource.chantico-project.github.io/datacenterresource-pdu2          True     Reconciled   Applied   
 
 NAME                                                 STATUS   REASON      TYPE             AGE
 measurementdevice.chantico-project.github.io/tno     True     Succeeded   ExporterReload
