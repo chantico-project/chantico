@@ -170,9 +170,9 @@ NAME                                                 STATUS   REASON      TYPE  
 measurementdevice.chantico-project.github.io/tno     True     Succeeded   ExporterReload
 measurementdevice.chantico-project.github.io/tno-2   True     Succeeded   ExporterReload
 
-NAME                                                                          AGE
-physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu1-out
-physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu2-out
+NAME                                                                          STATUS   REASON       TYPE      AGE
+physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu1-out   True     Reconciled   Applied   
+physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu2-out   True     Reconciled   Applied
 ```
 
 Additionally, you can verify in [Prometheus](http://localhost:19090) that the metrics are being scraped from the mock SNMP devices and aggregated into the `DataCenterResource` metrics. These will show up in the "Rule health" section as the following metrics:
