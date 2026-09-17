@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -269,7 +271,7 @@ func (r *DataCenterResourceReconciler) clearReferencedValidation(
 	if meta.IsStatusConditionFalse(*referenced.GetConditions(), string(chantico.ConditionValidated)) || meta.IsStatusConditionFalse(*dataCenterResource.GetConditions(), string(chantico.ConditionValidated)) {
 		patch := ph.Initialize(ctx, r.Client, referenced)
 		referenced.Status.InvolvedResource = ""
-		patch.PatchStatus()
+		_ = patch.PatchStatus()
 	}
 }
 func reloadPrometheus(ctx context.Context) error {
@@ -277,13 +279,19 @@ func reloadPrometheus(ctx context.Context) error {
 	host := config.ValidatedEnv.PrometheusServiceHost
 	port := config.ValidatedEnv.PrometheusServicePort
 
-	url := fmt.Sprintf("http://%s:%s/-/reload", host, port)
-	resp, err := http.Post(url, "", nil)
+	sanitizedPrometheusURL := url.URL{
+		Scheme: "http",
+		Host:   net.JoinHostPort(host, port),
+		Path:   "/-/reload",
+	}
+	resp, err := http.Post(sanitizedPrometheusURL.String(), "", nil)
 	if err != nil {
 		l.Error(err, "Failed to reload Prometheus")
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode != http.StatusOK {
 		l.Info("Prometheus reload returned status", "status", resp.StatusCode)
 		return fmt.Errorf("prometheus reload returned status %d", resp.StatusCode)
