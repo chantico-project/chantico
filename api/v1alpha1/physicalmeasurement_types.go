@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,15 +40,16 @@ type PhysicalMeasurementSpec struct {
 type PhysicalMeasurementStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	State            string `json:"state,omitempty"`
-	JobName          string `json:"jobName,omitempty"`
-	UpdateTime       string `json:"updateTime,omitempty"`
-	UpdateGeneration int64  `json:"updateGeneration,omitempty"`
-	ErrorMessage     string `json:"errorMessage,omitempty"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[-1].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[-1].reason`
+// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.status.conditions[-1].type`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // PhysicalMeasurement is the Schema for the physicalmeasurements API
 type PhysicalMeasurement struct {
@@ -71,13 +73,14 @@ const (
 	PhysicalMeasurementFinalizer = "physicalmeasurement.chantico-project.github.io/finalizer"
 )
 
-func (r *PhysicalMeasurement) GetState() string            { return r.Status.State }
-func (r *PhysicalMeasurement) SetState(s string)           { r.Status.State = s }
-func (r *PhysicalMeasurement) GetUpdateGeneration() int64  { return r.Status.UpdateGeneration }
-func (r *PhysicalMeasurement) SetUpdateGeneration(g int64) { r.Status.UpdateGeneration = g }
-func (r *PhysicalMeasurement) GetFinalizerName() string    { return PhysicalMeasurementFinalizer }
-func (r *PhysicalMeasurement) GetErrorMessage() string     { return r.Status.ErrorMessage }
-func (r *PhysicalMeasurement) SetErrorMessage(msg string)  { r.Status.ErrorMessage = msg }
+func (m *PhysicalMeasurement) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+
+func (m *PhysicalMeasurement) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
+	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
+		Type: string(t), Status: s, Reason: string(reason), Message: msg,
+		ObservedGeneration: m.GetGeneration(),
+	})
+}
 
 func init() {
 	SchemeBuilder.Register(&PhysicalMeasurement{}, &PhysicalMeasurementList{})
