@@ -273,16 +273,19 @@ func (r *DataCenterResourceReconciler) clearReferencedValidation(
 		patch.PatchStatus()
 	}
 }
-func reloadPrometheus(ctx context.Context) error {
-	l := log.FromContext(ctx)
+func getSanitizedPrometheusReloadURL() url.URL {
 	host := config.ValidatedEnv.PrometheusServiceHost
 	port := config.ValidatedEnv.PrometheusServicePort
 
-	prometheusUrl := url.URL{
+	return url.URL{
 		Scheme: "http",
 		Host:   fmt.Sprintf("%s:%s", host, port),
 		Path:   "/-/reload",
 	}
+}
+func reloadPrometheus(ctx context.Context) error {
+	l := log.FromContext(ctx)
+	prometheusUrl := getSanitizedPrometheusReloadURL()
 	resp, err := http.Post(prometheusUrl.String(), "", nil)
 	if err != nil {
 		l.Error(err, "Failed to reload Prometheus")
