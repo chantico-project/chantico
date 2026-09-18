@@ -128,9 +128,9 @@ func Validate(
 		return GetFromMap(resourcesMap, queue[0:visited]), "", ErrorUnknownType{Type: dataCenterResource.Spec.Type}
 	}
 
-	// Root nodes (no parents) must have energyMetric set so Prometheus can
+	// Root nodes (no parents) must have energyMetric or energyMetricFrom set so Prometheus can
 	// source their energy timeseries.
-	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetric == "" {
+	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetric == "" && dataCenterResource.Spec.EnergyMetricFrom.ConfigMapKeyRef.Name == "" {
 		return GetFromMap(resourcesMap, queue[0:visited]), "", ErrorMissingEnergyMetric{InvolvedResource: dataCenterResource.Name}
 	}
 
