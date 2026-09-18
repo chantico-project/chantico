@@ -110,7 +110,7 @@ func BuildRecordingRules(
 func buildEnergyAliasRule(
 	dataCenterResource *chantico.DataCenterResource,
 ) *RecordingRule {
-	if len(dataCenterResource.Spec.Parents) == 0 {
+	if len(dataCenterResource.Spec.Parents) > 0 {
 		return nil
 	}
 	return &RecordingRule{
@@ -129,7 +129,7 @@ func buildEnergyAliasRule(
 func buildCoefficientRules(
 	dataCenterResource *chantico.DataCenterResource,
 ) []RecordingRule {
-	if len(dataCenterResource.Spec.Parents) != 0 {
+	if len(dataCenterResource.Spec.Parents) == 0 {
 		return nil
 	}
 
@@ -166,7 +166,7 @@ func buildCoefficientRules(
 func buildEnergyRule(
 	dataCenterResource *chantico.DataCenterResource,
 ) *RecordingRule {
-	if len(dataCenterResource.Spec.Parents) != 0 {
+	if len(dataCenterResource.Spec.Parents) == 0 {
 		return nil
 	}
 
