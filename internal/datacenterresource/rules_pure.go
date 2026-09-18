@@ -68,19 +68,6 @@ func sanitizeMetricName(name string) string {
 	}, name)
 }
 
-// usesParentEnergy returns true if energy_watts is derived from the parent
-// using coefficients
-func usesParentEnergy(
-	dataCenterResource *chantico.DataCenterResource,
-) bool {
-	if len(dataCenterResource.Spec.Parents) == 0 {
-		return false
-	} else {
-
-		return dataCenterResource.Spec.EnergyMetric == ""
-	}
-}
-
 // BuildRecordingRules generates the set of Prometheus recording rules for a
 // DataCenterResource node, following the energy accounting design:
 //
@@ -123,7 +110,7 @@ func BuildRecordingRules(
 func buildEnergyAliasRule(
 	dataCenterResource *chantico.DataCenterResource,
 ) *RecordingRule {
-	if usesParentEnergy(dataCenterResource) {
+	if len(dataCenterResource.Spec.Parents) == 0 {
 		return nil
 	}
 	return &RecordingRule{
@@ -142,7 +129,7 @@ func buildEnergyAliasRule(
 func buildCoefficientRules(
 	dataCenterResource *chantico.DataCenterResource,
 ) []RecordingRule {
-	if !usesParentEnergy(dataCenterResource) {
+	if len(dataCenterResource.Spec.Parents) != 0 {
 		return nil
 	}
 
@@ -179,7 +166,7 @@ func buildCoefficientRules(
 func buildEnergyRule(
 	dataCenterResource *chantico.DataCenterResource,
 ) *RecordingRule {
-	if !usesParentEnergy(dataCenterResource) {
+	if len(dataCenterResource.Spec.Parents) != 0 {
 		return nil
 	}
 
