@@ -32,8 +32,8 @@ type ParentRef struct {
 	// Coefficient is the energy coefficient for the edge from this parent
 	// to the current node. It is a PromQL expression (often a literal
 	// number) that will be written as a Prometheus recording rule.
-	// +optional
-	Coefficient string `json:"coefficient,omitempty"`
+	// + required
+	Coefficient string `json:"coefficient"`
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource

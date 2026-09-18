@@ -45,9 +45,10 @@ type ParentRef struct {
 ```
 
 Each entry in `spec.parents` references a parent DataCenterResource by name
-and optionally carries a coefficient (a PromQL expression, usually a literal
-number like `"1"` or `"0.5"`).
-
+and carries a coefficient (a PromQL expression, usually a literal
+number like `"1"` or `"0.5"`). A child node may also have an `energyMetric`,
+for example from a self-reported source local to that node,
+however the energy derived from its parent nodes is used as the source of truth.
 ### `DataCenterResourceSpec` (relevant fields)
 
 | Field | Type | Description |
