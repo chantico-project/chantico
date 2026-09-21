@@ -399,7 +399,7 @@
             "uid": "chantico-victoriametrics"
           },
           "editorMode": "code",
-          "expr": "label_replace(\r\n  {__name__=~\"datacenter:datacenterresource_.+bm.+:energy_watts\"},\r\n  \"resource\",\r\n  \"$1\",\r\n  \"__name__\",\r\n  \"datacenter:datacenterresource_(.+bm.+):energy_watts\"\r\n)",
+          "expr": "label_replace(\r\n  {__name__=~\"datacenter:datacenterresource_.*?bm.+:energy_watts\"},\r\n  \"resource\",\r\n  \"$1\",\r\n  \"__name__\",\r\n  \"datacenter:datacenterresource_(.*?bm.+):energy_watts\"\r\n)",
           "legendFormat": "{{resource}}",
           "range": true,
           "refId": "A"
