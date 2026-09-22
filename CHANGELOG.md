@@ -1,3 +1,9 @@
+## 0.14.0 (2026-09-22)
+
+#### Feature
+
+* Add filestore interface and filesystem implementation (#193) (2c0f359d)
+
 ## 0.13.0 (2026-09-16)
 
 #### Feature
