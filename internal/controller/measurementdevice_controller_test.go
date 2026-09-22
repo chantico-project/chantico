@@ -72,10 +72,10 @@ func newReconciler(t *testing.T, root string, objs ...runtime.Object) *Measureme
 	}
 
 	return &MeasurementDeviceReconciler{
-		Client:          c,
-		Scheme:          scheme,
-		Namespace:       namespace,
-		ConfigFilestore: filestore.VolumeFileStore{Root: root},
+		Client:    c,
+		Scheme:    scheme,
+		Namespace: namespace,
+		Filestore: filestore.VolumeFileStore{Root: root},
 	}
 }
 
@@ -100,7 +100,7 @@ func TestWriteReconcileGeneratorFile(t *testing.T) {
 	}
 	path := md.GeneratorFile(measurementDevice.GetUID())
 
-	first, err := r.ConfigFilestore.ReadAll(context.Background(), path)
+	first, err := r.Filestore.ReadAll(context.Background(), path)
 	if err != nil {
 		t.Fatalf("expected file %s: %v", path, err)
 	}
@@ -110,7 +110,7 @@ func TestWriteReconcileGeneratorFile(t *testing.T) {
 	if res.Action == steps.ActionError {
 		t.Fatalf("second reconcileGeneratorFile errored: %v", res.Err)
 	}
-	second, err := r.ConfigFilestore.ReadAll(context.Background(), path)
+	second, err := r.Filestore.ReadAll(context.Background(), path)
 	if err != nil {
 		t.Fatalf("read after second run: %v", err)
 	}
@@ -128,12 +128,12 @@ func TestWriteReconcileMergedSNMPFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeFile(
-		t, r.ConfigFilestore,
+		t, r.Filestore,
 		md.SnmpFile(types.UID("a")),
 		[]byte("auths: {foo: {version: 3}}\nmodules: {foo: {walk: [1.3]}}\n"),
 	)
 	writeFile(
-		t, r.ConfigFilestore,
+		t, r.Filestore,
 		md.SnmpFile(types.UID("b")),
 		[]byte("auths: {bar: {version: 3}}\nmodules: {bar: {walk: [1.4]}}\n"),
 	)
@@ -143,11 +143,11 @@ func TestWriteReconcileMergedSNMPFile(t *testing.T) {
 		t.Fatalf("reconcileMergedSNMPFile errored: %v", res.Err)
 	}
 
-	got, err := r.ConfigFilestore.ReadAll(context.Background(), md.SnmpMergedFile)
+	got, err := r.Filestore.ReadAll(context.Background(), md.SnmpMergedFile)
 	if err != nil {
 		t.Fatalf("read merged file: %v", err)
 	}
-	merged, err := snmp.GetMergedSortedSNMPConfig(r.ConfigFilestore, md.SnmpSubDir)
+	merged, err := snmp.GetMergedSortedSNMPConfig(r.Filestore, md.SnmpSubDir)
 	if err != nil {
 		t.Fatalf("get merged config: %v", err)
 	}
@@ -211,8 +211,8 @@ func TestReconcileDeletion(t *testing.T) {
 	r := newReconciler(t, root, measurementDevice, job, exporter)
 
 	// Seed the per-device files that deletion should remove.
-	writeFile(t, r.ConfigFilestore, md.GeneratorFile(measurementDevice.UID), []byte("auths: {}\n"))
-	writeFile(t, r.ConfigFilestore, md.SnmpFile(measurementDevice.UID), []byte("auths: {}\nmodules: {}\n"))
+	writeFile(t, r.Filestore, md.GeneratorFile(measurementDevice.UID), []byte("auths: {}\n"))
+	writeFile(t, r.Filestore, md.SnmpFile(measurementDevice.UID), []byte("auths: {}\nmodules: {}\n"))
 
 	// Start deletion of measurementDevice.
 	res := r.reconcileDeletion(context.Background(), measurementDevice)
