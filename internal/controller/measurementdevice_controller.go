@@ -30,6 +30,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	errs "chantico/internal/errors"
 	"chantico/internal/filestore"
 	md "chantico/internal/measurementdevice"
 	"chantico/internal/snmp"
@@ -39,7 +40,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -176,7 +176,7 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 	if err != nil {
 		// If the generator file does not exist yet, create it with the desired content.
 		if errors.Is(err, fs.ErrNotExist) {
-			desired, derr := desiredGeneratorConfig(measurementDevice)
+			desired, derr := r.desiredGeneratorConfig(ctx, measurementDevice)
 			if derr != nil {
 				return steps.Error(measurementDevice.FailCondition(chantico.ConditionGeneratorFile, "Failed to marshal generator config: %w", derr))
 			}
@@ -211,24 +211,16 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 
 func (r *MeasurementDeviceReconciler) desiredGeneratorConfig(ctx context.Context, measurementDevice *chantico.MeasurementDevice) ([]byte, error) {
 	modules := map[string]*snmp.GeneratorModule{measurementDevice.Name: {Walk: measurementDevice.Spec.Walks}}
-	if measurementDevice.Spec.AuthFrom != nil {
+	switch {
+	case measurementDevice.Spec.AuthFrom == nil:
 		return yaml.Marshal(snmp.GeneratorConfig{
 			Auths:   map[string]*snmp.GeneratorAuth{measurementDevice.Name: &measurementDevice.Spec.Auth},
-			Modules: modules,
-		})
+			Modules: modules})
+	default:
+		// TODO: Implement
+		return []byte{}, &(errs.NotImplementedError{})
 	}
 
-	var secret corev1.Secret
-	err := r.Get(ctx, types.NamespacedName{Namespace: measurementDevice.ObjectMeta.Namespace, Name: measurementDevice.Spec.AuthFrom.Name}, &secret)
-	if err != nil {
-		return []byte{}, errors.New("Could not fetch authentication secret")
-	}
-	auths := secret.Key
-
-	return yaml.Marshal(snmp.GeneratorConfig{
-		Auths:   map[string]*snmp.GeneratorAuth{measurementDevice.Name: &secret},
-		Modules: modules,
-	})
 }
 
 func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
