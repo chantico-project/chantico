@@ -3,6 +3,7 @@ package physicalmeasurement
 import (
 	chantico "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
+	"chantico/internal/filestore"
 	sm "chantico/internal/statemachine"
 	"encoding/json"
 	"fmt"
@@ -77,7 +78,7 @@ func TestTargetFileAddition(t *testing.T) {
 				}
 
 				// Verify the file is valid JSON with correct structure
-				targets, err := LoadFileSDTargets(absPath)
+				targets, err := LoadFileSDTargets(filestore.VolumeFileStore{}, absPath)
 				if err != nil {
 					t.Fatalf("Failed to parse target file: %v\n", err)
 				}

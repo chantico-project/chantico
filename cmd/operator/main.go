@@ -39,6 +39,7 @@ import (
 	chanticov1alpha1 "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
 	"chantico/internal/controller"
+	"chantico/internal/filestore"
 	measurementdevice "chantico/internal/measurementdevice"
 	// +kubebuilder:scaffold:imports
 )
@@ -147,9 +148,10 @@ func main() {
 	}
 
 	if err = (&controller.MeasurementDeviceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Paths:  measurementdevice.NewPaths(config.ValidatedEnv.VolumeLocation),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		Paths:           measurementdevice.NewPaths(config.ValidatedEnv.VolumeLocation),
+		ConfigFilestore: filestore.VolumeFileStore{Root: ""},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)
