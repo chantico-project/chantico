@@ -33,6 +33,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	"chantico/internal/filestore"
 	md "chantico/internal/measurementdevice"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
@@ -200,7 +201,8 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 		return steps.Error(err)
 	}
 
-	if err := os.WriteFile(path, desired, 0777); err != nil {
+	vfs := filestore.VolumeFileStore{}
+	if err := vfs.Write(path, desired, 0777); err != nil {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to write generator file "+path+": "+err.Error())
 		return steps.Error(err)
 	}
