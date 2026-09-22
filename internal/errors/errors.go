@@ -41,3 +41,9 @@ type MissingOptionError struct {
 func (e *MissingOptionError) Error() string {
 	return fmt.Sprintf("%s must specify one of: %v", e.Parent, e.Options)
 }
+
+type NotImplementedError struct{}
+
+func (e *NotImplementedError) Error() string {
+	return "not implemented"
+}
