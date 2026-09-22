@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	chantico "chantico/api/v1alpha1"
@@ -196,12 +195,6 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 		return steps.Continue()
 	}
 
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0777); err != nil {
-		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to create directory "+dir+": "+err.Error())
-		return steps.Error(err)
-	}
-
 	if err := vfs.Write(path, desired, 0777); err != nil {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to write generator file "+path+": "+err.Error())
 		return steps.Error(err)
@@ -220,11 +213,14 @@ func desiredGeneratorConfig(measurementDevice *chantico.MeasurementDevice) ([]by
 }
 
 func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
+<<<<<<< HEAD
 	if err := os.MkdirAll(r.Paths.SNMPDir(), 0777); err != nil {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to create SNMP config directory "+r.Paths.SNMPDir()+": "+err.Error())
 		return steps.Error(err)
 	}
 
+=======
+>>>>>>> 92168f8 (feat: replace os.MkdirAll to automatically create folder on Write)
 	jobs, err := r.getOwnedJobs(ctx, measurementDevice)
 	if err != nil {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to get owned SNMP Generator jobs: "+err.Error())
@@ -333,6 +329,7 @@ func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Contex
 		return steps.Continue()
 	}
 
+<<<<<<< HEAD
 	if err := os.MkdirAll(filepath.Dir(path), 0777); err != nil {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to create merged SNMP dir "+filepath.Dir(path)+": "+err.Error())
 		return steps.Error(err)
@@ -343,6 +340,8 @@ func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Contex
 		measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to write merged SNMP file "+path+": "+err.Error())
 		return steps.Error(err)
 =======
+=======
+>>>>>>> 92168f8 (feat: replace os.MkdirAll to automatically create folder on Write)
 	if err := vfs.Write(path, merged, 0777); err != nil {
 		return steps.Error(measurementDevice.FailCondition(chantico.ConditionConfig, "Failed to write merged SNMP file %s: %w", path, err))
 >>>>>>> ceb2fb3 (feat: add volume filestore to the different controllers)

@@ -3,13 +3,13 @@ package log
 import (
 	"context"
 	"fmt"
-	"os"
 	"runtime"
 	"runtime/debug"
 	"time"
 
 	chantico "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
+	"chantico/internal/filestore"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 
@@ -160,15 +160,10 @@ Include logs, screenshots, or relevant code snippets to support the bug report.
 }
 
 func (pm *PostMortem) SaveAndQuit() {
-	dir := fmt.Sprintf("%s/bugs", config.ValidatedEnv.VolumeLocation)
-	err := os.MkdirAll(dir, 0755)
-	if err != nil {
-		panic(fmt.Sprintf("Could not create post-mortem folder %s", dir))
-	}
+	filename := fmt.Sprintf("%s/bugs/bug%d.md", config.ValidatedEnv.VolumeLocation, pm.Timestamp.UnixMicro())
 
-	filename := fmt.Sprintf("%s/bug%d.md", dir, pm.Timestamp.UnixMicro())
-	err = os.WriteFile(filename, []byte(pm.Markdown()), 0666)
-	if err != nil {
+	vfs := filestore.VolumeFileStore{}
+	if err := vfs.Write(filename, []byte(pm.Markdown()), 0666); err != nil {
 		panic(fmt.Sprintf("Could not save postmortem at location %s\nPost mortem content:%s\n", filename, pm.Markdown()))
 	}
 
