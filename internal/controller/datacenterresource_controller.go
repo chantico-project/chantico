@@ -45,7 +45,7 @@ const prometheusRulesDir = "prometheus/rules"
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list
 
 // DataCenterResourceReconciler reconciles a DataCenterResource object
 type DataCenterResourceReconciler struct {
@@ -221,13 +221,14 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 	resolvedDataCenterResource := dataCenterResource.DeepCopy()
 	resolvedDataCenterResource, err := r.resolveCoefficientTemplates(ctx, resolvedDataCenterResource)
 	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to resolve coefficient template: "+err.Error())
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve coefficient template: "+err.Error())
 		return steps.Error(err)
 	}
 	// Resolve the energy metric template and apply it
 	resolvedDataCenterResource, err = r.resolveEnergyMetricTemplate(ctx, resolvedDataCenterResource)
 	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to resolve energy metric template: "+err.Error())
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve energy metric template: "+err.Error())
+		return steps.Error(err)
 	}
 	ruleFile := dcr.BuildRuleFile(resolvedDataCenterResource)
 
