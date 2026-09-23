@@ -23,6 +23,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	testPDU1               = "pdu1"
+	testPDU1Coefficient    = "0.7"
+	testPDU2               = "pdu2"
+	testPDU2Coefficient    = "0.3"
+	testBM1                = "bm1"
+	testVM1                = "vm1"
+	testSNMPPDU1PowerWatts = "snmp_pdu1_power_watts"
+)
+
 type ExpectedRule struct {
 	Record         string
 	Expr           string
@@ -49,8 +59,8 @@ func TestSanitizeMetricName(t *testing.T) {
 		expected string
 	}{
 		"simple name": {
-			input:    "pdu1",
-			expected: "pdu1",
+			input:    testPDU1,
+			expected: testPDU1,
 		},
 		"name with hyphens": {
 			input:    "datacenterresource-pdu1",
@@ -82,7 +92,7 @@ func TestEnergyMetricName(t *testing.T) {
 		expected     string
 	}{
 		"simple": {
-			resourceName: "bm1",
+			resourceName: testBM1,
 			expected:     "datacenter:bm1:energy_watts",
 		},
 		"with hyphens": {
@@ -108,8 +118,8 @@ func TestCoefficientMetricName(t *testing.T) {
 		expected   string
 	}{
 		"simple": {
-			parentName: "bm1",
-			childName:  "vm1",
+			parentName: testBM1,
+			childName:  testVM1,
 			expected:   "coefficient_bm1_vm1",
 		},
 		"with hyphens": {
@@ -133,10 +143,10 @@ func TestCoefficientMetricName(t *testing.T) {
 func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 	// Root node with energyMetric produces 1 alias rule
 	pdu := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPDU1},
 		Spec: chantico.DataCenterResourceSpec{
 			Type:         DataCenterResourceTypePDU,
-			EnergyMetric: "snmp_pdu1_power_watts",
+			EnergyMetric: testSNMPPDU1PowerWatts,
 			ServiceId:    "3d88f471-674f-4446-9de2-54e5faa2c951",
 		},
 	}
@@ -147,7 +157,7 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 	}
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record:         "datacenter:pdu1:energy_watts",
-		Expr:           "snmp_pdu1_power_watts",
+		Expr:           testSNMPPDU1PowerWatts,
 		ServiceIdLabel: "3d88f471-674f-4446-9de2-54e5faa2c951",
 	})
 }
@@ -156,12 +166,12 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 	// Non-root node with parents that have coefficients should produce
 	// coefficient rules + energy rule.
 	bm := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+		ObjectMeta: metav1.ObjectMeta{Name: testBM1},
 		Spec: chantico.DataCenterResourceSpec{
 			Type: DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "0.5"},
-				{Name: "pdu2", Coefficient: "0.5"},
+				{Name: testPDU1, Coefficient: testPDU1Coefficient},
+				{Name: testPDU2, Coefficient: testPDU2Coefficient},
 			},
 		},
 	}
@@ -175,23 +185,23 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 	// Coefficient rules should be sorted by parent name
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record: "coefficient_pdu1_bm1",
-		Expr:   "0.5",
+		Expr:   testPDU1Coefficient,
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
 		Record: "coefficient_pdu2_bm1",
-		Expr:   "0.5",
+		Expr:   testPDU2Coefficient,
 	})
 }
 
 func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 	// BM node with 2 PDU parents (with coefficients) — no children defined here
 	bm := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+		ObjectMeta: metav1.ObjectMeta{Name: testBM1},
 		Spec: chantico.DataCenterResourceSpec{
 			Type: DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "0.3"},
-				{Name: "pdu2", Coefficient: "0.7"},
+				{Name: testPDU1, Coefficient: testPDU1Coefficient},
+				{Name: testPDU2, Coefficient: testPDU2Coefficient},
 			},
 		},
 	}
@@ -205,11 +215,11 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 	// First two should be coefficient rules (sorted by parent name)
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record: "coefficient_pdu1_bm1",
-		Expr:   "0.3",
+		Expr:   testPDU1Coefficient,
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
 		Record: "coefficient_pdu2_bm1",
-		Expr:   "0.7",
+		Expr:   testPDU2Coefficient,
 	})
 
 	// Last should be the energy rule
@@ -222,11 +232,11 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 func TestBuildRecordingRules_LeafNode(t *testing.T) {
 	// VM (leaf) with one parent and no children
 	vm := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "vm1"},
+		ObjectMeta: metav1.ObjectMeta{Name: testVM1},
 		Spec: chantico.DataCenterResourceSpec{
 			Type:      DataCenterResourceTypeVM,
 			ServiceId: "a479357a-2680-4577-8ffe-5105e634c836",
-			Parents:   []chantico.ParentRef{{Name: "bm1"}},
+			Parents:   []chantico.ParentRef{{Name: testBM1}},
 		},
 	}
 
@@ -245,10 +255,10 @@ func TestBuildRecordingRules_LeafNode(t *testing.T) {
 
 func TestBuildRuleFile_RootNoChildren(t *testing.T) {
 	pdu := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPDU1},
 		Spec: chantico.DataCenterResourceSpec{
 			Type:         DataCenterResourceTypePDU,
-			EnergyMetric: "snmp_pdu1_power_watts",
+			EnergyMetric: testSNMPPDU1PowerWatts,
 		},
 	}
 
@@ -263,11 +273,11 @@ func TestBuildRuleFile_RootNoChildren(t *testing.T) {
 
 func TestBuildRuleFile_WithRules(t *testing.T) {
 	bm := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+		ObjectMeta: metav1.ObjectMeta{Name: testBM1},
 		Spec: chantico.DataCenterResourceSpec{
 			Type: DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "0.6"},
+				{Name: testPDU1, Coefficient: "0.6"},
 			},
 		},
 	}
@@ -309,7 +319,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 
 	// BM1 with parent PDU1 (coefficient "1"), generates coefficient + energy
 	bm1 := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+		ObjectMeta: metav1.ObjectMeta{Name: testBM1},
 		Spec: chantico.DataCenterResourceSpec{
 			Type: DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
@@ -329,11 +339,11 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 
 	// VM1 with parent BM1 (coefficient "0.4")
 	vm1 := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "vm1"},
+		ObjectMeta: metav1.ObjectMeta{Name: testVM1},
 		Spec: chantico.DataCenterResourceSpec{
 			Type: DataCenterResourceTypeVM,
 			Parents: []chantico.ParentRef{
-				{Name: "bm1", Coefficient: "0.4"},
+				{Name: testBM1, Coefficient: "0.4"},
 			},
 		},
 	}
@@ -354,7 +364,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 			Type:      DataCenterResourceTypeVM,
 			ServiceId: "002793bc-e100-4953-ac07-a25d12b573d4",
 			Parents: []chantico.ParentRef{
-				{Name: "bm1", Coefficient: "0.6"},
+				{Name: testBM1, Coefficient: "0.6"},
 			},
 		},
 	}
@@ -372,10 +382,10 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 func TestBuildRecordingRules_ManyToOneParents(t *testing.T) {
 	// BM with two PDU parents (many-to-one)
 	bm := &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
+		ObjectMeta: metav1.ObjectMeta{Name: testBM1},
 		Spec: chantico.DataCenterResourceSpec{
 			Type:    DataCenterResourceTypeBaremetal,
-			Parents: []chantico.ParentRef{{Name: "pdu2"}, {Name: "pdu1"}}, // intentionally unsorted
+			Parents: []chantico.ParentRef{{Name: testPDU2}, {Name: testPDU1}}, // intentionally unsorted
 		},
 	}
 
