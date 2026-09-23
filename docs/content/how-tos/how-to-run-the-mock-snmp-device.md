@@ -178,7 +178,7 @@ physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu2-out
 Additionally, you can verify in [Prometheus](http://localhost:19090) that the metrics are being scraped from the mock SNMP devices and aggregated into the `DataCenterResource` metrics. These will show up in the "Rule health" section as the following rules containing the subsequent metrics:
 
 - chantico_datacenterresource_pdu1
-    - `chantcio_energy_watts{resource="datacenterresource-pdu1", type="pdu"}`
+    - `chantico_energy_watts{resource="datacenterresource-pdu1", type="pdu"}`
 - chantico_datacenterresource_pdu2
     - `chantico_energy_watts{resource="datacenterresource-pdu2", type="pdu"}`
 - chantico_datacenterresource_misd_gbm_01

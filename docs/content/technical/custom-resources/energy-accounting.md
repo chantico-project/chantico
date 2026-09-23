@@ -56,6 +56,28 @@ and optionally carries a coefficient (a PromQL expression). There are 2 cases:
 |---|---|---|
 | `parents` | `[]ParentRef` | Parent resources with optional coefficients |
 | `energyMetric` | `string` | Raw Prometheus metric expression for root nodes (e.g. `tnoPduPowerValue{job="tno"}`) |
+| `additionalLabels` | `map[string]string` | Additional labels to attach to the resource's Prometheus timeseries |
+
+#### Time Series Labels
+
+The default time series labels applied to every resource are:
+
+| Label | Description |
+|---|---|
+| `resource` | The name of the resource (from `metadata.name`) |
+| `type` | The type of the resource (from `spec.type`) |
+| `serviceId` | The service ID of the resource (from `spec.serviceId`) |
+| `parents` | Comma-separated list of parent resource names (from `spec.parents`) |
+
+The `additionalLabels` field allows you to attach arbitary identification infromation to the resource's Prometheus timeseries. These labels are merged with the default labels when generating the recording rules. For example:
+
+```yaml
+additionalLabels:
+  rackNumber: "7"
+```
+
+Ensure that the keys do not conflict with the default labels, as conflicting additional labels will be skipped. 
+
 
 ### Example CRs
 

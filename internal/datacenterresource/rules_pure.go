@@ -114,11 +114,17 @@ func applyAdditionalLabels(base map[string]string, labels map[string]string) map
 	return base
 }
 
-func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map[string]string) map[string]string {
+func constructParentNamesLabel(dataCenterResource *chantico.DataCenterResource) string {
 	parents := []string{}
 	for _, name := range dataCenterResource.Spec.ParentNames() {
 		parents = append(parents, name)
 	}
+	return strings.Join(parents, ",")
+}
+
+// buildSharedLabels builds the set of labels for the prometheus rule.
+// It includes the resource name, type, service ID, parent names, any base labels, and additional labels specified in the resource.
+func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map[string]string) map[string]string {
 	labels := map[string]string{
 		"resource": dataCenterResource.Name,
 		"type":     dataCenterResource.Spec.Type,
@@ -129,7 +135,7 @@ func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map
 	}
 
 	if len(dataCenterResource.Spec.Parents) > 0 {
-		labels["parents"] = strings.Join(parents, ",")
+		labels["parents"] = constructParentNamesLabel(dataCenterResource)
 	}
 
 	if base != nil {
@@ -137,12 +143,7 @@ func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map
 	}
 
 	if dataCenterResource.Spec.AdditionalLabels != nil {
-		additionalLabels := make(map[string]string)
-		for _, envVar := range dataCenterResource.Spec.AdditionalLabels {
-			// TODO: Allow resolving of variables from configmap or secret
-			additionalLabels[envVar.Name] = envVar.Value
-		}
-		labels = applyAdditionalLabels(labels, additionalLabels)
+		labels = applyAdditionalLabels(labels, dataCenterResource.Spec.AdditionalLabels)
 	}
 
 	return labels

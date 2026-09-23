@@ -392,7 +392,7 @@
           },
           "editorMode": "code",
           "expr": "chantico_energy_watts{type=\"baremetal\"}",
-          "legendFormat": "__auto",
+          "legendFormat": "{{resource}}",
           "range": true,
           "refId": "A"
         }
