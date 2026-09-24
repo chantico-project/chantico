@@ -51,6 +51,12 @@ const CoefficientMetricName = "chantico_energy_coefficient"
 // This metric comes from the rules generated in this file.
 const EnergyMetricName = "chantico_energy_watts"
 
+const (
+	EnergyMetricKindAttributed = "attributed"
+	EnergyMetricKindOverhead   = "overhead"
+	EnergyMetricKindTotal      = "total"
+)
+
 // EnergyMetricQuery returns the Prometheus query for a DataCenterResource's energy timeseries.
 func EnergyMetricQuery(resourceName string) string {
 	return fmt.Sprintf(`%s{resource="%s"}`, EnergyMetricName, resourceName)
@@ -101,6 +107,9 @@ func BuildRecordingRules(
 	if energyRule != nil {
 		rules = append(rules, *energyRule)
 	}
+
+	rules = append(rules, *BuildEnergyAttributedRule(dataCenterResource))
+	rules = append(rules, *BuildEnergyOverheadRule(dataCenterResource))
 
 	return rules
 }
@@ -164,7 +173,7 @@ func BuildEnergyAliasRule(
 
 	// Construct the initial set of labels for the recording rule.
 	baseLabels := map[string]string{
-		// "customLabel": "exampleValue",
+		"kind": EnergyMetricKindTotal,
 	}
 
 	// Add the defaults from the shared labels based on the resouce spec.
@@ -233,15 +242,60 @@ func BuildEnergyRule(
 
 	// Construct the initial set of labels for the recording rule.
 	labels := map[string]string{
-		// "customLabel": "exampleValue",
+		"kind": EnergyMetricKindTotal,
 	}
 	// Merge the shared labels into the initial set of labels.
 	maps.Copy(labels, buildSharedLabels(dataCenterResource, labels))
 
 	// Construct the Prometheus aggregation expression for the energy recording rule.
 	expr := fmt.Sprintf(
-		`sum(%s{child="%s"} * on (parent) group_left () label_replace(%s, "parent", "$1", "resource", "(.*)"))`,
-		CoefficientMetricName, dataCenterResource.Name, EnergyMetricName,
+		`sum(%s{child="%s"} * on (parent) group_left () label_replace(%s{kind="%s"}, "parent", "$1", "resource", "(.*)"))`,
+		CoefficientMetricName, dataCenterResource.Name, EnergyMetricName, EnergyMetricKindTotal,
+	)
+
+	return &RecordingRule{
+		Record: EnergyMetricName,
+		Expr:   expr,
+		Labels: labels,
+	}
+}
+
+func BuildEnergyAttributedRule(
+	dataCenterResource *chantico.DataCenterResource,
+) *RecordingRule {
+	// Construct the initial set of labels for the recording rule.
+	labels := map[string]string{
+		"kind": EnergyMetricKindAttributed,
+	}
+	// Merge the shared labels into the initial set of labels.
+	maps.Copy(labels, buildSharedLabels(dataCenterResource, labels))
+
+	// Querying the energy series for the children total energy
+	// Since some devices can have 2 (or more) parents, the clamp_min ensures the result is non-negative.
+	// TODO: Find a better way to handle multiple parent contributions.
+	expr := fmt.Sprintf(
+		`clamp_min(sum(%s{parent=~".*%s.*", kind="%s"}), 0) or vector(0)`,
+		EnergyMetricName, dataCenterResource.Name, EnergyMetricKindTotal,
+	)
+
+	return &RecordingRule{
+		Record: EnergyMetricName,
+		Expr:   expr,
+		Labels: labels,
+	}
+}
+
+func BuildEnergyOverheadRule(
+	dataCenterResource *chantico.DataCenterResource,
+) *RecordingRule {
+	labels := map[string]string{
+		"kind": EnergyMetricKindOverhead,
+	}
+	maps.Copy(labels, buildSharedLabels(dataCenterResource, labels))
+
+	expr := fmt.Sprintf(
+		`sum(%s{resource="%s", kind="%s"}) - sum(%s{resource="%s", kind="%s"})`,
+		EnergyMetricName, dataCenterResource.Name, EnergyMetricKindTotal, EnergyMetricName, dataCenterResource.Name, EnergyMetricKindAttributed,
 	)
 
 	return &RecordingRule{

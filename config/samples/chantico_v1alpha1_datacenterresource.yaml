@@ -11,8 +11,6 @@ spec:
   physicalMeasurements:
     - physicalMeasurement-pdu1-out
   energyMetric: tnoPduPowerValue{job="tno"}
-  additionalLabels:
-    exampleLabel: exampleValue
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -26,8 +24,6 @@ spec:
   physicalMeasurements:
     - physicalMeasurement-pdu2-out
   energyMetric: tnoPduPowerValue{job="tno-2"}
-  additionalLabels:
-    exampleLabel: exampleValue
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -44,5 +40,3 @@ spec:
       coefficient: "1"
     - name: datacenterresource-pdu2
       coefficient: "1"
-  additionalLabels:
-    exampleLabel: exampleValue
