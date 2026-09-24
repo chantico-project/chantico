@@ -18,6 +18,7 @@ package datacenterresource
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -42,19 +43,22 @@ type RuleFile struct {
 	Groups []RuleGroup `yaml:"groups"`
 }
 
-// EnergyMetricName returns the deterministic Prometheus metric name for a
-// DataCenterResource's energy timeseries.
-func EnergyMetricName(resourceName string) string {
-	sanitized := SanitizeMetricName(resourceName)
-	return fmt.Sprintf("datacenter:%s:energy_watts", sanitized)
+// CoefficientMetricName is the Prometheus metric name for energy coefficients in the case where
+// the device has parent(s) and the energy is a factor of the parent's energy.
+const CoefficientMetricName = "chantico_energy_coefficient"
+
+// EnergyMetricName is the Prometheus metric name for the energy timeseries of a DataCenterResource.
+// This metric comes from the rules generated in this file.
+const EnergyMetricName = "chantico_energy_watts"
+
+// EnergyMetricQuery returns the Prometheus query for a DataCenterResource's energy timeseries.
+func EnergyMetricQuery(resourceName string) string {
+	return fmt.Sprintf(`%s{resource="%s"}`, EnergyMetricName, resourceName)
 }
 
-// CoefficientMetricName returns the deterministic Prometheus metric name for
-// the coefficient from parent to child.
-func CoefficientMetricName(parentName, childName string) string {
-	sanitizedParent := SanitizeMetricName(parentName)
-	sanitizedChild := SanitizeMetricName(childName)
-	return fmt.Sprintf("coefficient_%s_%s", sanitizedParent, sanitizedChild)
+// CoefficientMetricQuery returns the Prometheus query for the coefficient from parent to child.
+func CoefficientMetricQuery(parentName, childName string) string {
+	return fmt.Sprintf(`%s{parent="%s", child="%s"}`, CoefficientMetricName, parentName, childName)
 }
 
 // SanitizeMetricName replaces characters that are not valid in Prometheus
@@ -72,11 +76,11 @@ func SanitizeMetricName(name string) string {
 // DataCenterResource node, following the energy accounting design:
 //
 //  1. For root nodes (spec.energyMetric is set), an alias rule mapping the raw
-//     energy metric to the canonical datacenter:<name>:energy_watts name.
+//     energy metric to a labeled series under the `chantico_energy_watts` name.
 //  2. One coefficient recording rule per parent that has a coefficient set
 //     (from the ParentRef entries in spec.parents).
 //  3. One energy recording rule for non-root nodes (sum of coefficient * parent
-//     energy for each parent).
+//     energy for each parent). Uses the same `chantico_energy_watts` name.
 //
 // Returns nil if no rules need to be written.
 func BuildRecordingRules(
@@ -101,10 +105,54 @@ func BuildRecordingRules(
 	return rules
 }
 
+func applyAdditionalLabels(base map[string]string, labels map[string]string) map[string]string {
+	for k, v := range labels {
+		if _, exists := base[k]; !exists {
+			base[k] = v
+		}
+	}
+	return base
+}
+
+func constructParentNamesLabel(dataCenterResource *chantico.DataCenterResource) string {
+	parents := []string{}
+	for _, name := range dataCenterResource.Spec.ParentNames() {
+		parents = append(parents, name)
+	}
+	return strings.Join(parents, ",")
+}
+
+// buildSharedLabels builds the set of labels for the prometheus rule.
+// It includes the resource name, type, service ID, parent names, any base labels, and additional labels specified in the resource.
+func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map[string]string) map[string]string {
+	labels := map[string]string{
+		"resource": dataCenterResource.Name,
+		"type":     dataCenterResource.Spec.Type,
+	}
+
+	if dataCenterResource.Spec.ServiceId != "" {
+		labels["serviceId"] = dataCenterResource.Spec.ServiceId
+	}
+
+	if len(dataCenterResource.Spec.Parents) > 0 {
+		labels["parents"] = constructParentNamesLabel(dataCenterResource)
+	}
+
+	if base != nil {
+		labels = applyAdditionalLabels(labels, base)
+	}
+
+	if dataCenterResource.Spec.AdditionalLabels != nil {
+		labels = applyAdditionalLabels(labels, dataCenterResource.Spec.AdditionalLabels)
+	}
+
+	return labels
+}
+
 // buildEnergyAliasRule creates a recording rule for root nodes that aliases
 // the raw energy metric (e.g. tnoPduPowerValue{instance="..."}) to the
-// canonical datacenter:<name>:energy_watts name. This allows children to
-// reference the parent's energy using a uniform naming convention.
+// a labelled time series under the `chantico_energy_watts` name. This allows
+// children to reference the parent's energy using a uniform naming convention.
 //
 // Returns nil if it is not a root node (has parents).
 func BuildEnergyAliasRule(
@@ -113,12 +161,21 @@ func BuildEnergyAliasRule(
 	if len(dataCenterResource.Spec.Parents) > 0 {
 		return nil
 	}
+
+	// Construct the initial set of labels for the recording rule.
+	baseLabels := map[string]string{
+		// "customLabel": "exampleValue",
+	}
+
+	// Add the defaults from the shared labels based on the resouce spec.
+	labels := buildSharedLabels(dataCenterResource, baseLabels)
+
 	return &RecordingRule{
-		Record: EnergyMetricName(dataCenterResource.Name),
-		Expr:   dataCenterResource.Spec.EnergyMetric,
-		Labels: map[string]string{
-			"serviceId": dataCenterResource.Spec.ServiceId,
-		},
+		Record: EnergyMetricName,
+		// Using `sum` for the case where labels change due to relabeling (eg. VM moved between hosts)
+		// That would produce multiple series, but one would end and the other would start, so summing ensures continuity.
+		Expr:   fmt.Sprintf("sum(%s)", dataCenterResource.Spec.EnergyMetric),
+		Labels: labels,
 	}
 }
 
@@ -150,8 +207,12 @@ func BuildCoefficientRules(
 	rules := make([]RecordingRule, 0, len(pcs))
 	for _, pc := range pcs {
 		rules = append(rules, RecordingRule{
-			Record: CoefficientMetricName(pc.parentName, dataCenterResource.Name),
+			Record: CoefficientMetricName,
 			Expr:   pc.coeff,
+			Labels: map[string]string{
+				"parent": pc.parentName,
+				"child":  dataCenterResource.Name,
+			},
 		})
 	}
 	return rules
@@ -170,24 +231,23 @@ func BuildEnergyRule(
 		return nil
 	}
 
-	// Build the PromQL expression: sum of coefficient * parent_energy for each parent
-	// Sort parents for deterministic output
-	parentNames := dataCenterResource.Spec.ParentNames()
-	sort.Strings(parentNames)
-
-	terms := make([]string, 0, len(parentNames))
-	for _, parentName := range parentNames {
-		coeffMetric := CoefficientMetricName(parentName, dataCenterResource.Name)
-		parentEnergyMetric := EnergyMetricName(parentName)
-		terms = append(terms, fmt.Sprintf("%s * on() %s", coeffMetric, parentEnergyMetric))
+	// Construct the initial set of labels for the recording rule.
+	labels := map[string]string{
+		// "customLabel": "exampleValue",
 	}
+	// Merge the shared labels into the initial set of labels.
+	maps.Copy(labels, buildSharedLabels(dataCenterResource, labels))
+
+	// Construct the Prometheus aggregation expression for the energy recording rule.
+	expr := fmt.Sprintf(
+		`sum(%s{child="%s"} * on (parent) group_left () label_replace(%s, "parent", "$1", "resource", "(.*)"))`,
+		CoefficientMetricName, dataCenterResource.Name, EnergyMetricName,
+	)
 
 	return &RecordingRule{
-		Record: EnergyMetricName(dataCenterResource.Name),
-		Expr:   strings.Join(terms, " + "),
-		Labels: map[string]string{
-			"serviceId": dataCenterResource.Spec.ServiceId,
-		},
+		Record: EnergyMetricName,
+		Expr:   expr,
+		Labels: labels,
 	}
 }
 

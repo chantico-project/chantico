@@ -1,3 +1,14 @@
+## 0.15.0 (2026-09-24)
+
+#### Feature
+
+* align datacenterresource metric names with prometheus convention (#220) (4cc7beeb)
+
+#### Chores
+
+* **deps:** bump google.golang.org/grpc from 1.82.1 to 1.83.2 (#225) (8432d131)
+* Address Sigrid finding about host request and do not block pipeline (#222) (1d30c09f)
+
 ## 0.14.0 (2026-09-22)
 
 #### Feature

@@ -63,3 +63,5 @@ spec:
       coefficient: "1"
     - name: datacenterresource-pdu2
       coefficient: "1"
+  additionalLabels:
+    exampleLabel: exampleValue
