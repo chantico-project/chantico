@@ -319,7 +319,7 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
 		Record: "chantico_energy_coefficient",
-		Expr:   "0.5",
+		Expr:   testPDU2Coefficient,
 	})
 }
 
@@ -444,7 +444,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	}
 	testExpectedRule(t, pdu1Rules[0], ExpectedRule{
 		Record: "chantico_energy_watts",
-		Expr:   "sum(snmp_pdu1a_power_watts)",
+		Expr:   "snmp_pdu1a_power_watts",
 	})
 
 	// BM1 with parent PDU1 (coefficient "1"), generates coefficient + energy
