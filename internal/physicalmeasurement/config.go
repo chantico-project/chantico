@@ -31,12 +31,14 @@ func CreateFileSDTarget(deviceId string, ip string, name string) FileSDTarget {
 	}
 }
 
-// WriteFileSDTargets marshals the targets to JSON and writes them to the given path.
-func WriteFileSDTargets(path string, targets []FileSDTarget) error {
-	data, err := json.MarshalIndent(targets, "", "  ")
-	if err != nil {
-		return err
-	}
+// MarshalFileSDTargets renders the targets as the JSON content of a file_sd_configs file.
+func MarshalFileSDTargets(targets []FileSDTarget) ([]byte, error) {
+	return json.MarshalIndent(targets, "", "  ")
+}
+
+// WriteFileSDTargets writes the file_sd_configs JSON atomically, so Prometheus never
+// reads a partially written target file.
+func WriteFileSDTargets(path string, data []byte) error {
 	vfs := filestore.VolumeFileStore{}
 	return vfs.Write(context.Background(), path, bytes.NewReader(data))
 }
