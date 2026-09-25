@@ -208,7 +208,7 @@ func TestSanitizeMetricName(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			result := SanitizeMetricName(tc.input)
+			result := sanitizeMetricName(tc.input)
 			if result != tc.expected {
 				t.Errorf("sanitizeMetricName(%q) = %q, want %q", tc.input, result, tc.expected)
 			}
@@ -261,7 +261,7 @@ func TestCoefficientMetricQuery(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			result := CoefficientMetricQuery(tc.parentName, tc.childName)
+			result := coefficientMetricQuery(tc.parentName, tc.childName)
 			if result != tc.expected {
 				t.Errorf("CoefficientMetricQuery(%q, %q) = %q, want %q",
 					tc.parentName, tc.childName, result, tc.expected)
@@ -281,7 +281,7 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 		},
 	}
 
-	rules := BuildRecordingRules(pdu)
+	rules := buildRecordingRules(pdu)
 	if len(rules) != 1 {
 		t.Fatalf("Expected 1 alias rule for root node, got %d rules", len(rules))
 	}
@@ -306,7 +306,7 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 		},
 	}
 
-	rules := BuildRecordingRules(bm)
+	rules := buildRecordingRules(bm)
 	// 2 coefficient rules + 1 energy rule = 3
 	if len(rules) != 3 {
 		t.Fatalf("Expected 3 rules, got %d", len(rules))
@@ -336,7 +336,7 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 		},
 	}
 
-	rules := BuildRecordingRules(bm)
+	rules := buildRecordingRules(bm)
 	// 2 coefficient rules + 1 energy rule = 3
 	if len(rules) != 3 {
 		t.Fatalf("Expected 3 rules, got %d", len(rules))
@@ -355,7 +355,7 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 	// Last should be the energy rule
 	testExpectedRule(t, rules[2], ExpectedRule{
 		Record: "chantico_energy_watts",
-		Expr:   `sum(chantico_energy_coefficient{resource="bm1"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`,
+		Expr:   `sum(chantico_energy_coefficient{resource="bm1"} * on (parent) group_left () label_replace(chantico_energy_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`,
 	})
 }
 
@@ -370,7 +370,7 @@ func TestBuildRecordingRules_LeafNode(t *testing.T) {
 		},
 	}
 
-	rules := BuildRecordingRules(vm)
+	rules := buildRecordingRules(vm)
 	// Only 1 energy rule (no coefficient rules, no children)
 	if len(rules) != 1 {
 		t.Fatalf("Expected 1 rule, got %d", len(rules))
@@ -378,7 +378,7 @@ func TestBuildRecordingRules_LeafNode(t *testing.T) {
 
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record:         "chantico_energy_watts",
-		Expr:           `sum(chantico_energy_coefficient{resource="vm1"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`,
+		Expr:           `sum(chantico_energy_coefficient{resource="vm1"} * on (parent) group_left () label_replace(chantico_energy_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`,
 		ServiceIdLabel: "a479357a-2680-4577-8ffe-5105e634c836",
 	})
 }
@@ -438,7 +438,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 			EnergyMetric: "snmp_pdu1a_power_watts",
 		},
 	}
-	pdu1Rules := BuildRecordingRules(pdu1)
+	pdu1Rules := buildRecordingRules(pdu1)
 	if len(pdu1Rules) != 1 {
 		t.Fatalf("PDU1: expected 1 alias rule, got %d", len(pdu1Rules))
 	}
@@ -457,7 +457,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 			},
 		},
 	}
-	bm1Rules := BuildRecordingRules(bm1)
+	bm1Rules := buildRecordingRules(bm1)
 	// 1 coefficient rule + 1 energy rule = 2
 	if len(bm1Rules) != 2 {
 		t.Fatalf("BM1: expected 2 rules, got %d", len(bm1Rules))
@@ -477,12 +477,12 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 			},
 		},
 	}
-	vm1Rules := BuildRecordingRules(vm1)
+	vm1Rules := buildRecordingRules(vm1)
 	// 1 coefficient + 1 energy = 2
 	if len(vm1Rules) != 2 {
 		t.Fatalf("VM1: expected 2 rules, got %d", len(vm1Rules))
 	}
-	expectedExpr := `sum(chantico_energy_coefficient{resource="vm1"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`
+	expectedExpr := `sum(chantico_energy_coefficient{resource="vm1"} * on (parent) group_left () label_replace(chantico_energy_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`
 	if vm1Rules[1].Expr != expectedExpr {
 		t.Errorf("VM1: expected expr %q, got %q", expectedExpr, vm1Rules[1].Expr)
 	}
@@ -498,12 +498,12 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 			},
 		},
 	}
-	vm2Rules := BuildRecordingRules(vm2)
+	vm2Rules := buildRecordingRules(vm2)
 	// 1 coefficient + 1 energy = 2
 	if len(vm2Rules) != 2 {
 		t.Fatalf("VM2: expected 2 rules, got %d", len(vm2Rules))
 	}
-	expectedExpr = `sum(chantico_energy_coefficient{resource="vm2"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`
+	expectedExpr = `sum(chantico_energy_coefficient{resource="vm2"} * on (parent) group_left () label_replace(chantico_energy_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`
 	if vm2Rules[1].Expr != expectedExpr {
 		t.Errorf("VM2: expected expr %q, got %q", expectedExpr, vm2Rules[1].Expr)
 	}
@@ -519,14 +519,14 @@ func TestBuildRecordingRules_ManyToOneParents(t *testing.T) {
 		},
 	}
 
-	rules := BuildRecordingRules(bm)
+	rules := buildRecordingRules(bm)
 	// Only 1 energy rule (no children)
 	if len(rules) != 1 {
 		t.Fatalf("Expected 1 rule, got %d", len(rules))
 	}
 
 	// Parents should be sorted in the expression
-	expectedExpr := `sum(chantico_energy_coefficient{resource="bm1"} * on (parent) group_left () label_replace(chantico_energy_watts, "parent", "$1", "resource", "(.*)"))`
+	expectedExpr := `sum(chantico_energy_coefficient{resource="bm1"} * on (parent) group_left () label_replace(chantico_energy_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`
 	if rules[0].Expr != expectedExpr {
 		t.Errorf("Expected expr %q, got %q", expectedExpr, rules[0].Expr)
 	}
