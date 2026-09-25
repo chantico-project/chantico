@@ -172,8 +172,6 @@ func BuildEnergyAliasRule(
 
 	return &RecordingRule{
 		Record: EnergyMetricName,
-		// Using `sum` for the case where labels change due to relabeling (eg. VM moved between hosts)
-		// That would produce multiple series, but one would end and the other would start, so summing ensures continuity.
 		Expr:   dataCenterResource.Spec.EnergyMetric,
 		Labels: labels,
 	}
