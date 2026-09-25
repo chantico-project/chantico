@@ -89,7 +89,7 @@ func TestBuildSharedLabels(t *testing.T) {
 				"customLabel": "exampleValue",
 			},
 		},
-		"with parents": {
+		"with parents get ignored": {
 			resource: &chantico.DataCenterResource{
 				ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
 				Spec: chantico.DataCenterResourceSpec{
@@ -104,7 +104,6 @@ func TestBuildSharedLabels(t *testing.T) {
 			expected: map[string]string{
 				"resource": "bm1",
 				"type":     DataCenterResourceTypeBaremetal,
-				"parents":  "pdu1,pdu2",
 			},
 		},
 		"with serviceId": {
