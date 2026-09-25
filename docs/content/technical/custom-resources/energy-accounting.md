@@ -40,7 +40,7 @@ Prometheus.
 ```go
 type ParentRef struct {
     Name        string `json:"name"`
-    Coefficient string `json:"coefficient,omitempty"`
+    Coefficient string `json:"coefficient"`
 }
 ```
 
