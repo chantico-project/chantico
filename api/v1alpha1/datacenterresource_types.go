@@ -39,7 +39,7 @@ type TemplateFrom struct {
 // The coefficient represents what fraction of the parent's energy is
 // attributable to this child.
 // +kubebuilder:validation:XValidation:rule="has(self.coefficient)||has(self.coefficientFrom)",message="Parent must have coefficient"
-// +kubebuilder:validation:XValidation:rule="!(has(self.coefficient)&&has(self.coefficientFrom))",message="Parent cannot have two coefficients"
+// +kubebuilder:validation:XValidation:rule="!(has(self.coefficient)&&has(self.coefficientFrom))",message="Parent cannot have both coefficient and coefficientFrom set"
 type ParentRef struct {
 	// Name is the name of the parent DataCenterResource.
 	Name string `json:"name"`
