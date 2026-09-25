@@ -20,7 +20,6 @@ import (
 	"chantico/internal/snmp"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -37,9 +36,8 @@ type MeasurementDeviceSpec struct {
 type MeasurementDeviceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	ConfigHash         string             `json:"configHash,omitempty"`
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
+	ConditionedStatus `json:",inline"`
+	ConfigHash        string `json:"configHash,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -82,11 +80,8 @@ const (
 	SNMPJobTimeout = 3 * time.Minute
 )
 
-func (m *MeasurementDevice) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+func (md *MeasurementDevice) GetConditions() *[]metav1.Condition { return &md.Status.Conditions }
 
-func (m *MeasurementDevice) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
-	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
-		Type: string(t), Status: s, Reason: string(reason), Message: msg,
-		ObservedGeneration: m.GetGeneration(),
-	})
+func (md *MeasurementDevice) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, r ConditionReason, msg string) {
+	updateStatusCondition(md, t, s, r, msg)
 }

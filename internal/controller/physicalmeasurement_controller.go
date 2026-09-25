@@ -122,8 +122,7 @@ func (r *PhysicalMeasurementReconciler) reconcileDeletion(ctx context.Context, p
 
 	err := os.Remove(targetPath)
 	if err != nil && !os.IsNotExist(err) {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting target file: "+err.Error())
-		return steps.Error(err)
+		return failed(physicalMeasurement, chantico.ConditionApplied, chantico.ReasonCleanupFailed, "Error deleting target file", err)
 	}
 
 	util.RemoveFinalizer(physicalMeasurement, chantico.PhysicalMeasurementFinalizer)
@@ -145,15 +144,12 @@ func (r *PhysicalMeasurementReconciler) reconcileValidation(ctx context.Context,
 	if err := r.Get(ctx, key, &chantico.MeasurementDevice{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.FromContext(ctx).Info("Referenced MeasurementDevice does not exist yet", "measurementDevice", deviceName)
-			physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ReasonDependencyUnavailable, "MeasurementDevice "+deviceName+" does not exist")
-			return steps.Requeue(chantico.EndpointRequeueDelay)
+			return requeued(physicalMeasurement, chantico.ConditionValidated, chantico.ReasonDependencyUnavailable, "MeasurementDevice "+deviceName+" does not exist", chantico.EndpointRequeueDelay)
 		}
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ReasonInvalidSpec, "Error getting MeasurementDevice "+deviceName+": "+err.Error())
-		return steps.Error(err)
+		return failed(physicalMeasurement, chantico.ConditionValidated, chantico.ReasonInvalidSpec, "Error getting MeasurementDevice "+deviceName, err)
 	}
 
-	physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
-	return steps.Continue()
+	return reconciled(physicalMeasurement, chantico.ConditionValidated, "Validation successful")
 }
 
 func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
@@ -162,8 +158,7 @@ func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context,
 	target := pm.CreateFileSDTarget(physicalMeasurement.Spec.MeasurementDevice, physicalMeasurement.Spec.Ip, physicalMeasurement.Name)
 	desired, err := pm.MarshalFileSDTargets([]pm.FileSDTarget{target})
 	if err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error marshalling target file: "+err.Error())
-		return steps.Error(err)
+		return failed(physicalMeasurement, chantico.ConditionApplied, chantico.ReasonApplyFailed, "Error marshalling target file", err)
 	}
 
 	volumePath := config.ValidatedEnv.VolumeLocation
@@ -172,35 +167,29 @@ func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context,
 
 	observed, err := os.ReadFile(targetPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error reading target file: "+err.Error())
-		return steps.Error(err)
+		return failed(physicalMeasurement, chantico.ConditionApplied, chantico.ReasonApplyFailed, "Error reading target file", err)
 	}
 
 	if !bytes.Equal(observed, desired) {
 		return writeTargetFile(physicalMeasurement, targetsDir, targetPath, desired, l)
 	}
 
-	physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Target file is up to date")
-	return steps.Continue()
+	return reconciled(physicalMeasurement, chantico.ConditionApplied, "Target file is up to date")
 }
 
 func writeTargetFile(physicalMeasurement *chantico.PhysicalMeasurement, targetsDir, targetPath string, desired []byte, l logr.Logger) steps.StepResult {
 	if err := os.MkdirAll(targetsDir, 0777); err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error creating targets directory: "+err.Error())
-		return steps.Error(err)
+		return failed(physicalMeasurement, chantico.ConditionApplied, chantico.ReasonApplyFailed, "Error creating targets directory", err)
 	}
 
 	if err := pm.WriteFileSDTargets(targetPath, desired); err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error writing target file: "+err.Error())
-		return steps.Error(err)
+		return failed(physicalMeasurement, chantico.ConditionApplied, chantico.ReasonApplyFailed, "Error writing target file", err)
 	}
 
 	l.Info("Wrote file_sd target file", "path", targetPath, "device", physicalMeasurement.Spec.MeasurementDevice)
-	physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Target file has been generated successfully")
-	return steps.Continue()
+	return reconciled(physicalMeasurement, chantico.ConditionApplied, "Target file has been generated successfully")
 }
 
 func (r *PhysicalMeasurementReconciler) reconcileReady(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
-	physicalMeasurement.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "Reconciliation completed successfully")
-	return steps.Continue()
+	return reconciled(physicalMeasurement, chantico.ConditionReady, "Reconciliation completed successfully")
 }

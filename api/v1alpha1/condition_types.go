@@ -1,5 +1,10 @@
 package v1alpha1
 
+import (
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 type ConditionType string
 
 const (
@@ -23,3 +28,26 @@ const (
 	ReasonReloadFailed             ConditionReason = "ReloadFailed"
 	ReasonTemplateResolutionFailed ConditionReason = "TemplateResolutionFailed"
 )
+
+// +kubebuilder:object:generate=false
+type ConditionsObject interface {
+	metav1.Object
+	GetConditions() *[]metav1.Condition
+	UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string)
+}
+
+func updateStatusCondition(o ConditionsObject, t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
+	meta.SetStatusCondition(o.GetConditions(), metav1.Condition{
+		Type: string(t), Status: s, Reason: string(reason), Message: msg,
+		ObservedGeneration: o.GetGeneration(),
+	})
+}
+
+type ConditionedStatus struct {
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// +optional
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
