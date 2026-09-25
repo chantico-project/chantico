@@ -113,10 +113,6 @@ func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map
 		labels["serviceId"] = dataCenterResource.Spec.ServiceId
 	}
 
-	if len(dataCenterResource.Spec.Parents) > 0 {
-		labels["parents"] = constructParentNamesLabel(dataCenterResource)
-	}
-
 	if base != nil {
 		labels = applyAdditionalLabels(labels, base)
 	}
@@ -144,6 +140,10 @@ func buildEnergyAliasRule(
 	// Construct the initial set of labels for the recording rule.
 	baseLabels := map[string]string{
 		"kind": EnergyMetricKindTotal,
+	}
+
+	if len(dataCenterResource.Spec.Parents) > 0 {
+		baseLabels["parents"] = constructParentNamesLabel(dataCenterResource)
 	}
 
 	// Add the defaults from the shared labels based on the resouce spec.
@@ -183,16 +183,20 @@ func buildCoefficientRules(
 	}
 	sort.Slice(pcs, func(i, j int) bool { return pcs[i].parentName < pcs[j].parentName })
 
+	baseLabels := map[string]string{
+		"resource": dataCenterResource.Name,
+		"kind":     EnergyCoefficientKindAttribution,
+	}
+
 	rules := make([]RecordingRule, 0, len(pcs))
 	for _, pc := range pcs {
+		baseLabels["parent"] = pc.parentName
+		labels := buildSharedLabels(dataCenterResource, baseLabels)
+
 		rules = append(rules, RecordingRule{
 			Record: CoefficientMetricName,
 			Expr:   pc.coeff,
-			Labels: map[string]string{
-				"parent":   pc.parentName,
-				"resource": dataCenterResource.Name,
-				"kind":     EnergyCoefficientKindAttribution,
-			},
+			Labels: labels,
 		})
 	}
 	return rules
