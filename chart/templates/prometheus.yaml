@@ -10,6 +10,7 @@ data:
       scrape_timeout: 5s
       evaluation_interval: 5s
     rule_files:
+      - /tmp/prometheus-config/static_rules.yml
       - /tmp/prometheus-volume/rules/*.yml
     {{- if .Values.victoriaMetrics.include }}
     remote_write:
@@ -32,6 +33,20 @@ data:
             target_label: instance
           - target_label: __address__
             replacement: {{ .Values.snmpExporterAddress }}
+  static_rules.yml: |-
+    groups:
+    - name: const-coefficients
+      rules:
+      - record: chantico_energy_coefficient
+        expr: |
+          label_replace(
+            1 - sum by (parent) (
+              chantico_energy_coefficient{kind="attribution"}
+            ),
+            "resource", "$1", "parent", "(.*)"
+          )
+        labels:
+          kind: overhead
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -102,6 +117,8 @@ spec:
         volumeMounts:
         - mountPath: "/tmp/chantico-volume-mount"
           name: chantico-volume-mount
+        - mountPath: "/tmp/prometheus-config"
+          name: chantico-prometheus-config
       volumes:
       - name: chantico-volume-mount
         persistentVolumeClaim:
