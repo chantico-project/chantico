@@ -6,7 +6,10 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
@@ -14,7 +17,13 @@ const (
 	ChanticoVolumeClaimEnv           = "CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME"
 	ChanticoPrometheusServiceHostEnv = "CHANTICO_PROMETHEUS_SERVICE_HOST"
 	ChanticoPrometheusServicePortEnv = "CHANTICO_PROMETHEUS_SERVICE_PORT"
+	ChanticoNamespaceEnv             = "CHANTICO_NAMESPACE"
+	ChanticoWatchNamespaceEnv        = "CHANTICO_WATCH_NAMESPACE"
 	ValidateHostPortTimeout          = 5 * time.Second
+
+	// AllNamespaces is the sentinel value for ChanticoWatchNamespaceEnv that makes the operator
+	// watch resources in every namespace instead of a single one.
+	AllNamespaces = "*"
 )
 
 type validatedEnv struct {
@@ -22,6 +31,12 @@ type validatedEnv struct {
 	VolumeClaim           string
 	PrometheusServiceHost string
 	PrometheusServicePort string
+	// PodNamespace is the namespace the operator is deployed in.
+	PodNamespace string
+	// WatchNamespace is either a single namespace name to restrict watches to,
+	// or `config.AllNamespaces` to watch every namespace. It defaults to the
+	// namespace the operator is deployed in.
+	WatchNamespace string
 }
 
 var ValidatedEnv validatedEnv
@@ -29,6 +44,15 @@ var ValidatedEnv validatedEnv
 func ValidateEnv() (validatedEnv, []error) {
 	var errs []error
 	var ret validatedEnv
+
+	podNamespace, watchNamespace, err := validateNamespaces()
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		ret.PodNamespace = podNamespace
+		ret.WatchNamespace = watchNamespace
+	}
+
 	volumeClaim, err := validateVar(ChanticoVolumeClaimEnv, validateClaim)
 	if err != nil {
 		errs = append(errs, err)
@@ -138,4 +162,35 @@ func validatePort(value string) error {
 		return fmt.Errorf("error converting prometheus port %s ('%s') to a 16-bit integer, is it a valid port?", ChanticoPrometheusServicePortEnv, value)
 	}
 	return nil
+}
+
+func lookupNamespace(envName string, allNamespacesAllowed bool) (string, error) {
+	namespace, ok := os.LookupEnv(envName)
+	if !ok || namespace == "" {
+		return namespace, fmt.Errorf("environment variable %s is not set", envName)
+	}
+	if allNamespacesAllowed && namespace == AllNamespaces {
+		return namespace, nil
+	}
+	if errMsgs := validation.IsDNS1123Label(namespace); len(errMsgs) > 0 {
+		return namespace, fmt.Errorf("environment variable %s ('%s') is not a valid namespace name (%s)", envName, namespace, strings.Join(errMsgs, "; "))
+	}
+	return namespace, nil
+}
+
+func validateNamespaces() (string, string, error) {
+	podNamespace, podErr := lookupNamespace(ChanticoNamespaceEnv, false)
+	watchNamespace, watchErr := lookupNamespace(ChanticoWatchNamespaceEnv, true)
+	if watchErr != nil {
+		if podErr != nil {
+			return "", "", fmt.Errorf("%s and %s; set %s explicitly to a namespace name or '%s', or ensure %s is set or populated in the Deployment manifest", podErr, watchErr, ChanticoWatchNamespaceEnv, AllNamespaces, ChanticoNamespaceEnv)
+		}
+		return podNamespace, podNamespace, nil
+	}
+
+	if watchNamespace == AllNamespaces {
+		return podNamespace, AllNamespaces, nil
+	}
+
+	return podNamespace, watchNamespace, nil
 }
