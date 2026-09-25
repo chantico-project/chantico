@@ -38,6 +38,8 @@ type TemplateFrom struct {
 // the energy coefficient for the edge from that parent to this node.
 // The coefficient represents what fraction of the parent's energy is
 // attributable to this child.
+// +kubebuilder:validation:XValidation:rule="has(self.coefficient)||has(self.coefficientFrom)",message="Parent must have coefficient"
+// +kubebuilder:validation:XValidation:rule="!(has(self.coefficient)&&has(self.coefficientFrom))",message="Parent cannot have both coefficient and coefficientFrom set"
 type ParentRef struct {
 	// Name is the name of the parent DataCenterResource.
 	Name string `json:"name"`
@@ -51,6 +53,8 @@ type ParentRef struct {
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
+// +kubebuilder:validation:XValidation:rule="has(self.energyMetric)||has(self.energyMetricFrom)",message="Resource must have energyMetric or energyMetricFrom"
+// +kubebuilder:validation:XValidation:rule="!(has(self.energyMetric)&&has(self.energyMetricFrom))",message="Resource cannot have both energyMetric and energyMetricFrom set"
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file

@@ -440,6 +440,12 @@ spec:
                   required:
                   - name
                   type: object
+                  x-kubernetes-validations:
+                  - message: Parent must have coefficient
+                    rule: has(self.coefficient)||has(self.coefficientFrom)
+                  - message: Parent cannot have both coefficient and coefficientFrom
+                      set
+                    rule: '!(has(self.coefficient)&&has(self.coefficientFrom))'
                 type: array
               physicalMeasurements:
                 items:
@@ -456,6 +462,12 @@ spec:
             required:
             - type
             type: object
+            x-kubernetes-validations:
+            - message: Resource must have energyMetric or energyMetricFrom
+              rule: has(self.energyMetric)||has(self.energyMetricFrom)
+            - message: Resource cannot have both energyMetric and energyMetricFrom
+                set
+              rule: '!(has(self.energyMetric)&&has(self.energyMetricFrom))'
           status:
             description: status defines the observed state of DataCenterResource
             properties:
