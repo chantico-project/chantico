@@ -35,9 +35,9 @@ const (
 )
 
 type ExpectedRule struct {
-	Record         string
-	Expr           string
-	ServiceIdLabel string
+	Record string
+	Expr   string
+	Labels map[string]string
 }
 
 func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
@@ -47,9 +47,9 @@ func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
 	if rule.Expr != expected.Expr {
 		t.Errorf("Expected rule expr = %q, got %q", expected.Expr, rule.Expr)
 	}
-	if expected.ServiceIdLabel != "" {
-		if val, ok := rule.Labels["serviceId"]; !ok || val != expected.ServiceIdLabel {
-			t.Errorf("Expected serviceId label = %q, got %q", expected.ServiceIdLabel, val)
+	for key, expectedValue := range expected.Labels {
+		if actualValue, ok := rule.Labels[key]; !ok || actualValue != expectedValue {
+			t.Errorf("Expected label %q = %q, got %q", key, expectedValue, actualValue)
 		}
 	}
 }
@@ -285,9 +285,14 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 		t.Fatalf("Expected 1 alias rule for root node, got %d rules", len(rules))
 	}
 	testExpectedRule(t, rules[0], ExpectedRule{
-		Record:         "chantico_energy_watts",
-		Expr:           testSNMPPDU1PowerWatts,
-		ServiceIdLabel: "3d88f471-674f-4446-9de2-54e5faa2c951",
+		Record: "chantico_energy_watts",
+		Expr:   testSNMPPDU1PowerWatts,
+		Labels: map[string]string{
+			"kind":      EnergyMetricKindTotal,
+			"resource":  testPDU1,
+			"serviceId": "3d88f471-674f-4446-9de2-54e5faa2c951",
+			"type":      DataCenterResourceTypePDU,
+		},
 	})
 }
 
@@ -315,10 +320,22 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record: "chantico_energy_coefficient",
 		Expr:   testPDU1Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU1,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
 		Record: "chantico_energy_coefficient",
 		Expr:   testPDU2Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU2,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 }
 
@@ -345,16 +362,33 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record: "chantico_energy_coefficient",
 		Expr:   testPDU1Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU1,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
 		Record: "chantico_energy_coefficient",
 		Expr:   testPDU2Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU2,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 
 	// Last should be the energy rule
 	testExpectedRule(t, rules[2], ExpectedRule{
 		Record: "chantico_energy_watts",
 		Expr:   `sum(chantico_energy_coefficient{resource="bm1"} * on (parent) group_left () label_replace(chantico_energy_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`,
+		Labels: map[string]string{
+			"kind":     EnergyMetricKindTotal,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 }
 
@@ -376,9 +410,14 @@ func TestBuildRecordingRules_LeafNode(t *testing.T) {
 	}
 
 	testExpectedRule(t, rules[0], ExpectedRule{
-		Record:         "chantico_energy_watts",
-		Expr:           `sum(chantico_energy_coefficient{resource="vm1"} * on (parent) group_left () label_replace(chantico_energy_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`,
-		ServiceIdLabel: "a479357a-2680-4577-8ffe-5105e634c836",
+		Record: "chantico_energy_watts",
+		Expr:   `sum(chantico_energy_coefficient{resource="vm1"} * on (parent) group_left () label_replace(chantico_energy_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`,
+		Labels: map[string]string{
+			"kind":      EnergyMetricKindTotal,
+			"resource":  testVM1,
+			"serviceId": "a479357a-2680-4577-8ffe-5105e634c836",
+			"type":      DataCenterResourceTypeVM,
+		},
 	})
 }
 
