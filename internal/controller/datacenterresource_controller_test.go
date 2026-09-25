@@ -54,6 +54,7 @@ func setupDataCenterResourceRuleTest(t *testing.T) (string, *DataCenterResourceR
 	t.Setenv(config.ChanticoVolumeClaimEnv, "chantico-snmp-prometheus-volume-claim")
 	t.Setenv(config.ChanticoPrometheusServiceHostEnv, host)
 	t.Setenv(config.ChanticoPrometheusServicePortEnv, port)
+	t.Setenv(config.ChanticoNamespaceEnv, "chantico")
 
 	var errs []error
 	config.ValidatedEnv, errs = config.ValidateEnv()

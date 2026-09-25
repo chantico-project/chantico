@@ -71,6 +71,8 @@ func TestAllVarsOkay(t *testing.T) {
 	_ = os.Setenv(ChanticoVolumeLocationEnv, goodLocation)
 	_ = os.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
 	_ = os.Setenv(ChanticoPrometheusServicePortEnv, goodPort)
+	_ = os.Setenv(ChanticoNamespaceEnv, "chantico")
+	_ = os.Setenv(ChanticoWatchNamespaceEnv, AllNamespaces)
 
 	_, errs := ValidateEnv()
 
@@ -166,4 +168,74 @@ func TestGoodHostPort(t *testing.T) {
 		return env.PrometheusServiceHost == goodUrl && env.PrometheusServicePort == goodPort
 	}
 	testGoodEnv(t, ChanticoPrometheusServiceHostEnv, goodUrl, testGoodHostPort)
+}
+
+func TestPodNamespace(t *testing.T) {
+	cases := []struct {
+		name string
+		val  string
+		good bool
+	}{
+		{"ValidNamespace", "chantico-system", true},
+		{"InvalidNamespace", "Not_A_Valid_Namespace!", false},
+		{"AsteriskNamespace", "*", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv(ChanticoNamespaceEnv, c.val)
+			if c.good {
+				var testPodNamespace = func(env validatedEnv) bool { return env.PodNamespace == c.val }
+				testGoodEnv(t, ChanticoNamespaceEnv, c.val, testPodNamespace)
+			} else {
+				var testPodNamespace = func(env validatedEnv) bool { return env.PodNamespace != c.val }
+				testBadEnv(t, ChanticoNamespaceEnv, c.val, testPodNamespace)
+			}
+		})
+	}
+}
+
+func TestWatchNamespace(t *testing.T) {
+	t.Setenv(ChanticoNamespaceEnv, "")
+
+	cases := []struct {
+		name         string
+		podNamespace string
+		val          string
+		good         bool
+	}{
+		{"AllNamespaces", "chantico", "*", true},
+		{"SpecificNamespace", "chantico", "chantico-system", true},
+		{"InvalidNamespace", "", "Not_A_Valid_Namespace!", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv(ChanticoNamespaceEnv, c.podNamespace)
+			t.Setenv(ChanticoWatchNamespaceEnv, c.val)
+			if c.good {
+				var testWatchNamespace = func(env validatedEnv) bool { return env.WatchNamespace == c.val }
+				testGoodEnv(t, ChanticoWatchNamespaceEnv, c.val, testWatchNamespace)
+			} else {
+				var testWatchNamespace = func(env validatedEnv) bool { return env.WatchNamespace != c.val }
+				testBadEnv(t, ChanticoWatchNamespaceEnv, c.val, testWatchNamespace)
+			}
+		})
+	}
+}
+
+func TestWatchNamespaceDefaultsToPodNamespace(t *testing.T) {
+	const podNamespace = "chantico-system"
+	_ = os.Unsetenv(ChanticoWatchNamespaceEnv)
+	t.Setenv(ChanticoNamespaceEnv, podNamespace)
+
+	var testDefaultsToPodNamespace = func(env validatedEnv) bool { return env.WatchNamespace == podNamespace }
+	testGoodEnv(t, ChanticoNamespaceEnv, podNamespace, testDefaultsToPodNamespace)
+}
+
+func TestWatchNamespaceMissingBothVars(t *testing.T) {
+	_ = os.Unsetenv(ChanticoWatchNamespaceEnv)
+	_ = os.Unsetenv(ChanticoNamespaceEnv)
+
+	testUnsetBadEnv(t, ChanticoWatchNamespaceEnv, "[UNSET]", testIdentity)
 }
