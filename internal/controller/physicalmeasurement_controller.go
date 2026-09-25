@@ -176,12 +176,15 @@ func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context,
 		return steps.Error(err)
 	}
 
-	// Prometheus reloads its targets on every write, so only write when the content changed.
-	if bytes.Equal(observed, desired) {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Target file is up to date")
-		return steps.Continue()
+	if !bytes.Equal(observed, desired) {
+		return writeTargetFile(physicalMeasurement, targetsDir, targetPath, desired, l)
 	}
 
+	physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Target file is up to date")
+	return steps.Continue()
+}
+
+func writeTargetFile(physicalMeasurement *chantico.PhysicalMeasurement, targetsDir, targetPath string, desired []byte, l logr.Logger) steps.StepResult {
 	if err := os.MkdirAll(targetsDir, 0777); err != nil {
 		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error creating targets directory: "+err.Error())
 		return steps.Error(err)
@@ -194,7 +197,6 @@ func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context,
 
 	l.Info("Wrote file_sd target file", "path", targetPath, "device", physicalMeasurement.Spec.MeasurementDevice)
 	physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Target file has been generated successfully")
-
 	return steps.Continue()
 }
 
