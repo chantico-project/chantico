@@ -25,6 +25,7 @@ import (
 
 	chantico "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
+	"chantico/internal/filestore"
 	pm "chantico/internal/physicalmeasurement"
 	"chantico/internal/steps"
 
@@ -483,7 +484,7 @@ func assertTargetFiles(t *testing.T, targetsDir string, want []string) {
 func readFileSDTargets(t *testing.T, path string) []pm.FileSDTarget {
 	t.Helper()
 
-	targets, err := pm.LoadFileSDTargets(path)
+	targets, err := pm.LoadFileSDTargets(filestore.VolumeFileStore{}, path)
 	if err != nil {
 		t.Fatalf("read target file %s: %v", path, err)
 	}

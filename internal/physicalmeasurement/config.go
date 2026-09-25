@@ -36,13 +36,9 @@ func MarshalFileSDTargets(targets []FileSDTarget) ([]byte, error) {
 	return json.MarshalIndent(targets, "", "  ")
 }
 
-// WriteFileSDTargets writes the file_sd_configs JSON through a temporary file and renames it
-// into place, so Prometheus never reads a partially written target file.
+// WriteFileSDTargets writes the file_sd_configs JSON atomically, so Prometheus never
+// reads a partially written target file.
 func WriteFileSDTargets(path string, data []byte) error {
-	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
-		return err
-	}
 	vfs := filestore.VolumeFileStore{}
 	return vfs.Write(context.Background(), path, bytes.NewReader(data))
 }
