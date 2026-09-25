@@ -27,6 +27,7 @@ import (
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
 
+	config "chantico/internal/configuration"
 	md "chantico/internal/measurementdevice"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -70,11 +71,11 @@ func newReconciler(t *testing.T, root string, objs ...runtime.Object) *Measureme
 			break
 		}
 	}
+	t.Setenv(config.ChanticoNamespaceEnv, namespace)
 
 	return &MeasurementDeviceReconciler{
 		Client:    c,
 		Scheme:    scheme,
-		Namespace: namespace,
 		Filestore: filestore.VolumeFileStore{Root: root},
 	}
 }

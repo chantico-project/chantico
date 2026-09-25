@@ -71,6 +71,8 @@ func TestAllVarsOkay(t *testing.T) {
 	_ = os.Setenv(ChanticoVolumeLocationEnv, goodLocation)
 	_ = os.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
 	_ = os.Setenv(ChanticoPrometheusServicePortEnv, goodPort)
+	_ = os.Setenv(ChanticoNamespaceEnv, "chantico")
+	_ = os.Setenv(ChanticoWatchNamespaceEnv, AllNamespaces)
 
 	_, errs := ValidateEnv()
 
@@ -166,4 +168,48 @@ func TestGoodHostPort(t *testing.T) {
 		return env.PrometheusServiceHost == goodUrl && env.PrometheusServicePort == goodPort
 	}
 	testGoodEnv(t, ChanticoPrometheusServiceHostEnv, goodUrl, testGoodHostPort)
+}
+
+func TestWatchNamespaceAllNamespaces(t *testing.T) {
+	_ = os.Unsetenv(ChanticoNamespaceEnv)
+
+	cases := []struct {
+		name string
+		env  string
+		val  string
+		good bool
+	}{
+		{"AllNamespaces", ChanticoWatchNamespaceEnv, AllNamespaces, true},
+		{"SpecificNamespace", ChanticoWatchNamespaceEnv, "chantico-system", true},
+		{"InvalidNamespace", ChanticoWatchNamespaceEnv, "Not_A_Valid_Namespace!", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv(c.env, c.val)
+			if c.good {
+				var testAllNamespaces = func(env validatedEnv) bool { return env.WatchNamespace == c.val }
+				testGoodEnv(t, c.env, c.val, testAllNamespaces)
+			} else {
+				var testAllNamespaces = func(env validatedEnv) bool { return env.WatchNamespace != c.val }
+				testBadEnv(t, c.env, c.val, testAllNamespaces)
+			}
+		})
+	}
+}
+
+func TestWatchNamespaceDefaultsToPodNamespace(t *testing.T) {
+	const podNamespace = "chantico-system"
+	_ = os.Unsetenv(ChanticoWatchNamespaceEnv)
+	t.Setenv(ChanticoNamespaceEnv, podNamespace)
+
+	var testDefaultsToPodNamespace = func(env validatedEnv) bool { return env.WatchNamespace == podNamespace }
+	testGoodEnv(t, ChanticoNamespaceEnv, podNamespace, testDefaultsToPodNamespace)
+}
+
+func TestWatchNamespaceMissingBothVars(t *testing.T) {
+	_ = os.Unsetenv(ChanticoWatchNamespaceEnv)
+	_ = os.Unsetenv(ChanticoNamespaceEnv)
+
+	testUnsetBadEnv(t, ChanticoWatchNamespaceEnv, "[UNSET]", testIdentity)
 }

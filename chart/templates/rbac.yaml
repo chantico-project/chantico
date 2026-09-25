@@ -1,9 +1,22 @@
 {{- if and .Values.controller.include .Values.controller.image }}
-# Generated from controller-gen rbac markers — keep rules in sync with `make manifests` and manually add any additional rules as needed
+{{- $watchNamespace := .Values.controller.watchNamespace | default .Release.Namespace }}
+{{- $allNamespaces := eq $watchNamespace "*" }}
+{{- $deploymentsCoveredByManagerRole := or $allNamespaces (eq $watchNamespace .Release.Namespace) }}
+# Originally generated from controller-gen rbac markers
+# Keep rules in sync with `make manifests` and manually add any additional rules as needed
+# The chantico-manager-role allows access (create/update/watch/get/list) to the resources
+# managed by the controller, including configmaps. If the watched resources live in
+# the same namespace as the release namespace or if we watch resources in all namespaces,
+# then the chantico-snmp Deployment is included here. As the release namespace is independent of the
+# watched namespace, its rules need their own Role/RoleBinding when watchNamespace differs
+# from the release namespace and isn't "*" (which already grants cluster-wide access).
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: {{ if $allNamespaces }}ClusterRole{{ else }}Role{{ end }}
 metadata:
   name: chantico-manager-role
+  {{- if not $allNamespaces }}
+  namespace: {{ $watchNamespace }}
+  {{- end }}
 rules:
 - apiGroups:
   - ""
@@ -13,6 +26,7 @@ rules:
   - get
   - list
   - watch
+{{- if $deploymentsCoveredByManagerRole }}
 - apiGroups:
   - apps
   resources:
@@ -23,6 +37,7 @@ rules:
   - watch
   - update
   - patch
+{{- end }}
 - apiGroups:
   - batch
   resources:
@@ -76,17 +91,55 @@ rules:
   - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: {{ if $allNamespaces }}ClusterRoleBinding{{ else }}RoleBinding{{ end }}
 metadata:
   name: chantico-manager-rolebinding
+  {{- if not $allNamespaces }}
+  namespace: {{ $watchNamespace }}
+  {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: {{ if $allNamespaces }}ClusterRole{{ else }}Role{{ end }}
   name: chantico-manager-role
 subjects:
 - kind: ServiceAccount
   name: chantico-controller-manager
   namespace: {{ .Release.Namespace }}
+{{- if not $deploymentsCoveredByManagerRole }}
+---
+# The chantico-snmp Deployment always lives in the release namespace, so it needs its own
+# Role/RoleBinding here since chantico-manager-role is scoped to the watch namespace instead.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chantico-manager-deployments-role
+  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chantico-manager-deployments-rolebinding
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chantico-manager-deployments-role
+subjects:
+- kind: ServiceAccount
+  name: chantico-controller-manager
+  namespace: {{ .Release.Namespace }}
+{{- end }}
 ---
 # Leader election — namespaced Role
 apiVersion: rbac.authorization.k8s.io/v1

@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	config "chantico/internal/configuration"
 	"chantico/internal/filestore"
 	md "chantico/internal/measurementdevice"
 	"chantico/internal/snmp"
@@ -62,7 +63,6 @@ import (
 type MeasurementDeviceReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
-	Namespace string
 	Filestore filestore.FileStore
 }
 
@@ -92,7 +92,6 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 		return ctrl.Result{}, err
 	}
-	r.Namespace = measurementDevice.GetNamespace()
 	l = l.WithValues("generation", measurementDevice.GetGeneration())
 	ctx = log.IntoContext(ctx, l)
 
@@ -389,7 +388,7 @@ func (r *MeasurementDeviceReconciler) reconcileReady(ctx context.Context, measur
 
 func (r *MeasurementDeviceReconciler) getSnmpExporterDeployment(ctx context.Context) (*appsv1.Deployment, error) {
 	var deploy appsv1.Deployment
-	if err := r.Get(ctx, client.ObjectKey{Name: "chantico-snmp", Namespace: r.Namespace}, &deploy); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: "chantico-snmp", Namespace: config.ValidatedEnv.PodNamespace}, &deploy); err != nil {
 		return nil, err
 	}
 	return &deploy, nil
