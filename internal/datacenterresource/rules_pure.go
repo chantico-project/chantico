@@ -57,6 +57,12 @@ const (
 	EnergyMetricKindTotal      = "total"
 )
 
+const (
+	EnergyCoefficientKindAttribution = "attribution"
+	EnergyCoefficientKindOverhead    = "overhead"
+	// No total is needed since sum(attributed) + overhead = 1 always!
+)
+
 // EnergyMetricQuery returns the Prometheus query for a DataCenterResource's energy timeseries.
 func EnergyMetricQuery(resourceName string) string {
 	return fmt.Sprintf(`%s{resource="%s"}`, EnergyMetricName, resourceName)
@@ -64,7 +70,7 @@ func EnergyMetricQuery(resourceName string) string {
 
 // CoefficientMetricQuery returns the Prometheus query for the coefficient from parent to child.
 func CoefficientMetricQuery(parentName, childName string) string {
-	return fmt.Sprintf(`%s{parent="%s", child="%s"}`, CoefficientMetricName, parentName, childName)
+	return fmt.Sprintf(`%s{parent="%s", resource="%s"}`, CoefficientMetricName, parentName, childName)
 }
 
 // SanitizeMetricName replaces characters that are not valid in Prometheus
@@ -108,8 +114,7 @@ func BuildRecordingRules(
 		rules = append(rules, *energyRule)
 	}
 
-	rules = append(rules, *BuildEnergyAttributedRule(dataCenterResource))
-	rules = append(rules, *BuildEnergyOverheadRule(dataCenterResource))
+	rules = append(rules, *BuildOverheadCoefficientRule(dataCenterResource))
 
 	return rules
 }
@@ -219,8 +224,9 @@ func BuildCoefficientRules(
 			Record: CoefficientMetricName,
 			Expr:   pc.coeff,
 			Labels: map[string]string{
-				"parent": pc.parentName,
-				"child":  dataCenterResource.Name,
+				"parent":   pc.parentName,
+				"resource": dataCenterResource.Name,
+				"kind":     EnergyCoefficientKindAttribution,
 			},
 		})
 	}
@@ -249,7 +255,7 @@ func BuildEnergyRule(
 
 	// Construct the Prometheus aggregation expression for the energy recording rule.
 	expr := fmt.Sprintf(
-		`sum(%s{child="%s"} * on (parent) group_left () label_replace(%s{kind="%s"}, "parent", "$1", "resource", "(.*)"))`,
+		`sum(%s{resource="%s"} * on (parent) group_left () label_replace(%s{kind="%s"}, "parent", "$1", "resource", "(.*)"))`,
 		CoefficientMetricName, dataCenterResource.Name, EnergyMetricName, EnergyMetricKindTotal,
 	)
 
@@ -260,7 +266,7 @@ func BuildEnergyRule(
 	}
 }
 
-func BuildEnergyAttributedRule(
+func BuildEnergyAttributedCoefficientRule(
 	dataCenterResource *chantico.DataCenterResource,
 ) *RecordingRule {
 	// Construct the initial set of labels for the recording rule.
@@ -285,21 +291,19 @@ func BuildEnergyAttributedRule(
 	}
 }
 
-func BuildEnergyOverheadRule(
+func BuildOverheadCoefficientRule(
 	dataCenterResource *chantico.DataCenterResource,
 ) *RecordingRule {
 	labels := map[string]string{
-		"kind": EnergyMetricKindOverhead,
+		"resource": dataCenterResource.Name,
+		"kind":     EnergyCoefficientKindOverhead,
 	}
-	maps.Copy(labels, buildSharedLabels(dataCenterResource, labels))
 
-	expr := fmt.Sprintf(
-		`sum(%s{resource="%s", kind="%s"}) - sum(%s{resource="%s", kind="%s"})`,
-		EnergyMetricName, dataCenterResource.Name, EnergyMetricKindTotal, EnergyMetricName, dataCenterResource.Name, EnergyMetricKindAttributed,
-	)
+	// Ensure that it always returns a coefficient value in case where it has no children by adding the `or vector(0)` clause.
+	expr := fmt.Sprintf("1 - sum(%s{parent=\"%s\", kind=\"%s\"}) or vector(0)", CoefficientMetricName, dataCenterResource.Name, EnergyCoefficientKindAttribution)
 
 	return &RecordingRule{
-		Record: EnergyMetricName,
+		Record: CoefficientMetricName,
 		Expr:   expr,
 		Labels: labels,
 	}
