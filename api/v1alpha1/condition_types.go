@@ -12,13 +12,14 @@ const (
 type ConditionReason string
 
 const (
-	ReasonReconciling           ConditionReason = "Reconciling"
-	ReasonReconciled            ConditionReason = "Reconciled"
-	ReasonInvalidSpec           ConditionReason = "InvalidSpec"
-	ReasonDependencyUnavailable ConditionReason = "DependencyUnavailable"
-	ReasonGenerationPending     ConditionReason = "GenerationPending"
-	ReasonGenerationFailed      ConditionReason = "GenerationFailed"
-	ReasonApplyFailed           ConditionReason = "ApplyFailed"
-	ReasonCleanupFailed         ConditionReason = "CleanupFailed"
-	ReasonReloadFailed          ConditionReason = "ReloadFailed"
+	ReasonReconciling              ConditionReason = "Reconciling"
+	ReasonReconciled               ConditionReason = "Reconciled"
+	ReasonInvalidSpec              ConditionReason = "InvalidSpec"
+	ReasonDependencyUnavailable    ConditionReason = "DependencyUnavailable"
+	ReasonGenerationPending        ConditionReason = "GenerationPending"
+	ReasonGenerationFailed         ConditionReason = "GenerationFailed"
+	ReasonApplyFailed              ConditionReason = "ApplyFailed"
+	ReasonCleanupFailed            ConditionReason = "CleanupFailed"
+	ReasonReloadFailed             ConditionReason = "ReloadFailed"
+	ReasonTemplateResolutionFailed ConditionReason = "TemplateResolutionFailed"
 )

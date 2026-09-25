@@ -35,19 +35,44 @@ timeseries. The `resource` label identifies the node, while labels such as
 
 ## Data Model
 
+### `TemplateFrom`
+
+```go
+type TemplateConfigMapKeyRef struct {
+  Name string `json:"name"`
+  Key  string `json:"key,omitempty"`
+}
+
+type TemplateFrom struct {
+  ConfigMapKeyRef TemplateConfigMapKeyRef `json:"configMapKeyRef"`
+  Parameters      []corev1.EnvVar         `json:"parameters,omitempty"`
+}
+```
+
+`TemplateConfigMapKeyRef.Name` identifies a ConfigMap which contains the template, and the `TemplateConfigMapKeyRef.Key` identifies the specific key within that ConfigMap. The `TemplateFrom.Parameters` field provides values for the template's placeholders.
+
+When a template ConfigMap is updated, Chantico reconciles every
+DataCenterResource in the same namespace that references it through
+`energyMetricFrom` or `coefficientFrom`.
+
 ### `ParentRef`
 
 ```go
 type ParentRef struct {
-    Name        string `json:"name"`
-    Coefficient string `json:"coefficient,omitempty"`
+  Name            string       `json:"name"`
+  Coefficient     string       `json:"coefficient,omitempty"`
+  CoefficientFrom TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 ```
 
 Each entry in `spec.parents` references a parent DataCenterResource by name
 and optionally carries a coefficient (a PromQL expression). There are 2 cases:
+
 1. All of the energy of a parent flows to a child, then the coefficient is set to `1` (eg. baremetal connected to a PDU socket)
 2. Only part of the parents energy flows to the child (eg. a VM running on a baremetal server), `coefficient` is either a fractional literal (eg. `0.5`) or a promql expression which uses other metrics to determine the share (eg. based on CPU utilisation of the VM).
+
+If a coefficient expression is reused across many resources, the `coefficientFrom` 
+can load a PromQL template from a ConfigMap and render it with named parameters.
 
 
 ### `DataCenterResourceSpec` (relevant fields)
@@ -56,7 +81,16 @@ and optionally carries a coefficient (a PromQL expression). There are 2 cases:
 |---|---|---|
 | `parents` | `[]ParentRef` | Parent resources with optional coefficients |
 | `energyMetric` | `string` | Raw Prometheus metric expression for root nodes (e.g. `tnoPduPowerValue{job="tno"}`) |
+| `energyMetricFrom` | `TemplateFrom` | ConfigMap-backed, parameterized alternative to `energyMetric` |
 | `additionalLabels` | `map[string]string` | Additional labels to attach to the resource's Prometheus timeseries |
+
+`TemplateFrom` identifies `configMapKeyRef.name` and `configMapKeyRef.key`,
+then supplies template values through `parameters`. Templates use Go template
+syntax such as `{{ .vmid }}`. Parameter entries follow the Kubernetes `EnvVar`
+shape and support the use of a `value`, `valueFrom.configMapKeyRef`, and
+`valueFrom.secretKeyRef`. See [How to register
+data center resources]({{% relref "how-tos/how-to-register-data-center-resources.md" %}})
+for examples.
 
 #### Time Series Labels
 
@@ -77,7 +111,6 @@ additionalLabels:
 ```
 
 Ensure that the keys do not conflict with the default labels, as conflicting additional labels will be skipped. 
-
 
 ### Example CRs
 

@@ -144,7 +144,7 @@ func validateResourceType(dataCenterResource *chantico.DataCenterResource) error
 
 // Root nodes (no parents) must have energyMetric set so Prometheus can source their energy timeseries.
 func validateEnergyMetric(dataCenterResource *chantico.DataCenterResource) error {
-	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetric == "" {
+	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetric == "" && dataCenterResource.Spec.EnergyMetricFrom.ConfigMapKeyRef.Name == "" {
 		return ErrorMissingEnergyMetric{InvolvedResource: dataCenterResource.Name}
 	}
 	return nil
