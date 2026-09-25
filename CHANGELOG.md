@@ -1,3 +1,46 @@
+## 0.16.0 (2026-09-25)
+
+#### Feature
+
+* PromQL Templates for datacenterresource coefficient and energyMetric (#219) (037a0701)
+
+## 0.15.1 (2026-09-25)
+
+#### Bug Fixes
+
+* remove windows support (#229) (4c58499d)
+
+## 0.15.0 (2026-09-24)
+
+#### Feature
+
+* align datacenterresource metric names with prometheus convention (#220) (4cc7beeb)
+
+#### Chores
+
+* **deps:** bump google.golang.org/grpc from 1.82.1 to 1.83.2 (#225) (8432d131)
+* Address Sigrid finding about host request and do not block pipeline (#222) (1d30c09f)
+
+## 0.14.0 (2026-09-22)
+
+#### Feature
+
+* Add filestore interface and filesystem implementation (#193) (2c0f359d)
+
+## 0.13.0 (2026-09-16)
+
+#### Feature
+
+* refactor state machine of data center resource (#206) (2d6294da)
+
+#### Chores
+
+* **docs:** Keep image/API build out of time limit of serving in CI (#216) (20942d76)
+* **ci:** Split sigrid into open-source health (allowed to fail) and others (not allowed) (#214) (a93b3712)
+* Update sigrid configuration for components, security scan and open source health (#199) (661d3072)
+* **docs:** Technical documentation on measurement device and physical measurement (#197) (677a9a70)
+* Update sigrid configuration to track components from internal directory again (#194) (d6fe9f3a)
+
 ## 0.12.0 (2026-07-31)
 
 #### Feature

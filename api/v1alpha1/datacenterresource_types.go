@@ -17,13 +17,29 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type TemplateConfigMapKeyRef struct {
+	// Name is the name of the ConfigMap.
+	Name string `json:"name"`
+	// Key is the key within the ConfigMap that contains the template.
+	Key string `json:"key,omitempty"`
+}
+
+type TemplateFrom struct {
+	ConfigMapKeyRef TemplateConfigMapKeyRef `json:"configMapKeyRef"`
+	Parameters      []corev1.EnvVar         `json:"parameters,omitempty"`
+}
 
 // ParentRef references a parent DataCenterResource and optionally carries
 // the energy coefficient for the edge from that parent to this node.
 // The coefficient represents what fraction of the parent's energy is
 // attributable to this child.
+// +kubebuilder:validation:XValidation:rule="has(self.coefficient)||has(self.coefficientFrom)",message="Parent must have coefficient"
+// +kubebuilder:validation:XValidation:rule="!(has(self.coefficient)&&has(self.coefficientFrom))",message="Parent cannot have two coefficients"
 type ParentRef struct {
 	// Name is the name of the parent DataCenterResource.
 	Name string `json:"name"`
@@ -31,16 +47,15 @@ type ParentRef struct {
 	// Coefficient is the energy coefficient for the edge from this parent
 	// to the current node. It is a PromQL expression (often a literal
 	// number) that will be written as a Prometheus recording rule.
-	// +required
-	Coefficient string `json:"coefficient"`
+	// +optional
+	Coefficient     string       `json:"coefficient,omitempty"`
+	CoefficientFrom TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
 	Type string `json:"type"`
 
@@ -61,11 +76,18 @@ type DataCenterResourceSpec struct {
 	// +optional
 	EnergyMetric string `json:"energyMetric,omitempty"`
 
+	EnergyMetricFrom TemplateFrom `json:"energyMetricFrom,omitempty"`
+
 	// ServiceId is the identifier of the service that this resource belongs to.
 	// Define on a resource to make it part of a service, or make a separate
 	// data center resource with service type with parent resources.
 	// +optional
 	ServiceId string `json:"serviceId"`
+
+	// AdditionalLabels are applied directly to the prometheus time series for this resource to
+	// add additional identification information. If a label conflicts with existing labels, the additional label is skipped.
+	// +optional
+	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
 }
 
 // DataCenterResourceStatus defines the observed state of DataCenterResource.
@@ -73,16 +95,20 @@ type DataCenterResourceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	State            string `json:"state,omitempty"`
-	UpdateTime       string `json:"updateTime,omitempty"`
-	UpdateGeneration int64  `json:"updateGeneration,omitempty"`
-	ErrorMessage     string `json:"errorMessage,omitempty"`
-	ErrorType        string `json:"errorType,omitempty"`
-	InvolvedResource string `json:"involvedResource,omitempty"`
+	UpdateTime       string             `json:"updateTime,omitempty"`
+	UpdateGeneration int64              `json:"updateGeneration,omitempty"`
+	ErrorMessage     string             `json:"errorMessage,omitempty"`
+	ErrorType        string             `json:"errorType,omitempty"`
+	InvolvedResource string             `json:"involvedResource,omitempty"`
+	Conditions       []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[-1].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[-1].reason`
+// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.status.conditions[-1].type`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // DataCenterResource is the Schema for the datacenterresources API
 type DataCenterResource struct {
@@ -118,13 +144,14 @@ const (
 	DataCenterResourceGraphFinalizer = "datacenterresource.finalizer.chantico-project.github.io/graph"
 )
 
-func (r *DataCenterResource) GetState() string            { return r.Status.State }
-func (r *DataCenterResource) SetState(s string)           { r.Status.State = s }
-func (r *DataCenterResource) GetUpdateGeneration() int64  { return r.Status.UpdateGeneration }
-func (r *DataCenterResource) SetUpdateGeneration(g int64) { r.Status.UpdateGeneration = g }
-func (r *DataCenterResource) GetFinalizerName() string    { return DataCenterResourceGraphFinalizer }
-func (r *DataCenterResource) GetErrorMessage() string     { return r.Status.ErrorMessage }
-func (r *DataCenterResource) SetErrorMessage(msg string)  { r.Status.ErrorMessage = msg }
+func (m *DataCenterResource) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+
+func (m *DataCenterResource) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
+	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
+		Type: string(t), Status: s, Reason: string(reason), Message: msg,
+		ObservedGeneration: m.GetGeneration(),
+	})
+}
 
 // ParentNames returns a flat list of parent resource names, for use in
 // validation, indexing, and anywhere the full ParentRef is not needed.

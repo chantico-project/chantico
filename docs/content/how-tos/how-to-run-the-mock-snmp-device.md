@@ -96,7 +96,7 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
     ```
 1. Wait for the SNMP generator job:
     ```bash
-    kubectl get jobs -n chantico | grep update-snmp
+    kubectl get jobs -n chantico -o wide | grep snmp-generator
 1. Create a `PhysicalMeasurement` pointing at the mock target:
     ```bash
     kubectl apply -n chantico -f ./config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
@@ -161,10 +161,10 @@ If all the resources are created correctly, you should see the following when qu
 
 ```bash
 $ kubectl get datacenterresource,measurementdevice,physicalmeasurement -n chantico
-NAME                                                                           AGE
-datacenterresource.chantico-project.github.io/datacenterresource-misd-gbm-01
-datacenterresource.chantico-project.github.io/datacenterresource-pdu1
-datacenterresource.chantico-project.github.io/datacenterresource-pdu2
+NAME                                                                           STATUS   REASON       TYPE      AGE
+datacenterresource.chantico-project.github.io/datacenterresource-misd-gbm-01   True     Reconciled   Applied   
+datacenterresource.chantico-project.github.io/datacenterresource-pdu1          True     Reconciled   Applied   
+datacenterresource.chantico-project.github.io/datacenterresource-pdu2          True     Reconciled   Applied   
 
 NAME                                                 STATUS   REASON      TYPE             AGE
 measurementdevice.chantico-project.github.io/tno     True     Succeeded   ExporterReload
@@ -175,9 +175,15 @@ physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu1-out
 physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu2-out
 ```
 
-Additionally, you can verify in [Prometheus](http://localhost:19090) that the metrics are being scraped from the mock SNMP devices and aggregated into the `DataCenterResource` metrics. These will show up in the "Rule health" section as the following metrics:
-- `datacenter:dataceneterresource_pdu1:energy_watts`
-- `datacenter:dataceneterresource_pdu2:energy_watts`
-- `datacenter:dataceneterresource_misd_gbm_01:energy_watts`
+Additionally, you can verify in [Prometheus](http://localhost:19090) that the metrics are being scraped from the mock SNMP devices and aggregated into the `DataCenterResource` metrics. These will show up in the "Rule health" section as the following rules containing the subsequent metrics:
+
+- chantico_datacenterresource_pdu1
+    - `chantico_energy_watts{resource="datacenterresource-pdu1", type="pdu"}`
+- chantico_datacenterresource_pdu2
+    - `chantico_energy_watts{resource="datacenterresource-pdu2", type="pdu"}`
+- chantico_datacenterresource_misd_gbm_01
+    - `chantico_energy_coefficient{child="datacenterresource-misd-gbm-01", parents="datacenterresource-pdu1}`
+    - `chantico_energy_coefficient{child="datacenterresource-misd-gbm-01", parents="datacenterresource-pdu2}`
+    - `chantico_energy_watts{resource="datacenterresource-misd-gbm-01", type="baremetal"}`
 
 You can query these metrics from Prometheus for the recent data of the specific time series. You can also visualize these metrics in [Grafana](http://localhost:13000) by visiting the pre-configured "Chantico" dashboard.
