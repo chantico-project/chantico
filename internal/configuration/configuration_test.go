@@ -170,29 +170,55 @@ func TestGoodHostPort(t *testing.T) {
 	testGoodEnv(t, ChanticoPrometheusServiceHostEnv, goodUrl, testGoodHostPort)
 }
 
-func TestWatchNamespaceAllNamespaces(t *testing.T) {
-	_ = os.Unsetenv(ChanticoNamespaceEnv)
-
+func TestPodNamespace(t *testing.T) {
 	cases := []struct {
 		name string
-		env  string
 		val  string
 		good bool
 	}{
-		{"AllNamespaces", ChanticoWatchNamespaceEnv, AllNamespaces, true},
-		{"SpecificNamespace", ChanticoWatchNamespaceEnv, "chantico-system", true},
-		{"InvalidNamespace", ChanticoWatchNamespaceEnv, "Not_A_Valid_Namespace!", false},
+		{"ValidNamespace", "chantico-system", true},
+		{"InvalidNamespace", "Not_A_Valid_Namespace!", false},
+		{"AsteriskNamespace", "*", false},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			t.Setenv(c.env, c.val)
+			t.Setenv(ChanticoNamespaceEnv, c.val)
 			if c.good {
-				var testAllNamespaces = func(env validatedEnv) bool { return env.WatchNamespace == c.val }
-				testGoodEnv(t, c.env, c.val, testAllNamespaces)
+				var testPodNamespace = func(env validatedEnv) bool { return env.PodNamespace == c.val }
+				testGoodEnv(t, ChanticoNamespaceEnv, c.val, testPodNamespace)
 			} else {
-				var testAllNamespaces = func(env validatedEnv) bool { return env.WatchNamespace != c.val }
-				testBadEnv(t, c.env, c.val, testAllNamespaces)
+				var testPodNamespace = func(env validatedEnv) bool { return env.PodNamespace != c.val }
+				testBadEnv(t, ChanticoNamespaceEnv, c.val, testPodNamespace)
+			}
+		})
+	}
+}
+
+func TestWatchNamespace(t *testing.T) {
+	t.Setenv(ChanticoNamespaceEnv, "")
+
+	cases := []struct {
+		name         string
+		podNamespace string
+		val          string
+		good         bool
+	}{
+		{"AllNamespaces", "chantico", "*", true},
+		{"SpecificNamespace", "chantico", "chantico-system", true},
+		{"InvalidNamespace", "", "Not_A_Valid_Namespace!", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv(ChanticoNamespaceEnv, c.podNamespace)
+			t.Setenv(ChanticoWatchNamespaceEnv, c.val)
+			if c.good {
+				var testWatchNamespace = func(env validatedEnv) bool { return env.WatchNamespace == c.val }
+				testGoodEnv(t, ChanticoWatchNamespaceEnv, c.val, testWatchNamespace)
+			} else {
+				var testWatchNamespace = func(env validatedEnv) bool { return env.WatchNamespace != c.val }
+				testBadEnv(t, ChanticoWatchNamespaceEnv, c.val, testWatchNamespace)
 			}
 		})
 	}
