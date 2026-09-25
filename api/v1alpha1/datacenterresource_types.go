@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -93,9 +92,8 @@ type DataCenterResourceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	InvolvedResource   string             `json:"involvedResource,omitempty"`
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
+	ConditionedStatus `json:",inline"`
+	InvolvedResource  string `json:"involvedResource,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -139,13 +137,10 @@ const (
 	DataCenterResourceGraphFinalizer = "datacenterresource.finalizer.chantico-project.github.io/graph"
 )
 
-func (m *DataCenterResource) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+func (dcr *DataCenterResource) GetConditions() *[]metav1.Condition { return &dcr.Status.Conditions }
 
-func (m *DataCenterResource) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
-	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
-		Type: string(t), Status: s, Reason: string(reason), Message: msg,
-		ObservedGeneration: m.GetGeneration(),
-	})
+func (dcr *DataCenterResource) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
+	updateStatusCondition(dcr, t, s, reason, msg)
 }
 
 // ParentNames returns a flat list of parent resource names, for use in

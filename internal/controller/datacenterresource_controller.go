@@ -155,12 +155,10 @@ func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, da
 	l.Info("Deleting rule file", "file", rulePath)
 
 	if err := deleteRuleFile(dataCenterResource); err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
-		return steps.Error(err)
+		return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonCleanupFailed, "Error deleting rule file", err)
 	}
 	if err := reloadPrometheus(ctx); err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Error reloading Prometheus: "+err.Error())
-		return steps.Error(err)
+		return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonReloadFailed, "Error reloading Prometheus", err)
 	}
 
 	util.RemoveFinalizer(dataCenterResource, chantico.DataCenterResourceGraphFinalizer)
@@ -189,29 +187,27 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
 		dataCenterResource.Status.InvolvedResource = involvedResource
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, validationFailureReason(err), err.Error())
-		return steps.Error(err)
-	} else {
-		l.Info("Clearing validation errors", "status", dataCenterResource.Status)
-		references := &chantico.DataCenterResourceList{}
-		_ = r.List(ctx, references, append(listOptions, client.MatchingFields{"status.involvedResource": dataCenterResource.Name})...)
-		children := &chantico.DataCenterResourceList{}
-		_ = r.List(ctx, children, append(listOptions, client.MatchingFields{"spec.parents": dataCenterResource.Name})...)
-		if dataCenterResource.Status.InvolvedResource != "" {
-			involved := &chantico.DataCenterResource{}
-			_ = r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
-			visited = append(visited, *involved)
-		}
-		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited), "references", dcr.FormatResources(references.Items), "children", dcr.FormatResources(children.Items))
-		items := mergeUnique(visited, references.Items, children.Items)
-
-		for _, item := range items {
-			r.clearReferencedValidation(ctx, dataCenterResource, &item)
-		}
-		dataCenterResource.Status.InvolvedResource = ""
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
+		return failed(dataCenterResource, chantico.ConditionValidated, validationFailureReason(err), "Validation failed", err)
 	}
-	return steps.Continue()
+
+	l.Info("Clearing validation errors", "status", dataCenterResource.Status)
+	references := &chantico.DataCenterResourceList{}
+	_ = r.List(ctx, references, append(listOptions, client.MatchingFields{"status.involvedResource": dataCenterResource.Name})...)
+	children := &chantico.DataCenterResourceList{}
+	_ = r.List(ctx, children, append(listOptions, client.MatchingFields{"spec.parents": dataCenterResource.Name})...)
+	if dataCenterResource.Status.InvolvedResource != "" {
+		involved := &chantico.DataCenterResource{}
+		_ = r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
+		visited = append(visited, *involved)
+	}
+	l.Info("Visited nodes", "nodes", dcr.FormatResources(visited), "references", dcr.FormatResources(references.Items), "children", dcr.FormatResources(children.Items))
+	items := mergeUnique(visited, references.Items, children.Items)
+
+	for _, item := range items {
+		r.clearReferencedValidation(ctx, dataCenterResource, &item)
+	}
+	dataCenterResource.Status.InvolvedResource = ""
+	return reconciled(dataCenterResource, chantico.ConditionValidated, "Validation successful")
 }
 
 func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
@@ -221,59 +217,48 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 	resolvedDataCenterResource := dataCenterResource.DeepCopy()
 	resolvedDataCenterResource, err := r.resolveCoefficientTemplates(ctx, resolvedDataCenterResource)
 	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve coefficient template: "+err.Error())
-		return steps.Error(err)
+		return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonTemplateResolutionFailed, "Failed to resolve coefficient template", err)
 	}
 	// Resolve the energy metric template and apply it
 	resolvedDataCenterResource, err = r.resolveEnergyMetricTemplate(ctx, resolvedDataCenterResource)
 	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve energy metric template: "+err.Error())
-		return steps.Error(err)
+		return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonTemplateResolutionFailed, "Failed to resolve energy metric template", err)
 	}
 	ruleFile := dcr.BuildRuleFile(resolvedDataCenterResource)
 
 	if ruleFile == nil {
 		l.Info("No rule file found")
 		if err := deleteRuleFile(dataCenterResource); err != nil {
-			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
-			return steps.Error(err)
+			return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonCleanupFailed, "Error deleting rule file", err)
 		}
 		if err := reloadPrometheus(ctx); err != nil {
-			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
-			return steps.Error(err)
+			return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonReloadFailed, "Failed to reload Prometheus", err)
 		}
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "No recording rule file required")
-		return steps.Continue()
+		return reconciled(dataCenterResource, chantico.ConditionApplied, "No recording rule file required")
 	}
 
 	volumePath := config.ValidatedEnv.VolumeLocation
 	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
 	if err := os.MkdirAll(rulesDir, 0777); err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to create directory "+rulesDir+": "+err.Error())
-		return steps.Error(err)
+		return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonApplyFailed, "Failed to create directory "+rulesDir, err)
 	}
 
 	data, err := yaml.Marshal(ruleFile)
 	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to marshal rule file: "+err.Error())
-		return steps.Error(err)
+		return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonApplyFailed, "Failed to marshal rule file", err)
 	}
 
 	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
 	if err := os.WriteFile(rulePath, data, 0644); err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to write rule file: "+err.Error())
-		return steps.Error(err)
+		return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonApplyFailed, "Failed to write rule file", err)
 	}
 
 	l.Info("Wrote recording rule file", "file", rulePath, "resource", dataCenterResource.Name)
-	err = reloadPrometheus(ctx)
-	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
-		return steps.Error(err)
+	if err := reloadPrometheus(ctx); err != nil {
+		return failed(dataCenterResource, chantico.ConditionApplied, chantico.ReasonReloadFailed, "Failed to reload Prometheus", err)
 	}
 
-	dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Recording rule file applied successfully")
-	return steps.Continue()
+	return reconciled(dataCenterResource, chantico.ConditionApplied, "Recording rule file applied successfully")
 }
 
 // Helper function which resolves and performs the substitution for of the templates. Used for both the coefficient templates and energy metrics templates.
@@ -388,8 +373,7 @@ func (r *DataCenterResourceReconciler) resolveEnvVar(ctx context.Context, namesp
 }
 
 func (r *DataCenterResourceReconciler) reconcileReady(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
-	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "Fully reconciled and ready")
-	return steps.Continue()
+	return reconciled(dataCenterResource, chantico.ConditionReady, "Fully reconciled and ready")
 }
 
 func deleteRuleFile(dataCenterResource *chantico.DataCenterResource) error {

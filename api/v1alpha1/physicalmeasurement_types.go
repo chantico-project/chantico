@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,8 +39,7 @@ type PhysicalMeasurementSpec struct {
 type PhysicalMeasurementStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
+	ConditionedStatus `json:",inline"`
 }
 
 // +kubebuilder:object:root=true
@@ -73,13 +71,11 @@ const (
 	PhysicalMeasurementFinalizer = "physicalmeasurement.chantico-project.github.io/finalizer"
 )
 
-func (m *PhysicalMeasurement) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+func (pm *PhysicalMeasurement) GetConditions() *[]metav1.Condition { return &pm.Status.Conditions }
 
-func (m *PhysicalMeasurement) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
-	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
-		Type: string(t), Status: s, Reason: string(reason), Message: msg,
-		ObservedGeneration: m.GetGeneration(),
-	})
+func (pm *PhysicalMeasurement) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, r ConditionReason, msg string) {
+	updateStatusCondition(pm, t, s, r, msg)
+
 }
 
 func init() {
