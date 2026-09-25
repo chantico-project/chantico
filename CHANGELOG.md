@@ -1,3 +1,15 @@
+## 0.16.0 (2026-09-25)
+
+#### Feature
+
+* PromQL Templates for datacenterresource coefficient and energyMetric (#219) (037a0701)
+
+## 0.15.1 (2026-09-25)
+
+#### Bug Fixes
+
+* remove windows support (#229) (4c58499d)
+
 ## 0.15.0 (2026-09-24)
 
 #### Feature

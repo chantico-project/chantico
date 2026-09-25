@@ -1,3 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pdu-energymetric-template
+data:
+  template: |
+    tnoPduPowerValue{job="{{ .jobName }}", name="{{ .resourceName }}"}
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -10,7 +17,15 @@ spec:
   type: pdu
   physicalMeasurements:
     - physicalMeasurement-pdu1-out
-  energyMetric: tnoPduPowerValue{job="tno"}
+  energyMetricFrom:
+    configMapKeyRef:
+      name: pdu-energymetric-template
+      key: template
+    parameters:
+    - name: jobName
+      value: tno
+    - name: resourceName
+      value: physicalmeasurement-pdu1-out
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -23,7 +38,15 @@ spec:
   type: pdu
   physicalMeasurements:
     - physicalMeasurement-pdu2-out
-  energyMetric: tnoPduPowerValue{job="tno-2"}
+  energyMetricFrom:
+    configMapKeyRef:
+      name: pdu-energymetric-template
+      key: template
+    parameters:
+    - name: jobName
+      value: tno-2
+    - name: resourceName
+      value: physicalmeasurement-pdu2-out
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource

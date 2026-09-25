@@ -17,9 +17,22 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type TemplateConfigMapKeyRef struct {
+	// Name is the name of the ConfigMap.
+	Name string `json:"name"`
+	// Key is the key within the ConfigMap that contains the template.
+	Key string `json:"key,omitempty"`
+}
+
+type TemplateFrom struct {
+	ConfigMapKeyRef TemplateConfigMapKeyRef `json:"configMapKeyRef"`
+	Parameters      []corev1.EnvVar         `json:"parameters,omitempty"`
+}
 
 // ParentRef references a parent DataCenterResource and optionally carries
 // the energy coefficient for the edge from that parent to this node.
@@ -33,7 +46,8 @@ type ParentRef struct {
 	// to the current node. It is a PromQL expression (often a literal
 	// number) that will be written as a Prometheus recording rule.
 	// +optional
-	Coefficient string `json:"coefficient,omitempty"`
+	Coefficient     string       `json:"coefficient,omitempty"`
+	CoefficientFrom TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
@@ -59,6 +73,8 @@ type DataCenterResourceSpec struct {
 	// timeseries is produced directly by hardware / an exporter.
 	// +optional
 	EnergyMetric string `json:"energyMetric,omitempty"`
+
+	EnergyMetricFrom TemplateFrom `json:"energyMetricFrom,omitempty"`
 
 	// ServiceId is the identifier of the service that this resource belongs to.
 	// Define on a resource to make it part of a service, or make a separate

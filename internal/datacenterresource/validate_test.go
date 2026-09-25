@@ -38,7 +38,7 @@ func TestValidate(t *testing.T) {
 			ExpectedError:            nil,
 			ExpectedInvolvedResource: "",
 		},
-		"gives error if root node has no energyMetric": {
+		"gives error if root node has no energyMetric or energyMetricFrom": {
 			Resource: &chantico.DataCenterResource{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
