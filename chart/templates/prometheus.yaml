@@ -47,6 +47,29 @@ data:
           )
         labels:
           kind: overhead
+      - record: chantico_energy_watts
+        expr:
+          chantico_energy_watts{kind="total"}
+          * on(resource) group_left()
+          label_replace(
+            chantico_energy_coefficient{kind="overhead"},
+            "resource", "$1",
+            "parent", "(.*)"
+          )
+        labels:
+          kind: overhead
+      - record: chantico_energy_watts
+        expr: |
+          chantico_energy_watts{kind="total"}
+          * on(resource) group_left()
+          label_replace(
+            1 - chantico_energy_coefficient{kind="overhead"},
+            "resource", "$1",
+            "parent", "(.*)"
+          )
+        labels:
+          kind: attributed
+
 ---
 apiVersion: apps/v1
 kind: Deployment
