@@ -1,3 +1,32 @@
+## 0.16.0 (2026-09-25)
+
+#### Feature
+
+* PromQL Templates for datacenterresource coefficient and energyMetric (#219) (037a0701)
+
+## 0.15.1 (2026-09-25)
+
+#### Bug Fixes
+
+* remove windows support (#229) (4c58499d)
+
+## 0.15.0 (2026-09-24)
+
+#### Feature
+
+* align datacenterresource metric names with prometheus convention (#220) (4cc7beeb)
+
+#### Chores
+
+* **deps:** bump google.golang.org/grpc from 1.82.1 to 1.83.2 (#225) (8432d131)
+* Address Sigrid finding about host request and do not block pipeline (#222) (1d30c09f)
+
+## 0.14.0 (2026-09-22)
+
+#### Feature
+
+* Add filestore interface and filesystem implementation (#193) (2c0f359d)
+
 ## 0.13.0 (2026-09-16)
 
 #### Feature

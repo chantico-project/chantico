@@ -5,6 +5,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 
+	"chantico/internal/filestore"
 	img "chantico/internal/images"
 	vol "chantico/internal/volumes"
 	"os"
@@ -21,11 +22,11 @@ func BuildGeneratorJob(measurementDevice *chantico.MeasurementDevice) (*batchv1.
 	}
 
 	const podMountPath = "/data"
-	podPath := NewPaths(podMountPath)
+	fs := filestore.VolumeFileStore{Root: podMountPath}
 
-	generatorPath := podPath.GeneratorFile(measurementDevice.GetUID())
-	mibsDir := podPath.MIBsDir()
-	outputPath := podPath.SNMPFile(measurementDevice.GetUID())
+	generatorPath := fs.Resolve(GeneratorFile(measurementDevice.GetUID()))
+	mibsDir := fs.Resolve(MibsSubDir)
+	outputPath := fs.Resolve(SnmpFile(measurementDevice.GetUID()))
 	backoffLimit := int32(0)
 	uid := int64(os.Getuid())
 	gid := int64(os.Getgid())

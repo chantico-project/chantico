@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.13.0
+VERSION ?= 0.16.0
 
 # Image REPOSITORY_URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
@@ -354,7 +354,7 @@ DOC2GO ?= $(LOCALBIN)/doc2go
 KUSTOMIZE_VERSION ?= v5.4.3
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.19
-GOLANGCI_LINT_VERSION ?= v2.12.2
+GOLANGCI_LINT_VERSION ?= v2.13.2
 KIND_VERSION ?= v0.30.0
 HUGO_VERSION ?= v0.163.3
 MUFFET_VERSION ?= v2.11.2

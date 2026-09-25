@@ -5,6 +5,8 @@ import (
 	"slices"
 
 	chantico "chantico/api/v1alpha1"
+
+	"github.com/prometheus/common/model"
 )
 
 const (
@@ -55,6 +57,14 @@ func (e ErrorServiceDefinedOnParent) Error() string {
 	return fmt.Sprintf("service ID must not be defined on %s with children (no leaf node)", e.InvolvedResource)
 }
 
+type ErrorInvalidLabelName struct {
+	LabelName string
+}
+
+func (e ErrorInvalidLabelName) Error() string {
+	return fmt.Sprintf("invalid additional label name: %s", e.LabelName)
+}
+
 func GetFromMap(
 	resourcesMap map[string]chantico.DataCenterResource,
 	nodes []string,
@@ -78,12 +88,14 @@ func FormatResources(resources []chantico.DataCenterResource) string {
 	return text
 }
 
-func Validate(
+// ValidateGraph checks that adding dataCenterResource keeps the parent
+// relations a valid directed acyclic graph, with service IDs only on leaf
+// nodes.
+func validateGraph(
 	dataCenterResource *chantico.DataCenterResource,
 	dataCenterResources []chantico.DataCenterResource,
 	physicalMeasurements []chantico.PhysicalMeasurement,
 ) ([]chantico.DataCenterResource, string, error) {
-	// Perform validation of parent for directed acyclic graph
 	resourcesMap := make(map[string]chantico.DataCenterResource)
 	visitedSet := make(map[string]bool)
 	for _, resource := range dataCenterResources {
@@ -117,22 +129,62 @@ func Validate(
 		queue = append(queue, current.Spec.ParentNames()...)
 	}
 
+	return GetFromMap(resourcesMap, queue[0:visited]), "", nil
+}
+
+// Ensure the resource type is in the list of known types.
+func validateResourceType(dataCenterResource *chantico.DataCenterResource) error {
+	switch dataCenterResource.Spec.Type {
+	case "", DataCenterResourceTypePDU, DataCenterResourceTypeBaremetal, DataCenterResourceTypeVM, DataCenterResourceTypeKubernetes, DataCenterResourceTypeHeat:
+		return nil
+	default:
+		return ErrorUnknownType{Type: dataCenterResource.Spec.Type}
+	}
+}
+
+// Root nodes (no parents) must have energyMetric set so Prometheus can source their energy timeseries.
+func validateEnergyMetric(dataCenterResource *chantico.DataCenterResource) error {
+	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetric == "" && dataCenterResource.Spec.EnergyMetricFrom.ConfigMapKeyRef.Name == "" {
+		return ErrorMissingEnergyMetric{InvolvedResource: dataCenterResource.Name}
+	}
+	return nil
+}
+
+// ValidateAdditionalLabelNames rejects additional labels that are not valid Prometheus label names.
+func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResource) error {
+	for labelName := range dataCenterResource.Spec.AdditionalLabels {
+		if !model.UTF8Validation.IsValidLabelName(labelName) {
+			return ErrorInvalidLabelName{LabelName: labelName}
+		}
+	}
+	return nil
+}
+
+var validators = []func(*chantico.DataCenterResource) error{
+	validateResourceType,
+	validateEnergyMetric,
+	validateAdditionalLabelNames,
+}
+
+func Validate(
+	dataCenterResource *chantico.DataCenterResource,
+	dataCenterResources []chantico.DataCenterResource,
+	physicalMeasurements []chantico.PhysicalMeasurement,
+) ([]chantico.DataCenterResource, string, error) {
+	involvedResources, involvedResourceName, err := validateGraph(dataCenterResource, dataCenterResources, physicalMeasurements)
+	if err != nil {
+		return involvedResources, involvedResourceName, err
+	}
+
 	// Check if physical measurements exist
 	// TODO(user): For now this validation is skipped because we do not know which
 	// order the resources are created
 
-	// Check type of resource
-	switch dataCenterResource.Spec.Type {
-	case "", DataCenterResourceTypePDU, DataCenterResourceTypeBaremetal, DataCenterResourceTypeVM, DataCenterResourceTypeKubernetes, DataCenterResourceTypeHeat:
-	default:
-		return GetFromMap(resourcesMap, queue[0:visited]), "", ErrorUnknownType{Type: dataCenterResource.Spec.Type}
+	for _, validate := range validators {
+		if err := validate(dataCenterResource); err != nil {
+			return involvedResources, "", err
+		}
 	}
 
-	// Root nodes (no parents) must have energyMetric set so Prometheus can
-	// source their energy timeseries.
-	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetric == "" {
-		return GetFromMap(resourcesMap, queue[0:visited]), "", ErrorMissingEnergyMetric{InvolvedResource: dataCenterResource.Name}
-	}
-
-	return GetFromMap(resourcesMap, queue[0:visited]), "", nil
+	return involvedResources, "", nil
 }
