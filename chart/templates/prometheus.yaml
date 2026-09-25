@@ -33,28 +33,20 @@ data:
             target_label: instance
           - target_label: __address__
             replacement: {{ .Values.snmpExporterAddress }}
+
   static_rules.yml: |-
     groups:
     - name: const-coefficients
       rules:
       - record: chantico_energy_coefficient
         expr: |
-          label_replace(
-            1 - sum by (parent) (
-              chantico_energy_coefficient{kind="attribution"}
-            ),
-            "resource", "$1", "parent", "(.*)"
-          )
-        labels:
-          kind: overhead
-      - record: chantico_energy_watts
-        expr:
-          chantico_energy_watts{kind="total"}
-          * on(resource) group_left()
-          label_replace(
-            chantico_energy_coefficient{kind="overhead"},
-            "resource", "$1",
-            "parent", "(.*)"
+          sum by (resource) (
+            label_replace(
+              1 - sum by (parent) (
+                chantico_energy_coefficient{kind="attribution"}
+              ),
+              "resource", "$1", "parent", "(.*)"
+            )
           )
         labels:
           kind: overhead
@@ -62,10 +54,27 @@ data:
         expr: |
           chantico_energy_watts{kind="total"}
           * on(resource) group_left()
-          label_replace(
-            1 - chantico_energy_coefficient{kind="overhead"},
-            "resource", "$1",
-            "parent", "(.*)"
+          sum by(resource) (
+            label_replace(
+              1 - sum by(parent) (
+                chantico_energy_coefficient{kind="attribution"}
+              ),
+              "resource", "$1", "parent", "(.*)"
+            )
+          )
+        labels:
+          kind: overhead
+      - record: chantico_energy_watts
+        expr: |
+          chantico_energy_watts{kind="total"}
+          * on(resource) group_left()
+          sum by(resource) (
+            label_replace(
+              sum by(parent) (
+                chantico_energy_coefficient{kind="attribution"}
+              ),
+              "resource", "$1", "parent", "(.*)"
+            )
           )
         labels:
           kind: attributed
