@@ -35,9 +35,9 @@ const (
 )
 
 type ExpectedRule struct {
-	Record         string
-	Expr           string
-	ServiceIdLabel string
+	Record string
+	Expr   string
+	Labels map[string]string
 }
 
 func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
@@ -47,9 +47,9 @@ func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
 	if rule.Expr != expected.Expr {
 		t.Errorf("Expected rule expr = %q, got %q", expected.Expr, rule.Expr)
 	}
-	if expected.ServiceIdLabel != "" {
-		if val, ok := rule.Labels["serviceId"]; !ok || val != expected.ServiceIdLabel {
-			t.Errorf("Expected serviceId label = %q, got %q", expected.ServiceIdLabel, val)
+	for key, expectedValue := range expected.Labels {
+		if actualValue, ok := rule.Labels[key]; !ok || actualValue != expectedValue {
+			t.Errorf("Expected label %q = %q, got %q", key, expectedValue, actualValue)
 		}
 	}
 }
@@ -315,10 +315,22 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record: "chantico_power_coefficient",
 		Expr:   testPDU1Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU1,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
 		Record: "chantico_power_coefficient",
 		Expr:   testPDU2Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU2,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 }
 
@@ -345,10 +357,22 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record: "chantico_power_coefficient",
 		Expr:   testPDU1Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU1,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
 		Record: "chantico_power_coefficient",
 		Expr:   testPDU2Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU2,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 
 	// Last should be the energy rule
