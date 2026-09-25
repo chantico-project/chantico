@@ -45,9 +45,9 @@ func ValidateEnv() (validatedEnv, []error) {
 	var errs []error
 	var ret validatedEnv
 
-	podNamespace, watchNamespace, err := validateNamespaces()
-	if err != nil {
-		errs = append(errs, err)
+	podNamespace, watchNamespace, nsErrs := validateNamespaces()
+	if nsErrs != nil {
+		errs = append(errs, nsErrs...)
 	} else {
 		ret.PodNamespace = podNamespace
 		ret.WatchNamespace = watchNamespace
@@ -113,7 +113,6 @@ func validateVar(varName string, extraTest func(string) error) (string, error) {
 	value, ok := os.LookupEnv(varName)
 	if !ok {
 		return value, fmt.Errorf("environment variable %s must be set", varName)
-
 	}
 	if value == "" {
 		return value, fmt.Errorf("environment variable %s is an empty string", varName)
@@ -178,13 +177,13 @@ func lookupNamespace(envName string, allNamespacesAllowed bool) (string, error) 
 	return namespace, nil
 }
 
-func validateNamespaces() (string, string, error) {
+func validateNamespaces() (string, string, []error) {
 	podNamespace, podErr := lookupNamespace(ChanticoNamespaceEnv, false)
 	watchNamespace, watchErr := lookupNamespace(ChanticoWatchNamespaceEnv, true)
+	if podErr != nil {
+		return "", "", []error{podErr, watchErr}
+	}
 	if watchErr != nil {
-		if podErr != nil {
-			return "", "", fmt.Errorf("%s and %s; set %s explicitly to a namespace name or '%s', or ensure %s is set or populated in the Deployment manifest", podErr, watchErr, ChanticoWatchNamespaceEnv, AllNamespaces, ChanticoNamespaceEnv)
-		}
 		return podNamespace, podNamespace, nil
 	}
 

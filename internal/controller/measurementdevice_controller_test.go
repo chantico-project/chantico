@@ -33,13 +33,17 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	TestMeasurementDeviceName = "tno"
+	ChanticoNamespace         = "chantico"
 )
 
 func newReconciler(t *testing.T, root string, objs ...runtime.Object) *MeasurementDeviceReconciler {
@@ -59,19 +63,7 @@ func newReconciler(t *testing.T, root string, objs ...runtime.Object) *Measureme
 		WithRuntimeObjects(objs...).
 		Build()
 
-	// Take first object with a namespace as reconciler namespace
-	namespace := ""
-	for _, obj := range objs {
-		accessor, err := meta.Accessor(obj)
-		if err != nil {
-			t.Fatal(err)
-		}
-		namespace = accessor.GetNamespace()
-		if namespace != "" {
-			break
-		}
-	}
-	t.Setenv(config.ChanticoNamespaceEnv, namespace)
+	t.Setenv(config.ChanticoNamespaceEnv, ChanticoNamespace)
 
 	return &MeasurementDeviceReconciler{
 		Client:    c,
@@ -84,7 +76,7 @@ func TestWriteReconcileGeneratorFile(t *testing.T) {
 	root := t.TempDir()
 	measurementDevice := &chantico.MeasurementDevice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tno", Namespace: "chantico",
+			Name: TestMeasurementDeviceName, Namespace: ChanticoNamespace,
 			UID: types.UID("dev-1"),
 		},
 		Spec: chantico.MeasurementDeviceSpec{
@@ -139,7 +131,7 @@ func TestWriteReconcileMergedSNMPFile(t *testing.T) {
 		[]byte("auths: {bar: {version: 3}}\nmodules: {bar: {walk: [1.4]}}\n"),
 	)
 
-	measurementDevice := &chantico.MeasurementDevice{ObjectMeta: metav1.ObjectMeta{Name: "tno", Namespace: "chantico"}}
+	measurementDevice := &chantico.MeasurementDevice{ObjectMeta: metav1.ObjectMeta{Name: TestMeasurementDeviceName, Namespace: ChanticoNamespace}}
 	if res := r.reconcileMergedSNMPFile(context.Background(), measurementDevice); res.Action == steps.ActionError {
 		t.Fatalf("reconcileMergedSNMPFile errored: %v", res.Err)
 	}
@@ -177,8 +169,8 @@ func TestReconcileDeletion(t *testing.T) {
 	now := metav1.Now()
 	measurementDevice := &chantico.MeasurementDevice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              "tno",
-			Namespace:         "chantico",
+			Name:              TestMeasurementDeviceName,
+			Namespace:         ChanticoNamespace,
 			UID:               types.UID("dev-del"),
 			DeletionTimestamp: &now,
 			Finalizers:        []string{chantico.SNMPUpdateFinalizer},
@@ -193,7 +185,7 @@ func TestReconcileDeletion(t *testing.T) {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "tno-generator",
-			Namespace: "chantico",
+			Namespace: ChanticoNamespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: chantico.GroupVersion.String(),
@@ -207,7 +199,7 @@ func TestReconcileDeletion(t *testing.T) {
 	}
 
 	exporter := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "chantico-snmp", Namespace: "chantico"},
+		ObjectMeta: metav1.ObjectMeta{Name: "chantico-snmp", Namespace: ChanticoNamespace},
 	}
 	r := newReconciler(t, root, measurementDevice, job, exporter)
 
