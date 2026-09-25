@@ -53,6 +53,8 @@ type ParentRef struct {
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
+// +kubebuilder:validation:XValidation:rule="has(self.energyMetric)||has(self.energyMetricFrom)",message="Resource must have energyMetric or energyMetricFrom"
+// +kubebuilder:validation:XValidation:rule="!(has(self.energyMetric)&&has(self.energyMetricFrom))",message="Resource cannot have both energyMetric and energyMetricFrom set"
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
