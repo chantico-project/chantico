@@ -1,3 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chantico-prometheus-config
+  namespace: {{ .Release.Namespace }}
+data:
+  prometheus.yml: |-
+    global:
+      scrape_interval: 10s
+      scrape_timeout: 5s
+      evaluation_interval: 5s
+    rule_files:
+      - /tmp/prometheus-volume/rules/*.yml
+    {{- if .Values.victoriaMetrics.include }}
+    remote_write:
+      - url: http://chantico-victoriametrics:8428/api/v1/write
+    {{- end }}
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+          - targets: ['localhost:9090']
+      - job_name: snmp
+        file_sd_configs:
+          - files:
+              - /tmp/prometheus-volume/targets/*.json
+            refresh_interval: 30s
+        metrics_path: /snmp
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: {{ .Values.snmpExporterAddress }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,11 +61,14 @@ spec:
       - image: docker.io/prom/prometheus:v3.7.3
         name: prometheus
         command: ["prometheus"]
-        args: ["--config.file=/tmp/prometheus-volume/yml/prometheus.yml", "--storage.tsdb.path=/tmp/prometheus-volume/storage", "--storage.tsdb.retention.time={{ .Values.prometheusRetention }}", "--web.enable-lifecycle", "--storage.tsdb.no-lockfile"]
+        args: ["--config.file=/tmp/prometheus-config/prometheus.yml", "--storage.tsdb.path=/tmp/prometheus-volume/storage", "--storage.tsdb.retention.time={{ .Values.prometheusRetention }}", "--web.enable-lifecycle", "--storage.tsdb.no-lockfile"]
         volumeMounts:
         - mountPath: "/tmp/prometheus-volume"
           name: chantico-volume-mount
           subPath: "prometheus"
+        - mountPath: "/tmp/prometheus-config"
+          name: chantico-prometheus-config
+          readOnly: true
         ports:
         - containerPort: 9090
         securityContext:
@@ -58,38 +96,8 @@ spec:
           - |
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/config;
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/storage;
-            mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/yml;
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/targets;
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/rules;
-            cat > /tmp/chantico-volume-mount/prometheus/yml/prometheus.yml <<'EOF'
-            global:
-              scrape_interval: 10s
-              scrape_timeout: 5s
-              evaluation_interval: 5s
-            rule_files:
-              - /tmp/prometheus-volume/rules/*.yml
-            {{- if .Values.victoriaMetrics.include }}
-            remote_write:
-              - url: http://chantico-victoriametrics:8428/api/v1/write
-            {{- end }}
-            scrape_configs:
-              - job_name: prometheus
-                static_configs:
-                  - targets: ['localhost:9090']
-              - job_name: snmp
-                file_sd_configs:
-                  - files:
-                      - /tmp/prometheus-volume/targets/*.json
-                    refresh_interval: 30s
-                metrics_path: /snmp
-                relabel_configs:
-                  - source_labels: [__address__]
-                    target_label: __param_target
-                  - source_labels: [__param_target]
-                    target_label: instance
-                  - target_label: __address__
-                    replacement: {{ .Values.snmpExporterAddress }}
-            EOF
             chmod -R 1777 /tmp/chantico-volume-mount/prometheus
         volumeMounts:
         - mountPath: "/tmp/chantico-volume-mount"
@@ -98,6 +106,9 @@ spec:
       - name: chantico-volume-mount
         persistentVolumeClaim:
           claimName: {{ .Values.persistentVolumeClaimName }}
+      - name: chantico-prometheus-config
+        configMap:
+          name: chantico-prometheus-config
       restartPolicy: Always
 ---
 apiVersion: v1
