@@ -150,11 +150,18 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace, hel
 # 	$(CONTAINER_TOOL) pull $(PROMETHEUS_EXPORTER_MOCK_IMAGE)
 # 	$(CONTAINER_TOOL) tag $(PROMETHEUS_EXPORTER_MOCK_IMAGE) chantico-prometheus-exporter-mock:latest
 	$(KIND) load docker-image chantico-prometheus-exporter-mock:latest --name kind
-	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
+# Apply the Mocks
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-deployment.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-service.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-2-deployment.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-2-service.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/prometheus-exporter-mock-deployment.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/prometheus-exporter-mock-service.yaml
+# Apply the sample configurations for the mocks
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock2.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?

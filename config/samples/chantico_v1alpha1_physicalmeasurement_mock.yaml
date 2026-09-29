@@ -6,5 +6,29 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: physicalmeasurement-pdu1-out
 spec:
+  type: snmp
   ip: chantico-snmp-mock:1161
   measurementDevice: tno
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: PhysicalMeasurement
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: physicalmeasurement-pdu2-out
+spec:
+  type: snmp
+  ip: chantico-snmp-mock-2:1161
+  measurementDevice: tno-2
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: PhysicalMeasurement
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: physicalmeasurement-bm1
+spec:
+  type: prometheus
+  ip: chantico-prometheus-exporter-mock:9090

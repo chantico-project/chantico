@@ -22,7 +22,7 @@ data:
       - job_name: snmp
         file_sd_configs:
           - files:
-              - /tmp/prometheus-volume/targets/*.json
+              - /tmp/prometheus-volume/targets/snmp/*.json
             refresh_interval: 30s
         metrics_path: /snmp
         relabel_configs:
@@ -32,6 +32,12 @@ data:
             target_label: instance
           - target_label: __address__
             replacement: {{ .Values.snmpExporterAddress }}
+      - job_name: prometheus-exporter
+        file_sd_configs:
+          - files:
+              - /tmp/prometheus-volume/targets/prometheus/*.json
+            refresh_interval: 30s
+        metrics_path: /metrics
 ---
 apiVersion: apps/v1
 kind: Deployment

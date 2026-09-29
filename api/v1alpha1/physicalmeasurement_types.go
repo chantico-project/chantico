@@ -23,6 +23,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type PhysicalMeasurementType string
+
+const (
+	PhysicalMeasurementTypeSNMP       PhysicalMeasurementType = "snmp"
+	PhysicalMeasurementTypePrometheus PhysicalMeasurementType = "prometheus"
+)
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -31,9 +38,10 @@ type PhysicalMeasurementSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Ip                string   `json:"ip"`
-	MeasurementDevice string   `json:"measurementDevice"`
-	ResourceIds       []string `json:"resourceIds,omitempty"`
+	Ip                string                  `json:"ip"`
+	Type              PhysicalMeasurementType `json:"type"`
+	MeasurementDevice string                  `json:"measurementDevice,omitempty"`
+	ResourceIds       []string                `json:"resourceIds,omitempty"`
 }
 
 // PhysicalMeasurementStatus defines the observed state of PhysicalMeasurement

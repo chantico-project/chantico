@@ -57,7 +57,6 @@ metadata:
   name: datacenterresource-misd-gbm-01
 spec:
   type: baremetal
-  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
   parents:
     - name: datacenterresource-pdu1
       coefficient: "1"
@@ -65,3 +64,57 @@ spec:
       coefficient: "1"
   additionalLabels:
     exampleLabel: exampleValue
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: mock-prometheus-attribution-template
+data:
+  template: |
+    vm_attribution_coefficient{name="{{ .resource }}", resource_consumer_id="{{ .cgroup }}"}
+
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: datacenterresource-misd-vm-120
+spec:
+  type: vm
+  parents:
+    - name: datacenterresource-pdu1
+      coefficientFrom:
+        configMapKeyRef:
+          name: mock-prometheus-attribution-template
+          key: template
+        parameters:
+        - name: resource
+          value: "physicalmeasurement-bm1"
+        - name: cgroup
+          value: "/qemu.slice/120.scope" 
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: datacenterresource-misd-vm-121
+spec:
+  type: vm
+  parents:
+    - name: datacenterresource-pdu1
+      coefficientFrom:
+        configMapKeyRef:
+          name: mock-prometheus-attribution-template
+          key: template
+        parameters:
+        - name: resource
+          value: "physicalmeasurement-bm1"
+        - name: cgroup
+          value: "/qemu.slice/121.scope" 
