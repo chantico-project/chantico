@@ -10,14 +10,8 @@ import (
 	"strings"
 )
 
-const raplMetricsBase = `# HELP rapl_consumed_energy_joules Energy consumed since the previous measurement, as reported by RAPL.
-# TYPE rapl_consumed_energy_joules gauge
-# UNIT rapl_consumed_energy_joules joules
-`
-
-const vmEnergyAttributionBase = ` # HELP attributed_energy_joules Energy attribution (since the previous value) per consumer and per resource.
-# TYPE attributed_energy_joules gauge
-# UNIT attributed_energy_joules joules
+const vmAttributionBase = `# HELP vm_attribution_coefficient Fraction of total system usage attributed to this VM.
+# TYPE vm_attribution_coefficient gauge
 `
 
 var (
@@ -58,44 +52,27 @@ func envVMIDs(name string, defaultValues []int) []int {
 	return vmIDs
 }
 
-func simulateRaplMetrics(w http.ResponseWriter, r *http.Request) {
-	// Simulate energy consumption values in a realistic range for demonstration purposes
-	packageEnergy := 60 + rand.Float64()*60
-	dramEnergy := 8 + rand.Float64()*16
-
-	_, _ = fmt.Fprintf(w, "rapl_consumed_energy_joules{domain=\"dram_total\",name=\"%s\",resource_consumer_id=\"\",resource_consumer_kind=\"local_machine\",resource_id=\"\",resource_kind=\"local_machine\"} %.6f\n", hostName, dramEnergy)
-	_, _ = fmt.Fprintf(w, "rapl_consumed_energy_joules{domain=\"package_total\",name=\"%s\",resource_consumer_id=\"\",resource_consumer_kind=\"local_machine\",resource_id=\"\",resource_kind=\"local_machine\"} %.6f\n", hostName, packageEnergy)
-}
-
-func simulateVMEnergyAttribution(w http.ResponseWriter, r *http.Request) {
-	// Simulate energy attribution values for demonstration purposes
-	_, _ = fmt.Fprintf(w, vmEnergyAttributionBase)
-
-	sumEnergy := 0.0
-
-	for _, vmID := range vmIDs {
-		vmEnergy := 0.01 + rand.Float64()*0.05 // Simulate energy attribution for each VM
-		sumEnergy += vmEnergy
-
-		_, _ = fmt.Fprintf(w, "attributed_energy_joules{domain=\"package_total\",kind=\"total\",resource_consumer_id=\"/qemu.slice/%d.scope\",resource_consumer_kind=\"cgroup\",resource_id=\"\",resource_kind=\"local_machine\"} %.6f\n", vmID, vmEnergy)
+func simulateVMAttribution(w http.ResponseWriter) {
+	weights := make([]float64, len(vmIDs))
+	totalWeight := 1.0 // Leave some system usage unattributed to VMs.
+	for index := range weights {
+		weights[index] = 0.1 + rand.Float64()
+		totalWeight += weights[index]
 	}
-	overheadQemu := 0.005 + rand.Float64()*0.01 // Simulate energy attribution for QEMU overhead
-	sumEnergy += overheadQemu
-	_, _ = fmt.Fprintf(w, "attributed_energy_joules{domain=\"package_total\",kind=\"total\",resource_consumer_id=\"/qemu.slice\",resource_consumer_kind=\"cgroup\",resource_id=\"\",resource_kind=\"local_machine\"} %.6f\n", sumEnergy)
-
+	for index, vmID := range vmIDs {
+		_, _ = fmt.Fprintf(w, "vm_attribution_coefficient{name=\"%s\",resource_consumer_id=\"/qemu.slice/%d.scope\"} %.6f\n", hostName, vmID, weights[index]/totalWeight)
+	}
 }
 
-// Simulate a very basic prometheus exporter that serves RAPL energy consumption metrics. The values are randomly generated for demonstration purposes.
+// Simulate a basic Prometheus exporter with per-VM system usage attribution.
 func metrics(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	_, _ = w.Write([]byte(raplMetricsBase))
-
-	simulateRaplMetrics(w, r)
-	simulateVMEnergyAttribution(w, r)
+	_, _ = w.Write([]byte(vmAttributionBase))
+	simulateVMAttribution(w)
 }
 
 func main() {
