@@ -36,8 +36,7 @@ type Bounds struct {
 	Variance float64 // Maximum change per step, in either direction.
 }
 
-// BoundsFromEnv reads the walk configuration from <prefix>_MIN, <prefix>_MAX,
-// <prefix>_START and <prefix>_VARIANCE, falling back to the given defaults.
+// BoundsFromEnv reads the walk configuration, with default values.
 func BoundsFromEnv(prefix string, defaults Bounds) Bounds {
 	return Bounds{
 		Min:      EnvFloat(prefix+"_MIN", defaults.Min),

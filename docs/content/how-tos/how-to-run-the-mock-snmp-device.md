@@ -10,11 +10,31 @@ menus:
 ## The SNMP mock
 
 The SNMP mock is an UDP server mocking a device using SNMP with a mock MIB file 
-(`./dev/mibs/TNO-PDU-MIB.txt`). It provides random energy values for the 
+(`./dev/mibs/TNO-PDU-MIB.txt`). It provides simulated energy values for the 
 following metrics: `tnoPduEnergyValue` and `tnoPduPowerValue`. This file details 
 how to set up the mock device, and how to subsequently run a demo with it 
 including both the `PhysicalMeasurement` and `MeasurementDevice` custom 
 resources.
+
+### Simulated values
+
+Values are not purely random: each OID has a value, which drifts by a random amount 
+within a set variance and stays between a lower and an upper bound. This keeps the values 
+stable, enabling developers to debug against.
+
+The simulation is configured with environment variables on the mock container 
+(see `dev/k8s/snmp-mock-deployment.yaml`):
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MOCK_SNMP_ADDRESS` | `:1161` | Address the UDP listener binds to. |
+| `MOCK_SNMP_VALUE_MIN` | `200` | Lower bound of the simulated value. |
+| `MOCK_SNMP_VALUE_MAX` | `800` | Upper bound of the simulated value. |
+| `MOCK_SNMP_VALUE_START` | `500` | Value returned on the first request for an OID. |
+| `MOCK_SNMP_VALUE_VARIANCE` | `10` | Maximum change per request, in either direction. |
+
+Use a different `MOCK_SNMP_VALUE_START` per mock deployment to tell multiple 
+simulated devices apart.
 
 ### Requirements
 
