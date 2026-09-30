@@ -28,3 +28,11 @@ spec:
           value: "120,121"
         - name: MOCK_PROMETHEUS_PORT
           value: "9090"
+        - name: MOCK_PROMETHEUS_WEIGHT_MIN
+          value: "0.1"
+        - name: MOCK_PROMETHEUS_WEIGHT_MAX
+          value: "1.0"
+        - name: MOCK_PROMETHEUS_WEIGHT_START
+          value: "0.6"
+        - name: MOCK_PROMETHEUS_WEIGHT_VARIANCE
+          value: "0.02"
