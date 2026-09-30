@@ -62,8 +62,6 @@ spec:
       coefficient: "1"
     - name: datacenterresource-pdu2
       coefficient: "1"
-  additionalLabels:
-    exampleLabel: exampleValue
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -75,7 +73,6 @@ metadata:
 data:
   template: |
     vm_attribution_coefficient{name="{{ .resource }}", resource_consumer_id="{{ .cgroup }}"}
-
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -87,7 +84,7 @@ metadata:
 spec:
   type: vm
   parents:
-    - name: datacenterresource-pdu1
+    - name: datacenterresource-misd-gbm-01
       coefficientFrom:
         configMapKeyRef:
           name: mock-prometheus-attribution-template
@@ -108,7 +105,7 @@ metadata:
 spec:
   type: vm
   parents:
-    - name: datacenterresource-pdu1
+    - name: datacenterresource-misd-gbm-01
       coefficientFrom:
         configMapKeyRef:
           name: mock-prometheus-attribution-template
