@@ -143,8 +143,8 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace, hel
 		--set victoriaMetrics.service.type="NodePort" \
 		--set grafana.service.type="NodePort"
 	
-	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
-	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
+# 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
+# 	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
 	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
 # TODO: Uncomment this when the prometheus exporter mock has been build and pushed to GHCR. It is currently not being built and pushed, so this will fail.
 # 	$(CONTAINER_TOOL) pull $(PROMETHEUS_EXPORTER_MOCK_IMAGE)

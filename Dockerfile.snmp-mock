@@ -10,10 +10,10 @@ COPY go.sum go.sum
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
 
-COPY dev/mocks/snmp/ .
+COPY dev/mocks/ dev/mocks/
 
 # Statically compile the Go binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o snmp-mock mock_snmp.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o snmp-mock ./dev/mocks/snmp
 
 # Stage 2: Minimal runtime using distroless
 FROM gcr.io/distroless/static:nonroot
