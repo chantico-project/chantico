@@ -46,11 +46,10 @@ func ValidateEnv() (validatedEnv, []error) {
 	var ret validatedEnv
 
 	podNamespace, watchNamespace, nsErrs := validateNamespaces()
+	ret.PodNamespace = podNamespace
+	ret.WatchNamespace = watchNamespace
 	if nsErrs != nil {
 		errs = append(errs, nsErrs...)
-	} else {
-		ret.PodNamespace = podNamespace
-		ret.WatchNamespace = watchNamespace
 	}
 
 	volumeClaim, err := validateVar(ChanticoVolumeClaimEnv, validateClaim)
@@ -184,11 +183,7 @@ func validateNamespaces() (string, string, []error) {
 		return "", "", []error{podErr, watchErr}
 	}
 	if watchErr != nil {
-		return podNamespace, podNamespace, nil
-	}
-
-	if watchNamespace == AllNamespaces {
-		return podNamespace, AllNamespaces, nil
+		return podNamespace, podNamespace, []error{watchErr, fmt.Errorf("falling back to using pod namespace '%s' for watch namespace", podNamespace)}
 	}
 
 	return podNamespace, watchNamespace, nil
