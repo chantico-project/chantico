@@ -14,11 +14,11 @@ const vmAttributionBase = `# HELP vm_attribution_coefficient Fraction of total s
 `
 
 var (
-	hostName = simulation.EnvString("MOCK_PROMETHEUS_HOST_NAME", "prometheus-mock-bm-1")
-	vmIDs    = simulation.EnvInts("MOCK_PROMETHEUS_VM_IDS", []int{120, 121})
-	port     = simulation.EnvString("MOCK_PROMETHEUS_PORT", "9090")
+	hostName = simulation.EnvString("MOCK_VM_ATTR_HOST_NAME", "prometheus-mock-bm-1")
+	vmIDs    = simulation.EnvInts("MOCK_VM_ATTR_VM_IDS", []int{120, 121})
+	port     = simulation.EnvString("MOCK_VM_ATTR_PORT", "9090")
 
-	weights = simulation.NewWalk(simulation.BoundsFromEnv("MOCK_PROMETHEUS_WEIGHT", simulation.Bounds{
+	weights = simulation.NewWalk(simulation.BoundsFromEnv("MOCK_VM_ATTR_WEIGHT", simulation.Bounds{
 		Min:      0.2,
 		Max:      1.0,
 		Start:    0.6,

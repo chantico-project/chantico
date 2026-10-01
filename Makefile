@@ -17,8 +17,8 @@ LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 
 SNMP_MOCK_TAG ?= latest
 SNMP_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
-PROMETHEUS_EXPORTER_MOCK_TAG ?= latest
-PROMETHEUS_EXPORTER_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-prometheus-exporter-mock:$(PROMETHEUS_EXPORTER_MOCK_TAG)
+VM_ATTRIBUTION_MOCK_TAG ?= latest
+VM_ATTRIBUTION_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-vm-attribution-mock:$(VM_ATTRIBUTION_MOCK_TAG)
 
 # Name of the kind cluster created by cluster-up, and the kube context it produces.
 KIND_CLUSTER_NAME ?= kind
@@ -142,21 +142,27 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace, hel
 		--set prometheus.service.type="NodePort" \
 		--set victoriaMetrics.service.type="NodePort" \
 		--set grafana.service.type="NodePort"
-# SNMP Mock Image
-	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
-	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
+
+.PHONY: cluster-load-mock-images
+cluster-load-mock-images:
 	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
-# Prometheus Exporter Mock Image
-	$(CONTAINER_TOOL) pull $(PROMETHEUS_EXPORTER_MOCK_IMAGE)
-	$(CONTAINER_TOOL) tag $(PROMETHEUS_EXPORTER_MOCK_IMAGE) chantico-prometheus-exporter-mock:latest
-	$(KIND) load docker-image chantico-prometheus-exporter-mock:latest --name kind
-# Apply the mock deployments and services
+	$(KIND) load docker-image chantico-vm-attribution-mock:latest --name kind
+
+.PHONY: cluster-mocks
+cluster-mocks: cluster-load-mock-images ## Apply the mock deployments and services.
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-deployment.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-service.yaml
-	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/prometheus-exporter-mock-deployment.yaml
-	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/prometheus-exporter-mock-service.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-2-deployment.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/snmp-mock-2-service.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/vm-attribution-mock-deployment.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/vm-attribution-mock-service.yaml
 
+.PHONY: cluster-mock-resources
+cluster-mock-resources: ## Apply the sample configurations for the mocks
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock2.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
@@ -182,6 +188,23 @@ docker-build: ## Build docker image with the manager.
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
+
+.PHONY: docker-pull-mocks
+docker-pull-mocks:
+	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
+	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
+	$(CONTAINER_TOOL) pull $(VM_ATTRIBUTION_MOCK_IMAGE)
+	$(CONTAINER_TOOL) tag $(VM_ATTRIBUTION_MOCK_IMAGE) chantico-vm-attribution-mock:latest
+
+.PHONY: docker-build-mocks
+docker-build-mocks:
+	$(CONTAINER_TOOL) build -t chantico-snmp-mock:latest -f Dockerfile.snmp-mock .
+	$(CONTAINER_TOOL) build -t chantico-vm-attribution-mock:latest -f Dockerfile.vm-attribution-mock .
+
+.PHONY: docker-push-mocks
+docker-push-mocks:
+	$(CONTAINER_TOOL) push chantico-snmp-mock:latest
+	$(CONTAINER_TOOL) push chantico-vm-attribution-mock:latest
 
 HELM_CHART_DIR ?= chart
 GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts

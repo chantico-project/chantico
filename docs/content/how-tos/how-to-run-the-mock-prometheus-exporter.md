@@ -1,15 +1,15 @@
 ---
-title: "How to run the mock Prometheus exporter"
+title: "How to run the VM Attribution mock"
 menus:
   main:
     parent: howto
     weight: 20
 ---
 
-## The Prometheus exporter mock
+## The VM Attribution mock
 
-The Prometheus exporter mock simulates a hypervisor prometheus exporter that reports which
-fraction of a baremetal host's usage is attributed to each of the virtual
+The VM Attribution mock simulates a hypervisor Prometheus exporter that reports which
+which fraction of a baremetal host's usage is attributed to each of the virtual
 machines running on it. It serves a single metric on the `/metrics` endpoint:
 
 ```text
@@ -27,7 +27,7 @@ per scrape and stays between a lower and an upper bound. The reported
 coefficient is that weight relative to the total.
 
 The mock is configured with environment variables on its container (see
-`dev/k8s/prometheus-exporter-mock-deployment.yaml`):
+`dev/k8s/vm-attribution-mock-deployment.yaml`):
 
 | Variable | Default | Description |
 | --- | --- | --- |
@@ -45,10 +45,10 @@ The mock is part of the local development environment and is deployed by
 `make cluster-configure`. To build and deploy it manually:
 
 ```bash
-docker build -t chantico-prometheus-exporter-mock:latest -f Dockerfile.prometheus-exporter-mock .
-kind load docker-image chantico-prometheus-exporter-mock:latest --name kind
-kubectl apply -n chantico -f dev/k8s/prometheus-exporter-mock-deployment.yaml
-kubectl apply -n chantico -f dev/k8s/prometheus-exporter-mock-service.yaml
+docker build -t chantico-vm-attribution-mock:latest -f Dockerfile.vm-attribution-mock .
+kind load docker-image chantico-vm-attribution-mock:latest --name kind
+kubectl apply -n chantico -f dev/k8s/vm-attribution-mock-deployment.yaml
+kubectl apply -n chantico -f dev/k8s/vm-attribution-mock-service.yaml
 ```
 
 ### Querying the mock

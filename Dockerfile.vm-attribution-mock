@@ -13,15 +13,15 @@ RUN go mod download
 COPY dev/mocks/ dev/mocks/
 
 # Statically compile the Go binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o prometheus-exporter-mock ./dev/mocks/cmd/vm-attribution
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o vm-attribution-mock ./dev/mocks/cmd/vm-attribution
 
 # Stage 2: Minimal runtime using distroless
 FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /
 
-COPY --from=builder /app/prometheus-exporter-mock .
+COPY --from=builder /app/vm-attribution-mock .
 
 USER 65532:65532
 
-ENTRYPOINT ["/prometheus-exporter-mock"]
+ENTRYPOINT ["/vm-attribution-mock"]
