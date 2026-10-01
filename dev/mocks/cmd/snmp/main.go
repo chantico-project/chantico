@@ -6,7 +6,7 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 
-	"chantico/dev/mocks/simulation"
+	"chantico/dev/mocks/internal/simulation"
 )
 
 var (

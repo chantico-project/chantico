@@ -13,7 +13,7 @@ RUN go mod download
 COPY dev/mocks/ dev/mocks/
 
 # Statically compile the Go binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o snmp-mock ./dev/mocks/snmp
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o snmp-mock ./dev/mocks/cmd/snmp
 
 # Stage 2: Minimal runtime using distroless
 FROM gcr.io/distroless/static:nonroot

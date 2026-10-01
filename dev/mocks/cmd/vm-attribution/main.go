@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"chantico/dev/mocks/simulation"
+	"chantico/dev/mocks/internal/simulation"
 )
 
 const vmAttributionBase = `# HELP vm_attribution_coefficient Fraction of total system usage attributed to this VM.
