@@ -35,6 +35,18 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Cache Hugo modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hugo_cache/modules
+          key: ${{ runner.os }}-hugo-modules-${{ hashFiles('docs/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-hugo-modules-
+
+      - name: Download Hugo modules
+        run: |
+          make docs-mod-download
+
       - name: Build and run documentation
         run: |
           make docs-sources

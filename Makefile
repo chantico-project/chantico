@@ -277,6 +277,11 @@ $(DOCS_CHANGELOG_OUTPUT_PATH): CHANGELOG.md
 .PHONY: docs-sources
 docs-sources: docs-png docs-api docs-changelog
 
+.PHONY: docs-mod-download
+docs-mod-download: hugo ## Download Hugo modules used by the documentation
+	@echo "Downloading Hugo modules..."
+	@$(HUGO) mod graph --source $(DOCS_DIRECTORY) > /dev/null
+
 .PHONY: docs-build
 docs-build: docs-sources hugo
 	@echo "Building docs with Hugo..."
