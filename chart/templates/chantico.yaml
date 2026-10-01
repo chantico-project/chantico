@@ -46,7 +46,11 @@ spec:
             - name: CHANTICO_DATA_PATH
               value: "/data"
             - name: CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME
-              value: {{ .Values.persistentVolumeClaimName }}
+              value: {{ .Values.persistentVolumeClaimName | quote }}
+            - name: CHANTICO_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: CHANTICO_WATCH_NAMESPACE
+              value: {{ .Values.controller.watchNamespace | quote }}
           ports:
             - containerPort: 8443
               name: https
@@ -83,7 +87,7 @@ spec:
       volumes:
         - name: chantico-volume
           persistentVolumeClaim:
-            claimName: {{ .Values.persistentVolumeClaimName }}
+            claimName: {{ .Values.persistentVolumeClaimName | quote }}
       {{- if .Values.imagePullSecretName }}
       imagePullSecrets:
         - name: {{ .Values.imagePullSecretName }}
