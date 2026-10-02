@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chantico-vm-attribution-mock
+  labels:
+    app: chantico-vm-attribution-mock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chantico-vm-attribution-mock
+  template:
+    metadata:
+      labels:
+        app: chantico-vm-attribution-mock
+    spec:
+      containers:
+      - name: chantico-vm-attribution-mock
+        image: chantico-vm-attribution-mock:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 30909
+          protocol: TCP
+        env:
+        - name: MOCK_VM_ATTR_HOST_NAME
+          value: "prometheus-mock-bm-1"
+        - name: MOCK_VM_ATTR_VM_IDS
+          value: "120,121"
+        - name: MOCK_VM_ATTR_PORT
+          value: "30909"
+        - name: MOCK_VM_ATTR_WEIGHT_MIN
+          value: "0.1"
+        - name: MOCK_VM_ATTR_WEIGHT_MAX
+          value: "1.0"
+        - name: MOCK_VM_ATTR_WEIGHT_START
+          value: "0.6"
+        - name: MOCK_VM_ATTR_WEIGHT_VARIANCE
+          value: "0.02"

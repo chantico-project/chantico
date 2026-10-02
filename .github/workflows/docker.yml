@@ -35,14 +35,17 @@ jobs:
           if [ ! -z "${{ inputs.version }}" ]; then
             echo "controller=images/chantico" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
+            echo "vm_attribution_mock=images/chantico-vm-attribution-mock" >> $GITHUB_OUTPUT
             echo "tag=v${{ inputs.version }}" >> $GITHUB_OUTPUT
           elif [ ! -z "${{ inputs.pr }}" ]; then
             echo "controller=images/chantico-pr" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock-pr" >> $GITHUB_OUTPUT
+            echo "vm_attribution_mock=images/chantico-vm-attribution-mock-pr" >> $GITHUB_OUTPUT
             echo "tag=pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
           else
             echo "controller=images/chantico" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
+            echo "vm_attribution_mock=images/chantico-vm-attribution-mock" >> $GITHUB_OUTPUT
             echo "tag=latest" >> $GITHUB_OUTPUT
           fi
 
@@ -68,3 +71,12 @@ jobs:
           file: ./Dockerfile.snmp-mock
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.snmp }}:${{ steps.meta.outputs.tag }}
+
+
+      - name: Build and push vm-attribution-mock
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.vm-attribution-mock
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.vm_attribution_mock }}:${{ steps.meta.outputs.tag }}

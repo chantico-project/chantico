@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chantico-vm-attribution-mock
+spec:
+  selector:
+    app: chantico-vm-attribution-mock
+  ports:
+  - protocol: TCP
+    port: 30909
+    targetPort: 30909 
+    nodePort: 30909  # NodePort (must be between 30000–32767)
+  type: NodePort

@@ -18,7 +18,17 @@ spec:
       - name: chantico-snmp-mock
         image: chantico-snmp-mock:latest
         imagePullPolicy: Never
-        args: ["1000"]  # Port(s) to listen on, matches your app’s CLI argument
         ports:
         - containerPort: 1161
           protocol: UDP
+        env:
+        - name: MOCK_SNMP_ADDRESS
+          value: ":1161"
+        - name: MOCK_SNMP_VALUE_MIN
+          value: "200"
+        - name: MOCK_SNMP_VALUE_MAX
+          value: "800"
+        - name: MOCK_SNMP_VALUE_START
+          value: "500"
+        - name: MOCK_SNMP_VALUE_VARIANCE
+          value: "10"

@@ -20,3 +20,5 @@ nodes:
       - hostPort: 31161 # snmp-mock-device
         containerPort: 31161
         protocol: UDP
+      - hostPort: 30909 # vm-attribution-mock
+        containerPort: 30909

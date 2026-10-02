@@ -2,19 +2,29 @@ package main
 
 import (
 	"log"
-	"math/rand"
 	"net"
 
 	"github.com/gosnmp/gosnmp"
+
+	"chantico/dev/mocks/internal/simulation"
+)
+
+var (
+	address = simulation.EnvString("MOCK_SNMP_ADDRESS", ":1161")
+	walk    = simulation.NewWalk(simulation.BoundsFromEnv("MOCK_SNMP_VALUE", simulation.Bounds{
+		Min:      200,
+		Max:      800,
+		Start:    500,
+		Variance: 10,
+	}))
 )
 
 func main() {
-	addr := ":1161"
-	conn, err := net.ListenPacket("udp", addr)
+	conn, err := net.ListenPacket("udp", address)
 	if err != nil {
 		log.Fatalf("Error starting SNMP listener: %v", err)
 	}
-	log.Printf("Listening on %s", addr)
+	log.Printf("Listening on %s", address)
 
 	buf := make([]byte, 2048)
 	for {
@@ -34,7 +44,7 @@ func main() {
 			variables := packet.Variables
 			for i := range variables {
 				variables[i].Type = gosnmp.Integer
-				variables[i].Value = rand.Intn(1000)
+				variables[i].Value = int(walk.Next(variables[i].Name))
 			}
 
 			response := &gosnmp.SnmpPacket{
