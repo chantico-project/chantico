@@ -41,6 +41,8 @@ The controller will run locally on your computer. The controller will talk to a 
 ```bash
 make cluster-up         # start up the kind cluster
 make cluster-configure  # configures the manifests in the kind cluster
+make docker-pull-mocks  # pull the mock images
+make cluster-mocks      # deploy the mock services
 make run                # run the controller locally; this is blocking
 ```
 

@@ -120,7 +120,7 @@ cluster-down: kind ## Delete Kind cluster
 cluster-clean: cluster-down cluster-delete-mount ## Delete Kind cluster and volume mount
 
 .PHONY: cluster-configure
-cluster-configure: sync-deployment-crds ## Configure cluster with namespace, helm installation and snmp mock
+cluster-configure: sync-deployment-crds ## Configure cluster with namespace and helm installation
 # 	idempotent function to create namespace
 	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 # 	idempotent helm installation

@@ -41,15 +41,15 @@ The mock is configured with environment variables on its container (see
 
 ### Manual installation
 
-The mock is part of the local development environment and is deployed by
-`make cluster-configure`. To build and deploy it manually:
+The mock is part of the local development environment. After deploying Chantico (which is deployed by
+`make cluster-configure`), you can then deploy the mocks with:
 
 ```bash
-docker build -t chantico-vm-attribution-mock:latest -f Dockerfile.vm-attribution-mock .
-kind load docker-image chantico-vm-attribution-mock:latest --name kind
-kubectl apply -n chantico -f dev/k8s/vm-attribution-mock-deployment.yaml
-kubectl apply -n chantico -f dev/k8s/vm-attribution-mock-service.yaml
+make docker-pull-mocks
+make cluster-mocks
 ```
+
+This deploys both the mock deployment and the service for both the VM Attribution mock and the SNMP mock (see [how to run the SNMP mock](how-to-run-the-mock-snmp-device.md)).
 
 ### Querying the mock
 

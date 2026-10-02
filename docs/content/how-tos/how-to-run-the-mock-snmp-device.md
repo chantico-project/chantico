@@ -48,42 +48,17 @@ a production-like or local development environment. After this:
 
 ## Manual installation
 
-Note that the SNMP mock is part of the local development environment, so you do 
-not need to follow the manual installation steps here if you are fine with the 
-default latest version of the mock image. Only in cases where you need to update 
-the mock image during development, or when deploying the mock into a separate 
-cluster, follow the manual installation steps below. Otherwise, skip to the 
-section on running the demo with the mock SNMP device.
-
-### Load the snmp-mock image into the kind environment
-
-To obtain the latest SNMP mock image, pull it from the GitHub Container Registry 
-and load it into the kind cluster:
+The mock is part of the local development environment. After deploying Chantico
+(which is deployed by `make cluster-configure`), deploy the mocks with:
 
 ```bash
-export CI_REGISTRY="ghcr.io/chantico-project/images"
-export SNMP_MOCK_TAG="${SNMP_MOCK_TAG:-latest}"
-export SNMP_MOCK_IMAGE="$CI_REGISTRY/chantico-snmp-mock:$SNMP_MOCK_TAG"
-docker pull "$SNMP_MOCK_IMAGE"
-docker tag "$SNMP_MOCK_IMAGE" chantico-snmp-mock:latest
-kind load docker-image chantico-snmp-mock:latest --name kind
+make docker-pull-mocks
+make cluster-mocks
 ```
 
-Alternatively, you can build the image locally and load it into the kind cluster:
-
-```bash
-docker build -t chantico-snmp-mock:latest -f Dockerfile.snmp-mock .
-kind load docker-image chantico-snmp-mock:latest --name kind
-```
-
-### Apply the mock to Kubernetes
-
-```bash
-kubectl config set-context --current --namespace=chantico
-kubectl apply -n chantico -f dev/k8s/snmp-mock-deployment.yaml
-kubectl apply -n chantico -f dev/k8s/snmp-mock-service.yaml
-kubectl apply -n chantico -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
-```
+This deploys the mock deployments and services for the SNMP mock (including the
+second SNMP device) and the VM Attribution mock (see [how to run the VM
+Attribution mock](how-to-run-the-mock-prometheus-exporter.md)).
 
 ## Running the demo with the mock SNMP device
 
