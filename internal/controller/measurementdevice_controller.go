@@ -204,7 +204,7 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 	}
 
 	if bytes.Equal(observed, desired) {
-		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionTrue, chantico.ReasonReconciled, "Generator file is up to date.")
+		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionTrue, chantico.ReasonReconciled, "Generator file is up to date")
 		return steps.Continue()
 	}
 
@@ -215,7 +215,7 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 	}
 
 	log.FromContext(ctx).Info("Generator file has been generated successfully.", "path", path)
-	measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionTrue, chantico.ReasonReconciled, "Generator file has been generated successfully.")
+	measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionTrue, chantico.ReasonReconciled, "Generator file has been generated successfully")
 	return steps.Continue()
 }
 
@@ -329,7 +329,7 @@ func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Contex
 		return steps.Error(err)
 	}
 	if bytes.Equal(existing, merged) {
-		measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionUnknown, chantico.ReasonReconciling, "Merged SNMP file is up to date; exporter reload is being verified.")
+		measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionUnknown, chantico.ReasonReconciling, "Merged SNMP file is up to date; exporter reload is being verified")
 		return steps.Continue()
 	}
 
@@ -338,7 +338,7 @@ func (r *MeasurementDeviceReconciler) reconcileMergedSNMPFile(ctx context.Contex
 		return steps.Error(err)
 	}
 
-	measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionUnknown, chantico.ReasonReconciling, "Merged SNMP file has been written successfully; exporter reload is pending.")
+	measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionUnknown, chantico.ReasonReconciling, "Merged SNMP file has been written successfully; exporter reload is pending")
 	return steps.Continue()
 }
 
@@ -346,7 +346,7 @@ func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Contex
 	merged, err := r.Filestore.ReadAll(ctx, md.SnmpMergedFile)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionUnknown, chantico.ReasonGenerationPending, "Merged SNMP file does not exist yet.")
+			measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionUnknown, chantico.ReasonGenerationPending, "Merged SNMP file does not exist yet")
 			return steps.Continue()
 		}
 		measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to read merged SNMP file: "+err.Error())
@@ -378,7 +378,7 @@ func (r *MeasurementDeviceReconciler) reconcileExporterReload(ctx context.Contex
 	}
 
 	log.FromContext(ctx).Info("Triggered SNMP exporter reload", "hash", desiredHash)
-	measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "SNMP exporter deployment annotation updated to trigger reload.")
+	measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "SNMP exporter deployment annotation updated to trigger reload")
 	return steps.Continue()
 }
 
