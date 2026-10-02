@@ -20,6 +20,15 @@ type FileSDTarget struct {
 // The labels __param_module and __param_auth are used by the SNMP exporter relabel
 // configs in prometheus.yml to route scrapes through the correct SNMP module.
 func CreateFileSDTarget(deviceId string, ip string, name string) FileSDTarget {
+	if deviceId == "" {
+		return FileSDTarget{
+			Targets: []string{ip},
+			Labels: map[string]string{
+				"name":     name,
+				"instance": ip,
+			},
+		}
+	}
 	return FileSDTarget{
 		Targets: []string{ip},
 		Labels: map[string]string{
@@ -27,6 +36,7 @@ func CreateFileSDTarget(deviceId string, ip string, name string) FileSDTarget {
 			"__param_auth":   deviceId,
 			"job":            deviceId,
 			"name":           name,
+			"instance":       ip,
 		},
 	}
 }
