@@ -48,8 +48,9 @@ type ParentRef struct {
 	// to the current node. It is a PromQL expression (often a literal
 	// number) that will be written as a Prometheus recording rule.
 	// +optional
-	Coefficient     string       `json:"coefficient,omitempty"`
-	CoefficientFrom TemplateFrom `json:"coefficientFrom,omitempty"`
+	Coefficient string `json:"coefficient,omitempty"`
+	// +optional
+	CoefficientFrom *TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
@@ -78,7 +79,8 @@ type DataCenterResourceSpec struct {
 	// +optional
 	EnergyMetric string `json:"energyMetric,omitempty"`
 
-	EnergyMetricFrom TemplateFrom `json:"energyMetricFrom,omitempty"`
+	// +optional
+	EnergyMetricFrom *TemplateFrom `json:"energyMetricFrom,omitempty"`
 
 	// ServiceId is the identifier of the service that this resource belongs to.
 	// Define on a resource to make it part of a service, or make a separate

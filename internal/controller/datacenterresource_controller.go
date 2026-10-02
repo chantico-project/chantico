@@ -280,6 +280,9 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 func (r *DataCenterResourceReconciler) resolveAndApplyTemplate(ctx context.Context, namespace string, templateFrom *chantico.TemplateFrom) (string, error) {
 	// Lookup the configmap and resolve retrieve the template text
 	configMap := &corev1.ConfigMap{}
+	if templateFrom == nil {
+		return "", fmt.Errorf("DataCenterResource does not have a template ConfigMap")
+	}
 	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: templateFrom.ConfigMapKeyRef.Name}, configMap); err != nil {
 		return "", fmt.Errorf("get template ConfigMap %q: %w", templateFrom.ConfigMapKeyRef.Name, err)
 	}
@@ -315,6 +318,9 @@ func (r *DataCenterResourceReconciler) resolveAndApplyTemplate(ctx context.Conte
 func (r *DataCenterResourceReconciler) resolveCoefficientTemplates(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (*chantico.DataCenterResource, error) {
 	for index := range dataCenterResource.Spec.Parents {
 		parent := &dataCenterResource.Spec.Parents[index]
+		if parent.CoefficientFrom == nil {
+			continue
+		}
 		configMapRef := parent.CoefficientFrom.ConfigMapKeyRef
 		if configMapRef.Name == "" && configMapRef.Key == "" {
 			continue
@@ -323,7 +329,7 @@ func (r *DataCenterResourceReconciler) resolveCoefficientTemplates(ctx context.C
 			return nil, fmt.Errorf("parent %q coefficient template requires both configMapKeyRef.name and configMapKeyRef.key", parent.Name)
 		}
 
-		rendered, err := r.resolveAndApplyTemplate(ctx, dataCenterResource.Namespace, &parent.CoefficientFrom)
+		rendered, err := r.resolveAndApplyTemplate(ctx, dataCenterResource.Namespace, parent.CoefficientFrom)
 		if err != nil {
 			return nil, fmt.Errorf("resolve and apply coefficient template for parent %q: %w", parent.Name, err)
 		}
@@ -338,10 +344,10 @@ func (r *DataCenterResourceReconciler) resolveCoefficientTemplates(ctx context.C
 // Resolves the energy metric template and puts the value (after substituting in the template variables) into
 // the `EnergyMetric` field of the DataCenterResource spec.
 func (r *DataCenterResourceReconciler) resolveEnergyMetricTemplate(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (*chantico.DataCenterResource, error) {
-	if dataCenterResource.Spec.EnergyMetricFrom.ConfigMapKeyRef.Name == "" {
+	if dataCenterResource.Spec.EnergyMetricFrom == nil || dataCenterResource.Spec.EnergyMetricFrom.ConfigMapKeyRef.Name == "" {
 		return dataCenterResource, nil
 	}
-	rendered, err := r.resolveAndApplyTemplate(ctx, dataCenterResource.Namespace, &dataCenterResource.Spec.EnergyMetricFrom)
+	rendered, err := r.resolveAndApplyTemplate(ctx, dataCenterResource.Namespace, dataCenterResource.Spec.EnergyMetricFrom)
 	if err != nil {
 		return nil, fmt.Errorf("resolve and apply energy metric template: %w", err)
 	}

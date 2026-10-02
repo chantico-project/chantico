@@ -598,7 +598,7 @@ func TestResolveCoefficientTemplates(t *testing.T) {
 			Parents: []chantico.ParentRef{
 				{
 					Name: "pdu1",
-					CoefficientFrom: chantico.TemplateFrom{
+					CoefficientFrom: &chantico.TemplateFrom{
 						ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
 							Name: "pdu-coefficient-template",
 							Key:  "template",
@@ -641,7 +641,7 @@ func TestResolveEnergyMetricTemplates(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "bm1", Namespace: "chantico"},
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
-			EnergyMetricFrom: chantico.TemplateFrom{
+			EnergyMetricFrom: &chantico.TemplateFrom{
 				ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
 					Name: "pdu-energymetric-template",
 					Key:  "template",
