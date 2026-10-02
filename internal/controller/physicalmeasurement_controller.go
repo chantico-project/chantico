@@ -161,7 +161,12 @@ func (r *PhysicalMeasurementReconciler) ensureFinalizerIsSet(ctx context.Context
 
 func (r *PhysicalMeasurementReconciler) reconcileValidation(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
 	deviceName := physicalMeasurement.Spec.MeasurementDevice
-	if physicalMeasurement.Spec.MeasurementDevice == "" {
+	if deviceName == "" {
+		if physicalMeasurement.Spec.Type == chantico.PhysicalMeasurementTypeSNMP {
+			physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ReasonInvalidSpec, "measurementDevice is required for type snmp")
+			return steps.Stop()
+		}
+		physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
 		return steps.Continue()
 	}
 	key := types.NamespacedName{Namespace: physicalMeasurement.Namespace, Name: deviceName}
