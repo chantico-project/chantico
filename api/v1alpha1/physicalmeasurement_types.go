@@ -38,8 +38,9 @@ type PhysicalMeasurementSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Ip                string                  `json:"ip"`
+	// +kubebuilder:validation:Enum=snmp;prometheus-exporter;
 	Type              PhysicalMeasurementType `json:"type"`
+	Ip                string                  `json:"ip"`
 	MeasurementDevice string                  `json:"measurementDevice,omitempty"`
 	ResourceIds       []string                `json:"resourceIds,omitempty"`
 }
