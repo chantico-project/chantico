@@ -31,13 +31,16 @@ type TemplateConfigMapKeyRef struct {
 
 type TemplateFrom struct {
 	ConfigMapKeyRef TemplateConfigMapKeyRef `json:"configMapKeyRef"`
-	Parameters      []corev1.EnvVar         `json:"parameters,omitempty"`
+	// +optional
+	Parameters []corev1.EnvVar `json:"parameters,omitempty"`
 }
 
 // ParentRef references a parent DataCenterResource and optionally carries
 // the energy coefficient for the edge from that parent to this node.
 // The coefficient represents what fraction of the parent's energy is
 // attributable to this child.
+// +kubebuilder:validation:XValidation:rule="has(self.coefficient)||has(self.coefficientFrom)",message="Parent must have coefficient"
+// +kubebuilder:validation:XValidation:rule="!(has(self.coefficient)&&has(self.coefficientFrom))",message="Parent cannot have both coefficient and coefficientFrom set"
 type ParentRef struct {
 	// Name is the name of the parent DataCenterResource.
 	Name string `json:"name"`
@@ -46,11 +49,14 @@ type ParentRef struct {
 	// to the current node. It is a PromQL expression (often a literal
 	// number) that will be written as a Prometheus recording rule.
 	// +optional
-	Coefficient     string       `json:"coefficient,omitempty"`
-	CoefficientFrom TemplateFrom `json:"coefficientFrom,omitempty"`
+	Coefficient string `json:"coefficient,omitempty"`
+	// +optional
+	CoefficientFrom *TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
+// +kubebuilder:validation:XValidation:rule="(has(self.parents)&&size(self.parents)>0)||has(self.energyMetric)||has(self.energyMetricFrom)",message="Resource must have at least one parent, energyMetric or energyMetricFrom"
+// +kubebuilder:validation:XValidation:rule="!(has(self.energyMetric)&&has(self.energyMetricFrom))",message="Resource cannot have both energyMetric and energyMetricFrom set"
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -74,7 +80,8 @@ type DataCenterResourceSpec struct {
 	// +optional
 	EnergyMetric string `json:"energyMetric,omitempty"`
 
-	EnergyMetricFrom TemplateFrom `json:"energyMetricFrom,omitempty"`
+	// +optional
+	EnergyMetricFrom *TemplateFrom `json:"energyMetricFrom,omitempty"`
 
 	// ServiceId is the identifier of the service that this resource belongs to.
 	// Define on a resource to make it part of a service, or make a separate
