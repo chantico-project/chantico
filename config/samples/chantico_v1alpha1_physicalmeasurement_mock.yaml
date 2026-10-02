@@ -7,8 +7,8 @@ metadata:
   name: physicalmeasurement-pdu1-out
 spec:
   type: snmp
-  ip: chantico-snmp-mock-2:1161
-  measurementDevice: tno-2
+  ip: chantico-snmp-mock:1161
+  measurementDevice: tno
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: PhysicalMeasurement
@@ -20,7 +20,7 @@ metadata:
 spec:
   type: snmp
   ip: chantico-snmp-mock-2:1161
-  measurementDevice: tno-2
+  measurementDevice: tno
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: PhysicalMeasurement
@@ -31,4 +31,4 @@ metadata:
   name: physicalmeasurement-bm1
 spec:
   type: prometheus-exporter
-  ip: chantico-vm-attribution-mock:9090
+  ip: chantico-vm-attribution-mock:30909
