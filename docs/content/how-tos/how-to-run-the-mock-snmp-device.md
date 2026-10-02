@@ -103,44 +103,7 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
     ```
     Open http://localhost:19090/targets and verify the target is `UP`.
 
-### Adding another mock snmp device
-
-The same mock SNMP image can be deployed multiple times to simulate additional devices. Each additional device needs its own Deployment, Service, `MeasurementDevice`, and `PhysicalMeasurement`. Example manifests for a second mock device are provided in the repository.
-
-1. Deploy the second mock SNMP agent:
-    ```bash
-    kubectl apply -n chantico -f dev/k8s/snmp-mock-2-deployment.yaml
-    kubectl apply -n chantico -f dev/k8s/snmp-mock-2-service.yaml
-    ```
-1. Create a second `MeasurementDevice` (can reuse the same MIB/walks, or use 
-   different ones):
-    ```bash
-    kubectl apply -n chantico -f ./config/samples/chantico_v1alpha1_measurementdevice_mock2.yaml
-    ```
-1. Wait for the SNMP generator job for the new device:
-    ```bash
-    kubectl get jobs -n chantico | grep update-snmp
-    ```
-1. Create a second `PhysicalMeasurement` pointing at the new mock target:
-    ```bash
-    kubectl apply -n chantico -f ./config/samples/chantico_v1alpha1_physicalmeasurement_mock2.yaml
-    ```
-1. Verify both targets appear in Prometheus, port-forwarding if not already done 
-   by the local development environment:
-    ```bash
-    kubectl port-forward -n chantico deployment/chantico-prometheus 19090:9090
-    ```
-
-    Open http://localhost:19090/targets — both the original and the new target 
-    should show as `UP`.
-
-The second mock is exposed on NodePort `31162`, so you can also query it directly:
-
-```bash
-snmpget -v2c -c public -M +./dev -m +TNO-PDU-MIB localhost:31162 tnoPduEnergyValue
-```
-
-> **Tip:** To add more devices beyond the second, copy the mock-2 manifests, update the names (e.g. `chantico-snmp-mock-3`), pick a free NodePort, and create corresponding `MeasurementDevice` / `PhysicalMeasurement` resources. Prometheus will automatically pick up new targets via `file_sd_configs` — no restart required.
+> **Tip:** To add more devices beyond the second, copy the mock manifests, update the names (e.g. `chantico-snmp-mock-2`), pick a free NodePort, and create corresponding `MeasurementDevice` / `PhysicalMeasurement` resources. Prometheus will automatically pick up new targets via `file_sd_configs` — no restart required.
 
 ### Adding baremetal resources and linking them to the mock SNMP device
 

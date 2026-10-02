@@ -232,7 +232,6 @@ kubectl apply -n chantico -f dev/k8s/snmp-mock-2-service.yaml
 ```bash
 # MeasurementDevice + PhysicalMeasurement
 kubectl apply -n chantico -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
-kubectl apply -n chantico -f config/samples/chantico_v1alpha1_physicalmeasurement_mock2.yaml
 
 # DataCenterResources: PDU1, PDU2, and bare metal (BM)
 kubectl apply -n chantico -f config/samples/chantico_v1alpha1_datacenterresource.yaml
