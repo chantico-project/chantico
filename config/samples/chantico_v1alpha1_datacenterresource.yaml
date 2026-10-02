@@ -4,7 +4,7 @@ metadata:
   name: pdu-energymetric-template
 data:
   template: |
-    tnoPduPowerValue{job="{{ .jobName }}", name="{{ .resourceName }}"}
+    tnoPduPowerValue{name="{{ .resourceName }}"}
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -22,8 +22,6 @@ spec:
       name: pdu-energymetric-template
       key: template
     parameters:
-    - name: jobName
-      value: tno
     - name: resourceName
       value: physicalmeasurement-pdu1-out
 ---
@@ -43,8 +41,6 @@ spec:
       name: pdu-energymetric-template
       key: template
     parameters:
-    - name: jobName
-      value: tno-2
     - name: resourceName
       value: physicalmeasurement-pdu2-out
 ---
@@ -63,5 +59,3 @@ spec:
       coefficient: "1"
     - name: datacenterresource-pdu2
       coefficient: "1"
-  additionalLabels:
-    exampleLabel: exampleValue

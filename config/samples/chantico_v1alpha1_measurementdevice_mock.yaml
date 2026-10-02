@@ -11,3 +11,15 @@ spec:
   walks:
     - tnoPduEnergyValue
     - tnoPduPowerValue
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: MeasurementDevice
+metadata:
+  name: tno-2
+spec:
+  auth:
+    community: public
+    version: 2
+  walks:
+    - tnoPduEnergyValue
+    - tnoPduPowerValue
