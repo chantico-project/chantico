@@ -7,7 +7,7 @@ spec:
     app: chantico-vm-attribution-mock
   ports:
   - protocol: TCP
-    port: 9090
-    targetPort: 9090
+    port: 30909
+    targetPort: 30909 
     nodePort: 30909  # NodePort (must be between 30000–32767)
   type: NodePort

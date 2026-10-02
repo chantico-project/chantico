@@ -19,7 +19,7 @@ spec:
         image: chantico-vm-attribution-mock:latest
         imagePullPolicy: Never
         ports:
-        - containerPort: 9090
+        - containerPort: 30909
           protocol: TCP
         env:
         - name: MOCK_VM_ATTR_HOST_NAME
@@ -27,7 +27,7 @@ spec:
         - name: MOCK_VM_ATTR_VM_IDS
           value: "120,121"
         - name: MOCK_VM_ATTR_PORT
-          value: "9090"
+          value: "30909"
         - name: MOCK_VM_ATTR_WEIGHT_MIN
           value: "0.1"
         - name: MOCK_VM_ATTR_WEIGHT_MAX
