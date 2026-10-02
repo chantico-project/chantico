@@ -463,8 +463,8 @@ spec:
             - type
             type: object
             x-kubernetes-validations:
-            - message: Resource must have energyMetric or energyMetricFrom
-              rule: has(self.energyMetric)||has(self.energyMetricFrom)
+            - message: Resource must have at least one parent, energyMetric or energyMetricFrom
+              rule: (has(self.parents)&&size(self.parents)>0)||has(self.energyMetric)||has(self.energyMetricFrom)
             - message: Resource cannot have both energyMetric and energyMetricFrom
                 set
               rule: '!(has(self.energyMetric)&&has(self.energyMetricFrom))'

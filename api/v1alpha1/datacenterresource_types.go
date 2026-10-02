@@ -31,7 +31,8 @@ type TemplateConfigMapKeyRef struct {
 
 type TemplateFrom struct {
 	ConfigMapKeyRef TemplateConfigMapKeyRef `json:"configMapKeyRef"`
-	Parameters      []corev1.EnvVar         `json:"parameters,omitempty"`
+	// +optional
+	Parameters []corev1.EnvVar `json:"parameters,omitempty"`
 }
 
 // ParentRef references a parent DataCenterResource and optionally carries
@@ -54,7 +55,7 @@ type ParentRef struct {
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
-// +kubebuilder:validation:XValidation:rule="has(self.energyMetric)||has(self.energyMetricFrom)",message="Resource must have energyMetric or energyMetricFrom"
+// +kubebuilder:validation:XValidation:rule="(has(self.parents)&&size(self.parents)>0)||has(self.energyMetric)||has(self.energyMetricFrom)",message="Resource must have at least one parent, energyMetric or energyMetricFrom"
 // +kubebuilder:validation:XValidation:rule="!(has(self.energyMetric)&&has(self.energyMetricFrom))",message="Resource cannot have both energyMetric and energyMetricFrom set"
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
