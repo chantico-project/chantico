@@ -322,9 +322,6 @@ func (r *DataCenterResourceReconciler) resolveCoefficientTemplates(ctx context.C
 			continue
 		}
 		configMapRef := parent.CoefficientFrom.ConfigMapKeyRef
-		if configMapRef.Name == "" && configMapRef.Key == "" {
-			continue
-		}
 		if configMapRef.Name == "" || configMapRef.Key == "" {
 			return nil, fmt.Errorf("parent %q coefficient template requires both configMapKeyRef.name and configMapKeyRef.key", parent.Name)
 		}
@@ -344,7 +341,7 @@ func (r *DataCenterResourceReconciler) resolveCoefficientTemplates(ctx context.C
 // Resolves the energy metric template and puts the value (after substituting in the template variables) into
 // the `EnergyMetric` field of the DataCenterResource spec.
 func (r *DataCenterResourceReconciler) resolveEnergyMetricTemplate(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (*chantico.DataCenterResource, error) {
-	if dataCenterResource.Spec.EnergyMetricFrom == nil || dataCenterResource.Spec.EnergyMetricFrom.ConfigMapKeyRef.Name == "" {
+	if dataCenterResource.Spec.EnergyMetricFrom == nil {
 		return dataCenterResource, nil
 	}
 	rendered, err := r.resolveAndApplyTemplate(ctx, dataCenterResource.Namespace, dataCenterResource.Spec.EnergyMetricFrom)
