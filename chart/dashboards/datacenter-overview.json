@@ -75,7 +75,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "chantico_energy_watts{type=\"pdu\"}",
+          "expr": "chantico_power_watts{type=\"pdu\"}",
           "instant": true,
           "legendFormat": "{{resource}}",
           "refId": "A"
@@ -125,7 +125,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(chantico_energy_watts{type=\"pdu\"})",
+          "expr": "sum(chantico_power_watts{type=\"pdu\"})",
+          "instant": true,
           "legendFormat": "total",
           "range": true,
           "refId": "A"
@@ -472,7 +473,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "chantico_energy_watts{type=\"pdu\"}",
+          "expr": "chantico_power_watts{type=\"pdu\"}",
           "legendFormat": "{{resource}}",
           "range": true,
           "refId": "A"
@@ -563,7 +564,7 @@
             "uid": "chantico-victoriametrics"
           },
           "editorMode": "code",
-          "expr": "chantico_energy_watts{type=\"baremetal\"}",
+          "expr": "chantico_power_watts{type=\"baremetal\"}",
           "legendFormat": "{{resource}}",
           "range": true,
           "refId": "A"

@@ -136,12 +136,12 @@ physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu2-out   Tr
 Additionally, you can verify in [Prometheus](http://localhost:19090) that the metrics are being scraped from the mock SNMP devices and aggregated into the `DataCenterResource` metrics. These will show up in the "Rule health" section as the following rules containing the subsequent metrics:
 
 - chantico_datacenterresource_pdu1
-    - `chantico_energy_watts{resource="datacenterresource-pdu1", type="pdu"}`
+    - `chantico_power_watts{resource="datacenterresource-pdu1", type="pdu"}`
 - chantico_datacenterresource_pdu2
-    - `chantico_energy_watts{resource="datacenterresource-pdu2", type="pdu"}`
+    - `chantico_power_watts{resource="datacenterresource-pdu2", type="pdu"}`
 - chantico_datacenterresource_misd_gbm_01
-    - `chantico_energy_coefficient{child="datacenterresource-misd-gbm-01", parents="datacenterresource-pdu1}`
-    - `chantico_energy_coefficient{child="datacenterresource-misd-gbm-01", parents="datacenterresource-pdu2}`
-    - `chantico_energy_watts{resource="datacenterresource-misd-gbm-01", type="baremetal"}`
+    - `chantico_power_coefficient{child="datacenterresource-misd-gbm-01", parents="datacenterresource-pdu1}`
+    - `chantico_power_coefficient{child="datacenterresource-misd-gbm-01", parents="datacenterresource-pdu2}`
+    - `chantico_power_watts{resource="datacenterresource-misd-gbm-01", type="baremetal"}`
 
 You can query these metrics from Prometheus for the recent data of the specific time series. You can also visualize these metrics in [Grafana](http://localhost:13000) by visiting the pre-configured "Chantico" dashboard.

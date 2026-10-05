@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.16.0
+VERSION ?= 0.16.1
 
 # Image REPOSITORY_URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
@@ -313,6 +313,11 @@ $(DOCS_CHANGELOG_OUTPUT_PATH): CHANGELOG.md
 
 .PHONY: docs-sources
 docs-sources: docs-png docs-api docs-changelog
+
+.PHONY: docs-mod-download
+docs-mod-download: hugo ## Download Hugo modules used by the documentation
+	@echo "Downloading Hugo modules..."
+	@$(HUGO) mod graph --source $(DOCS_DIRECTORY) > /dev/null
 
 .PHONY: docs-build
 docs-build: docs-sources hugo

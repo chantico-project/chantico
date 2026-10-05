@@ -1,3 +1,14 @@
+## 0.16.1 (2026-10-02)
+
+#### Bug Fixes
+
+* Redesign of physical measurement controller (#221) (3132deb5)
+
+#### Chores
+
+* **dev-tooling:** Add bounded simulations to the development mocks (#235) (38facedb)
+* **deps:** bump go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc (#236) (3b543dc3)
+
 ## 0.16.0 (2026-09-25)
 
 #### Feature
