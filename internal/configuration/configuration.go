@@ -58,6 +58,10 @@ func (e InvalidError) Error() string {
 	return msg
 }
 
+func (e InvalidError) Unwrap() error {
+	return e.Err
+}
+
 type ConnectErrorType string
 
 const (
@@ -76,6 +80,10 @@ type ConnectError struct {
 
 func (e ConnectError) Error() string {
 	return fmt.Sprintf("cannot connect to %s %s (from environment variable %v): %s. %v", e.Type, e.Value, e.VarNames, e.Err, e.Reason)
+}
+
+func (e ConnectError) Unwrap() error {
+	return e.Err
 }
 
 type validatedEnv struct {
