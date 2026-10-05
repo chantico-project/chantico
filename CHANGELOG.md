@@ -1,3 +1,9 @@
+## 0.17.2 (2026-10-05)
+
+#### Bug Fixes
+
+* nil pointer panic in ConfigMap watch (75fff728)
+
 ## 0.17.1 (2026-10-05)
 
 #### Bug Fixes
