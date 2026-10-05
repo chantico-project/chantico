@@ -53,9 +53,36 @@ metadata:
   name: datacenterresource-misd-gbm-01
 spec:
   type: baremetal
-  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
   parents:
     - name: datacenterresource-pdu1
       coefficient: "1"
     - name: datacenterresource-pdu2
       coefficient: "1"
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: datacenterresource-misd-gbm-01-vm-120
+spec:
+  type: vm
+  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
+  parents:
+    - name: datacenterresource-misd-gbm-01
+      coefficient: sum(vm_attribution_coefficient{resource_consumer_id="/qemu.slice/120.scope"})
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: datacenterresource-misd-gbm-01-vm-121
+spec:
+  type: vm
+  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
+  parents:
+    - name: datacenterresource-misd-gbm-01
+      coefficient: sum(vm_attribution_coefficient{resource_consumer_id="/qemu.slice/121.scope"})
