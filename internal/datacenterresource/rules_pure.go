@@ -45,11 +45,11 @@ type RuleFile struct {
 
 // CoefficientMetricName is the Prometheus metric name for energy coefficients in the case where
 // the device has parent(s) and the energy is a factor of the parent's energy.
-const CoefficientMetricName = "chantico_energy_coefficient"
+const CoefficientMetricName = "chantico_power_coefficient"
 
 // EnergyMetricName is the Prometheus metric name for the energy timeseries of a DataCenterResource.
 // This metric comes from the rules generated in this file.
-const EnergyMetricName = "chantico_energy_watts"
+const EnergyMetricName = "chantico_power_watts"
 
 // EnergyMetricQuery returns the Prometheus query for a DataCenterResource's energy timeseries.
 func EnergyMetricQuery(resourceName string) string {
@@ -76,11 +76,11 @@ func SanitizeMetricName(name string) string {
 // DataCenterResource node, following the energy accounting design:
 //
 //  1. For root nodes (spec.energyMetric is set), an alias rule mapping the raw
-//     energy metric to a labeled series under the `chantico_energy_watts` name.
+//     energy metric to a labeled series under the `chantico_power_watts` name.
 //  2. One coefficient recording rule per parent that has a coefficient set
 //     (from the ParentRef entries in spec.parents).
 //  3. One energy recording rule for non-root nodes (sum of coefficient * parent
-//     energy for each parent). Uses the same `chantico_energy_watts` name.
+//     energy for each parent). Uses the same `chantico_power_watts` name.
 //
 // Returns nil if no rules need to be written.
 func BuildRecordingRules(
@@ -151,7 +151,7 @@ func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map
 
 // buildEnergyAliasRule creates a recording rule for root nodes that aliases
 // the raw energy metric (e.g. tnoPduPowerValue{instance="..."}) to the
-// a labelled time series under the `chantico_energy_watts` name. This allows
+// a labelled time series under the `chantico_power_watts` name. This allows
 // children to reference the parent's energy using a uniform naming convention.
 //
 // Returns nil if it is not a root node (has parents).
