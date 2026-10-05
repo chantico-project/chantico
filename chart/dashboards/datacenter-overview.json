@@ -291,7 +291,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(chantico_energy_watts{type=\"baremetal\"})",
+          "expr": "sum(chantico_power_watts{type=\"baremetal\"})",
           "legendFormat": "total",
           "range": true,
           "refId": "A"
@@ -341,7 +341,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(chantico_energy_watts{type=\"vm\"})",
+          "expr": "sum(chantico_power_watts{type=\"vm\"})",
           "legendFormat": "total",
           "range": true,
           "refId": "A"
@@ -392,7 +392,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(avg_over_time(chantico_energy_watts{type=\"pdu\"}[$__range])) * $__range_s / 3600",
+          "expr": "sum(avg_over_time(chantico_power_watts{type=\"pdu\"}[$__range])) * $__range_s / 3600",
           "instant": true,
           "legendFormat": "energy",
           "refId": "A"
@@ -645,7 +645,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "chantico_energy_watts{type=\"vm\"}",
+          "expr": "chantico_power_watts{type=\"vm\"}",
           "legendFormat": "{{resource}}",
           "range": true,
           "refId": "A"
@@ -720,7 +720,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "chantico_energy_watts",
+          "expr": "chantico_power_watts",
           "format": "table",
           "instant": true,
           "refId": "A"
