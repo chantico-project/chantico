@@ -141,7 +141,7 @@ func TestBadHostPort(t *testing.T) {
 
 	var thisErrs []error
 	for _, err := range errs {
-		if errString := fmt.Sprintf("%s", err); strings.Contains(errString, "cannot connect to host") {
+		if errString := fmt.Sprintf("%s", err); strings.Contains(errString, "cannot connect") {
 			thisErrs = append(thisErrs, err)
 		}
 
@@ -207,6 +207,7 @@ func TestWatchNamespace(t *testing.T) {
 		{"AllNamespaces", "chantico", "*", true},
 		{"SpecificNamespace", "chantico", "chantico-system", true},
 		{"InvalidNamespace", "", "Not_A_Valid_Namespace!", false},
+		{"InvalidNamespaceNoFallback", "chantico-ignore", "No_Fallback!", false},
 	}
 
 	for _, c := range cases {
