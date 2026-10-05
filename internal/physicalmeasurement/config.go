@@ -30,6 +30,7 @@ func CreateFileSDTarget(physicalMeasurement *chantico.PhysicalMeasurement) (File
 			Labels: map[string]string{
 				"name":     physicalMeasurement.Name,
 				"instance": physicalMeasurement.Spec.Ip,
+				"type":     "prometheus-exporter",
 			},
 		}, nil
 	case chantico.PhysicalMeasurementTypeSNMP:
@@ -41,6 +42,7 @@ func CreateFileSDTarget(physicalMeasurement *chantico.PhysicalMeasurement) (File
 				"job":            physicalMeasurement.Spec.MeasurementDevice,
 				"name":           physicalMeasurement.Name,
 				"instance":       physicalMeasurement.Spec.Ip,
+				"type":           "snmp",
 			},
 		}, nil
 	}
