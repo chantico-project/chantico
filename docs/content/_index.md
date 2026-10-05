@@ -1,5 +1,5 @@
 ---
-title: "Chantico"
+title: " "
 menus:
   main:
     weight: -100
@@ -7,9 +7,9 @@ menus:
     name: "Chantico"
 ---
 
-Streamlining Energy Management for Cloud Operators.
+{{< figure src="logo/chantico.png" alt="Chantico" width="400" link="https://github.com/chantico-project/chantico" >}}
 
-{{< figure src="logo/chantico.png" alt="" width="400" >}}
+Streamlining Energy Management for Cloud Operators.
 
 ## Naming
 
