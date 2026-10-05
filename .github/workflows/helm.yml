@@ -12,6 +12,9 @@ on:
       pr:
         required: false
         type: string
+      sha:
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -34,11 +37,15 @@ jobs:
         run: |
           if [ ! -z "${{ inputs.version }}" ]; then
             echo "registry=charts" >> $GITHUB_OUTPUT
-            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+            echo "versions=${{ inputs.version }}" >> $GITHUB_OUTPUT
           elif [ ! -z "${{ inputs.pr }}" ]; then
             VERSION=$(helm show chart chart/ | sed -nE 's/^version: *//p')
             echo "registry=charts-pr" >> $GITHUB_OUTPUT
-            echo "version=$VERSION-pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
+            VERSIONS="$VERSION-pr-${{ inputs.pr }}"
+            if [ ! -z "${{ inputs.sha }}" ]; then
+              VERSIONS="$VERSIONS $VERSION-pr-${{ inputs.pr }}-$(echo "${{ inputs.sha }}" | cut -c1-7)"
+            fi
+            echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
           else
             echo "One of 'version' or 'pr' input parameters must be provided." >&2
             exit 1
@@ -52,11 +59,14 @@ jobs:
         run: |
           make sync-deployment-crds
           helm lint chart/
-          helm package chart/ --version ${{ steps.meta.outputs.version }} --destination dist
-          echo "chart=$(ls -1 dist/chantico-*.tgz)" >> $GITHUB_OUTPUT
+          for v in ${{ steps.meta.outputs.versions }}; do
+            helm package chart/ --version "$v" --destination dist
+          done
 
       - name: Push chart to GHCR
         if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]'
         run: |
           echo "${{ secrets.BOT_RELEASE_TOKEN }}" | helm registry login ghcr.io -u chantico-bot --password-stdin
-          helm push "${{ steps.package.outputs.chart }}" oci://ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.registry }}
+          for chart in dist/chantico-*.tgz; do
+            helm push "$chart" oci://ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.registry }}
+          done

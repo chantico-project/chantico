@@ -1,3 +1,20 @@
+## 0.17.1 (2026-10-05)
+
+#### Bug Fixes
+
+* Updated CI to tag PR images and charts with commit SHA (#249) (17f8a6be)
+
+## 0.17.0 (2026-10-05)
+
+#### Feature
+
+* New logo of Chantico and its favicon. (#247) (5ac6ed58)
+
+#### Chores
+
+* **ci:** Cache Hugo modules and download before serving documentation, token permission (#239) (389ff68a)
+* Add datacenter resource field validate (#207) (c436d933)
+
 ## 0.16.1 (2026-10-02)
 
 #### Bug Fixes
