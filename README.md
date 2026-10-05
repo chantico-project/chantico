@@ -1,4 +1,4 @@
-<img src="docs/assets/logo/chantico.png" width="250">
+<img src="docs/assets/logo/chantico.png" width="400">
 
 ## Description
 
