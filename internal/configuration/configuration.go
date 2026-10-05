@@ -183,7 +183,11 @@ func validateNamespaces() (string, string, []error) {
 		return "", "", []error{podErr, watchErr}
 	}
 	if watchErr != nil {
-		return podNamespace, podNamespace, []error{watchErr, fmt.Errorf("falling back to using pod namespace '%s' for watch namespace", podNamespace)}
+		if watchErr.Error() == fmt.Sprintf("environment variable %s is not set", ChanticoWatchNamespaceEnv) {
+			return podNamespace, podNamespace, nil
+		} else {
+			return "", "", []error{watchErr}
+		}
 	}
 
 	return podNamespace, watchNamespace, nil
