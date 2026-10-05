@@ -1,3 +1,9 @@
+## 0.17.1 (2026-10-05)
+
+#### Bug Fixes
+
+* Updated CI to tag PR images and charts with commit SHA (#249) (17f8a6be)
+
 ## 0.17.0 (2026-10-05)
 
 #### Feature
