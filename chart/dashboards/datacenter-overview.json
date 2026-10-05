@@ -442,6 +442,7 @@
             }
           },
           "mappings": [],
+          "min": 0,
           "unit": "watt"
         },
         "overrides": []
@@ -529,6 +530,7 @@
             }
           ],
           "mappings": [],
+          "min": 0,
           "unit": "watt"
         },
         "overrides": []
@@ -614,6 +616,7 @@
             }
           },
           "mappings": [],
+          "min": 0,
           "unit": "watt"
         },
         "overrides": []
