@@ -291,8 +291,10 @@ func TestReconcileTargetFile_MultipleMeasurements(t *testing.T) {
 					t.Errorf("expected 1 target group in %s, got %d", fileName, len(targets))
 					continue
 				}
-				if got := targets[0].Labels["__param_module"]; got != expectedModule {
-					t.Errorf("in %s: expected module %q, got %q", fileName, expectedModule, got)
+				if targets[0].Labels["type"] == "snmp" {
+					if got := targets[0].Labels["__param_module"]; got != expectedModule {
+						t.Errorf("in %s: expected module %q, got %q", fileName, expectedModule, got)
+					}
 				}
 			}
 		})
@@ -324,7 +326,7 @@ func TestReconcileTargetFile_PrometheusExporter(t *testing.T) {
 	if want := []string{physicalMeasurement.Spec.Ip}; !slices.Equal(targets[0].Targets, want) {
 		t.Errorf("expected targets %v, got %v", want, targets[0].Targets)
 	}
-	wantLabels := map[string]string{"name": "exporter", "instance": physicalMeasurement.Spec.Ip}
+	wantLabels := map[string]string{"name": "exporter", "instance": physicalMeasurement.Spec.Ip, "type": "prometheus-exporter"}
 	if !maps.Equal(targets[0].Labels, wantLabels) {
 		t.Errorf("expected labels %v, got %v", wantLabels, targets[0].Labels)
 	}
