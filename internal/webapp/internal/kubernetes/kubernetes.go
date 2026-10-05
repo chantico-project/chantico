@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,12 +22,21 @@ type KubernetesClient struct {
 }
 
 func New(kubeconfigPath string) (*KubernetesClient, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-	if err != nil {
-		return nil, err
+	var config *rest.Config
+	var err error
+	currentContext := "in-cluster"
+	if kubeconfigPath == "" {
+		config, err = rest.InClusterConfig()
+	} else {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		if err == nil {
+			rawConfig, loadErr := clientcmd.LoadFromFile(kubeconfigPath)
+			err = loadErr
+			if err == nil {
+				currentContext = rawConfig.CurrentContext
+			}
+		}
 	}
-
-	rawConfig, err := clientcmd.LoadFromFile(kubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +56,7 @@ func New(kubeconfigPath string) (*KubernetesClient, error) {
 
 	return &KubernetesClient{
 		client:         k,
-		CurrentContext: rawConfig.CurrentContext,
+		CurrentContext: currentContext,
 		Host:           config.Host,
 	}, nil
 }

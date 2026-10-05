@@ -106,6 +106,9 @@ func loadConfig(get envGetter) (config, error) {
 		KubeconfigPath: "~/.kube/config",
 	}
 	var errs []error
+	if get("KUBERNETES_SERVICE_HOST") != "" {
+		cfg.KubeconfigPath = ""
+	}
 
 	if portStr := get("PORT"); portStr != "" {
 		port, err := strconv.Atoi(portStr)
