@@ -12,6 +12,9 @@ on:
       pr:
         required: false
         type: string
+      sha:
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -38,7 +41,12 @@ jobs:
           elif [ ! -z "${{ inputs.pr }}" ]; then
             VERSION=$(helm show chart chart/ | sed -nE 's/^version: *//p')
             echo "registry=charts-pr" >> $GITHUB_OUTPUT
-            echo "version=$VERSION-pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
+            if [ ! -z "${{ inputs.sha }}" ]; then
+              VERSION="$VERSION-pr-${{ inputs.pr }}-$(echo "${{ inputs.sha }}" | cut -c1-7)"
+            else
+              VERSION="$VERSION-pr-${{ inputs.pr }}"
+            fi
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
           else
             echo "One of 'version' or 'pr' input parameters must be provided." >&2
             exit 1
