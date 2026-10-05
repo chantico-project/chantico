@@ -188,7 +188,12 @@ func (r *PhysicalMeasurementReconciler) reconcileValidation(ctx context.Context,
 func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
 	l := log.FromContext(ctx)
 
-	target := pm.CreateFileSDTarget(physicalMeasurement.Spec.MeasurementDevice, physicalMeasurement.Spec.Ip, physicalMeasurement.Name)
+	target, err := pm.CreateFileSDTarget(physicalMeasurement)
+	if err != nil {
+		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error creating target: "+err.Error())
+		return steps.Error(err)
+	}
+
 	desired, err := pm.MarshalFileSDTargets([]pm.FileSDTarget{target})
 	if err != nil {
 		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error marshalling target file: "+err.Error())
