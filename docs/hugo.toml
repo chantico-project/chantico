@@ -15,6 +15,7 @@ allowContent = ['.*']
 [params]
 disableInlineCopyToClipBoard = true
 themeVariant = ['relearn-dark', 'relearn-light']
+linkTitle = " " # only show logo in sidebar
 
 [params.sidebar]
   autoCollapsed = false
