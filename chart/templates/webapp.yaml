@@ -74,10 +74,15 @@ metadata:
   name: chantico-visualisation-webapp
   namespace: {{ .Release.Namespace }}
 spec:
+  type: {{ .Values.visualisationWebapp.service.type }}
   selector:
     app: chantico-visualisation-webapp
   ports:
     - protocol: TCP
       port: 80
+      {{- if eq .Values.visualisationWebapp.service.type "NodePort" }}
+      nodePort: 30005
+      {{- else }}
       targetPort: 80
+      {{- end }}
 {{- end }}
