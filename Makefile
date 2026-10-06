@@ -142,8 +142,7 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 		--set prometheus.service.type="NodePort" \
 		--set victoriaMetrics.service.type="NodePort" \
 		--set grafana.service.type="NodePort" \
-		--set visualisationWebapp.include=true \
-		--set visualisationWebapp.image.tag="latest"
+		--set visualisationWebapp.include=true
 
 .PHONY: cluster-load-mock-images
 cluster-load-mock-images:
