@@ -33,7 +33,7 @@ grafana:
 visualisationWebapp:
   include: false
   image:
-    repository: "ghcr.io/chantico-project/images/visualisation-webapp"
+    repository: "ghcr.io/chantico-project/images/chantico-visualisation-webapp"
     tag: "" # defaults to Chart.version
   service:
     type: "ClusterIP"

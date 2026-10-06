@@ -2,13 +2,13 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: visualisation-webapp
+  name: chantico-visualisation-webapp
   namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: visualisation-webapp-datacenterresources
+  name: chantico-visualisation-webapp-datacenterresources
 rules:
 - apiGroups:
   - chantico-project.github.io
@@ -22,33 +22,33 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: visualisation-webapp-datacenterresources
+  name: chantico-visualisation-webapp-datacenterresources
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: visualisation-webapp-datacenterresources
+  name: chantico-visualisation-webapp-datacenterresources
 subjects:
 - kind: ServiceAccount
-  name: visualisation-webapp
+  name: chantico-visualisation-webapp
   namespace: {{ .Release.Namespace }}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: visualisation-webapp
+  name: chantico-visualisation-webapp
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: visualisation-webapp
+      app: chantico-visualisation-webapp
   template:
     metadata:
       labels:
-        app: visualisation-webapp
+        app: chantico-visualisation-webapp
     spec:
-      serviceAccountName: visualisation-webapp
+      serviceAccountName: chantico-visualisation-webapp
       containers:
-        - name: visualisation-webapp
+        - name: chantico-visualisation-webapp
           image: "{{ .Values.visualisationWebapp.image.repository }}:{{ .Values.visualisationWebapp.image.tag | default .Chart.AppVersion }}"
           ports:
             - containerPort: 80
@@ -71,11 +71,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: visualisation-webapp
+  name: chantico-visualisation-webapp
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: visualisation-webapp
+    app: chantico-visualisation-webapp
   ports:
     - protocol: TCP
       port: 80
