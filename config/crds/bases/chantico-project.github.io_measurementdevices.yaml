@@ -52,34 +52,83 @@ spec:
           spec:
             description: MeasurementDeviceSpec defines the desired state of MeasurementDevice
             properties:
-              auth:
-                description: 'Courtesy of the snmp_exporter repository: https://github.com/prometheus/snmp_exporter/blob/main/config/config.go'
+              authFrom:
+                description: |-
+                  SecretConfigMapSelector is a generic selector that resolves to a string value
+                  coming from one of: a literal Value, a key in a ConfigMap, or a key in a Secret.
                 properties:
-                  auth_protocol:
+                  value:
+                    description: |-
+                      Value is a literal value for the selector.
+                      Mutually exclusive with ValueFrom.
                     type: string
-                  community:
-                    type: string
-                  context_name:
-                    type: string
-                  password:
-                    type: string
-                  priv_password:
-                    type: string
-                  priv_protocol:
-                    type: string
-                  security_level:
-                    type: string
-                  username:
-                    type: string
-                  version:
-                    type: integer
+                  valueFrom:
+                    description: |-
+                      ValueFrom selects a source for the selector's value. Supported sources are
+                      limited to ConfigMapKeyRef and SecretKeyRef.
+                    properties:
+                      configMapKeyRef:
+                        description: Selects a key of a ConfigMap to populate the
+                          value.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the ConfigMap or its key
+                              must be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      secretKeyRef:
+                        description: Selects a key of a Secret to populate the value.
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                    type: object
+                    x-kubernetes-validations:
+                    - message: ConfigMapKeyRef and SecretKeyRef cannot be set simultaneously
+                      rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
                 type: object
+                x-kubernetes-validations:
+                - message: Value and ValueFrom cannot be set at the same time
+                  rule: '!(has(self.value) && has(self.valueFrom))'
               walks:
                 items:
                   type: string
                 type: array
             required:
-            - auth
+            - authFrom
             - walks
             type: object
           status:
