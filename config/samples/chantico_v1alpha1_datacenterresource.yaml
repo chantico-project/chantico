@@ -6,6 +6,14 @@ data:
   template: |
     tnoPduPowerValue{name="{{ .resourceName }}"}
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vm-attribution-coefficient-template
+data:
+  template: |
+    sum(vm_attribution_coefficient{resource_consumer_id="/qemu.slice/{{ .vmid }}.scope"})
+---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
@@ -68,10 +76,16 @@ metadata:
   name: datacenterresource-misd-gbm-01-vm-120
 spec:
   type: vm
-  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
+  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55ba
   parents:
     - name: datacenterresource-misd-gbm-01
-      coefficient: sum(vm_attribution_coefficient{resource_consumer_id="/qemu.slice/120.scope"})
+      coefficientFrom:
+        configMapKeyRef:
+          name: vm-attribution-coefficient-template
+          key: template
+        parameters:
+        - name: vmid
+          value: "120"
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -85,4 +99,10 @@ spec:
   serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
   parents:
     - name: datacenterresource-misd-gbm-01
-      coefficient: sum(vm_attribution_coefficient{resource_consumer_id="/qemu.slice/121.scope"})
+      coefficientFrom:
+        configMapKeyRef:
+          name: vm-attribution-coefficient-template
+          key: template
+        parameters:
+        - name: vmid
+          value: "121"

@@ -160,7 +160,6 @@ cluster-mocks: cluster-load-mock-images ## Apply the mock deployments and servic
 .PHONY: cluster-mock-resources
 cluster-mock-resources: ## Apply the sample configurations for the mocks
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
-# 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock2.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 
