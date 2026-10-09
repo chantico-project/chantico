@@ -24,6 +24,7 @@ import (
 
 	chantico "chantico/api/v1alpha1"
 	"chantico/internal/filestore"
+	ch "chantico/internal/k8s"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
 
@@ -87,8 +88,8 @@ func TestWriteReconcileGeneratorFile(t *testing.T) {
 			UID: types.UID("dev-1"),
 		},
 		Spec: chantico.MeasurementDeviceSpec{
-			Auth:  snmp.GeneratorAuth{},
-			Walks: []string{"1.3.6.1"},
+			AuthFrom: &ch.SecretConfigMapSelector{Value: ""},
+			Walks:    []string{"1.3.6.1"},
 		},
 	}
 	r := newReconciler(t, root, measurementDevice)
@@ -183,8 +184,8 @@ func TestReconcileDeletion(t *testing.T) {
 			Finalizers:        []string{chantico.SNMPUpdateFinalizer},
 		},
 		Spec: chantico.MeasurementDeviceSpec{
-			Auth:  snmp.GeneratorAuth{},
-			Walks: []string{"1.3.6.1"},
+			AuthFrom: &ch.SecretConfigMapSelector{Value: ""},
+			Walks:    []string{"1.3.6.1"},
 		},
 	}
 
