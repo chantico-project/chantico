@@ -1,0 +1,13 @@
+apiVersion: chantico-project.github.io/v1alpha1
+kind: MeasurementDevice
+metadata:
+  name: tno
+  labels:
+    app.kubernetes.io/name: chantico
+spec:
+  auth:
+    community: public
+    version: 2
+  walks:
+    - tnoPduEnergyValue
+    - tnoPduPowerValue
