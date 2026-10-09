@@ -123,7 +123,7 @@ func TestResolvedExpressions(t *testing.T) {
 	parameter := chantico.TemplateParameter{Name: "identifier", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "pdu1"}}
 	tests := map[string]struct {
 		resource *chantico.DataCenterResource
-		want     ResolvedDataCenterResource
+		want     ResolvedExpressions
 	}{
 		"coefficient template": {
 			resource: &chantico.DataCenterResource{
@@ -133,8 +133,7 @@ func TestResolvedExpressions(t *testing.T) {
 					Parents: []chantico.ParentRef{{Name: "pdu1", CoefficientFrom: testTemplateFrom(parameter)}},
 				},
 			},
-			want: ResolvedDataCenterResource{
-				Name: "bm1", Type: DataCenterResourceTypeBaremetal,
+			want: ResolvedExpressions{
 				Parents: []ResolvedParent{{Name: "pdu1", Coefficient: `usage_coeff{identifier="pdu1"}`}},
 			},
 		},
@@ -151,8 +150,7 @@ func TestResolvedExpressions(t *testing.T) {
 					},
 				},
 			},
-			want: ResolvedDataCenterResource{
-				Name: "pdu1", Type: DataCenterResourceTypePDU,
+			want: ResolvedExpressions{
 				EnergyMetric: `power_watts{identifier="pdu1"}`,
 			},
 		},

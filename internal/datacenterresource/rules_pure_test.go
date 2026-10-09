@@ -17,8 +17,11 @@ limitations under the License.
 package datacenterresource
 
 import (
+	chantico "chantico/api/v1alpha1"
 	"reflect"
 	"testing"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -51,14 +54,38 @@ func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
 	}
 }
 
+type ruleFixture struct {
+	Name             string
+	Type             string
+	ServiceId        string
+	AdditionalLabels map[string]string
+	EnergyMetric     string
+	Parents          []ResolvedParent
+}
+
+func testRuleBuilder(fixture *ruleFixture) *RuleBuilder {
+	resource := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: fixture.Name},
+		Spec: chantico.DataCenterResourceSpec{
+			Type:             fixture.Type,
+			ServiceId:        fixture.ServiceId,
+			AdditionalLabels: fixture.AdditionalLabels,
+		},
+	}
+	for _, parent := range fixture.Parents {
+		resource.Spec.Parents = append(resource.Spec.Parents, chantico.ParentRef{Name: parent.Name})
+	}
+	return NewRuleBuilder(resource, &ResolvedExpressions{EnergyMetric: fixture.EnergyMetric, Parents: fixture.Parents})
+}
+
 func TestBuildSharedLabels(t *testing.T) {
 	testCases := map[string]struct {
-		resource    *ResolvedDataCenterResource
+		resource    *ruleFixture
 		extraLabels map[string]string
 		expected    map[string]string
 	}{
 		"basic case": {
-			resource: &ResolvedDataCenterResource{Name: "bm1", Type: DataCenterResourceTypeBaremetal},
+			resource:    &ruleFixture{Name: "bm1", Type: DataCenterResourceTypeBaremetal},
 			extraLabels: nil,
 			expected: map[string]string{
 				"resource": "bm1",
@@ -66,7 +93,7 @@ func TestBuildSharedLabels(t *testing.T) {
 			},
 		},
 		"with extra labels": {
-			resource: &ResolvedDataCenterResource{Name: "bm1", Type: DataCenterResourceTypeBaremetal},
+			resource: &ruleFixture{Name: "bm1", Type: DataCenterResourceTypeBaremetal},
 			extraLabels: map[string]string{
 				"customLabel": "exampleValue",
 			},
@@ -77,7 +104,7 @@ func TestBuildSharedLabels(t *testing.T) {
 			},
 		},
 		"with parents": {
-			resource: &ResolvedDataCenterResource{
+			resource: &ruleFixture{
 				Name: "bm1", Type: DataCenterResourceTypeBaremetal,
 				Parents: []ResolvedParent{{Name: "pdu1"}, {Name: "pdu2"}},
 			},
@@ -89,7 +116,7 @@ func TestBuildSharedLabels(t *testing.T) {
 			},
 		},
 		"with serviceId": {
-			resource: &ResolvedDataCenterResource{
+			resource: &ruleFixture{
 				Name: "bm1", Type: DataCenterResourceTypeBaremetal,
 				ServiceId: "3d88f471-674f-4446-9de2-54e5faa2c951",
 			},
@@ -101,7 +128,7 @@ func TestBuildSharedLabels(t *testing.T) {
 			},
 		},
 		"with additional labels": {
-			resource: &ResolvedDataCenterResource{
+			resource: &ruleFixture{
 				Name: "bm1", Type: DataCenterResourceTypeBaremetal,
 				AdditionalLabels: map[string]string{"customLabel": "exampleValue"},
 			},
@@ -113,7 +140,7 @@ func TestBuildSharedLabels(t *testing.T) {
 			},
 		},
 		"with conflicing labels": {
-			resource: &ResolvedDataCenterResource{
+			resource: &ruleFixture{
 				Name: "bm1", Type: DataCenterResourceTypeBaremetal,
 				AdditionalLabels: map[string]string{"resource": "customResource"},
 			},
@@ -124,7 +151,7 @@ func TestBuildSharedLabels(t *testing.T) {
 			},
 		},
 		"with extra label conflic takes presedence": {
-			resource: &ResolvedDataCenterResource{
+			resource: &ruleFixture{
 				Name: "bm1", Type: DataCenterResourceTypeBaremetal,
 				AdditionalLabels: map[string]string{"extraLabel": "additional"},
 			},
@@ -141,7 +168,7 @@ func TestBuildSharedLabels(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if labels := buildSharedLabels(tc.resource, tc.extraLabels); !reflect.DeepEqual(labels, tc.expected) {
+			if labels := testRuleBuilder(tc.resource).buildSharedLabels(tc.extraLabels); !reflect.DeepEqual(labels, tc.expected) {
 				t.Errorf("buildSharedLabels() = %#v, want %#v", labels, tc.expected)
 			}
 		})
@@ -237,13 +264,13 @@ func TestCoefficientMetricQuery(t *testing.T) {
 
 func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 	// Root node with energyMetric produces 1 alias rule
-	pdu := &ResolvedDataCenterResource{
+	pdu := &ruleFixture{
 		Name: testPDU1, Type: DataCenterResourceTypePDU,
 		EnergyMetric: testSNMPPDU1PowerWatts,
 		ServiceId:    "3d88f471-674f-4446-9de2-54e5faa2c951",
 	}
 
-	rules := BuildRecordingRules(pdu)
+	rules := testRuleBuilder(pdu).BuildRecordingRules()
 	if len(rules) != 1 {
 		t.Fatalf("Expected 1 alias rule for root node, got %d rules", len(rules))
 	}
@@ -257,7 +284,7 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 	// Non-root node with parents that have coefficients should produce
 	// coefficient rules + energy rule.
-	bm := &ResolvedDataCenterResource{
+	bm := &ruleFixture{
 		Name: testBM1, Type: DataCenterResourceTypeBaremetal,
 		Parents: []ResolvedParent{
 			{Name: testPDU1, Coefficient: testPDU1Coefficient},
@@ -265,7 +292,7 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 		},
 	}
 
-	rules := BuildRecordingRules(bm)
+	rules := testRuleBuilder(bm).BuildRecordingRules()
 	// 2 coefficient rules + 1 energy rule = 3
 	if len(rules) != 3 {
 		t.Fatalf("Expected 3 rules, got %d", len(rules))
@@ -284,7 +311,7 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 
 func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 	// BM node with 2 PDU parents (with coefficients) — no children defined here
-	bm := &ResolvedDataCenterResource{
+	bm := &ruleFixture{
 		Name: testBM1, Type: DataCenterResourceTypeBaremetal,
 		Parents: []ResolvedParent{
 			{Name: testPDU1, Coefficient: testPDU1Coefficient},
@@ -292,7 +319,7 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 		},
 	}
 
-	rules := BuildRecordingRules(bm)
+	rules := testRuleBuilder(bm).BuildRecordingRules()
 	// 2 coefficient rules + 1 energy rule = 3
 	if len(rules) != 3 {
 		t.Fatalf("Expected 3 rules, got %d", len(rules))
@@ -317,13 +344,13 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 
 func TestBuildRecordingRules_LeafNode(t *testing.T) {
 	// VM (leaf) with one parent and no children
-	vm := &ResolvedDataCenterResource{
+	vm := &ruleFixture{
 		Name: testVM1, Type: DataCenterResourceTypeVM,
 		ServiceId: "a479357a-2680-4577-8ffe-5105e634c836",
 		Parents:   []ResolvedParent{{Name: testBM1}},
 	}
 
-	rules := BuildRecordingRules(vm)
+	rules := testRuleBuilder(vm).BuildRecordingRules()
 	// Only 1 energy rule (no coefficient rules, no children)
 	if len(rules) != 1 {
 		t.Fatalf("Expected 1 rule, got %d", len(rules))
@@ -337,12 +364,12 @@ func TestBuildRecordingRules_LeafNode(t *testing.T) {
 }
 
 func TestBuildRuleFile_RootNoChildren(t *testing.T) {
-	pdu := &ResolvedDataCenterResource{
+	pdu := &ruleFixture{
 		Name: testPDU1, Type: DataCenterResourceTypePDU,
 		EnergyMetric: testSNMPPDU1PowerWatts,
 	}
 
-	ruleFile := BuildRuleFile(pdu)
+	ruleFile := testRuleBuilder(pdu).BuildRuleFile()
 	if ruleFile == nil {
 		t.Fatal("Expected non-nil rule file for root node with energyMetric")
 	}
@@ -352,14 +379,14 @@ func TestBuildRuleFile_RootNoChildren(t *testing.T) {
 }
 
 func TestBuildRuleFile_WithRules(t *testing.T) {
-	bm := &ResolvedDataCenterResource{
+	bm := &ruleFixture{
 		Name: testBM1, Type: DataCenterResourceTypeBaremetal,
 		Parents: []ResolvedParent{
 			{Name: testPDU1, Coefficient: "0.6"},
 		},
 	}
 
-	ruleFile := BuildRuleFile(bm)
+	ruleFile := testRuleBuilder(bm).BuildRuleFile()
 	if ruleFile == nil {
 		t.Fatal("Expected non-nil rule file")
 	}
@@ -378,11 +405,11 @@ func TestBuildRuleFile_WithRules(t *testing.T) {
 func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	// Complete three-layer example: PDU → BM → VM
 	// PDU1 is a root node with no parents — no rules generated
-	pdu1 := &ResolvedDataCenterResource{
+	pdu1 := &ruleFixture{
 		Name: "pdu1a", Type: DataCenterResourceTypePDU,
 		EnergyMetric: "snmp_pdu1a_power_watts",
 	}
-	pdu1Rules := BuildRecordingRules(pdu1)
+	pdu1Rules := testRuleBuilder(pdu1).BuildRecordingRules()
 	if len(pdu1Rules) != 1 {
 		t.Fatalf("PDU1: expected 1 alias rule, got %d", len(pdu1Rules))
 	}
@@ -392,13 +419,13 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	})
 
 	// BM1 with parent PDU1 (coefficient "1"), generates coefficient + energy
-	bm1 := &ResolvedDataCenterResource{
+	bm1 := &ruleFixture{
 		Name: testBM1, Type: DataCenterResourceTypeBaremetal,
 		Parents: []ResolvedParent{
 			{Name: "pdu1a", Coefficient: "1"},
 		},
 	}
-	bm1Rules := BuildRecordingRules(bm1)
+	bm1Rules := testRuleBuilder(bm1).BuildRecordingRules()
 	// 1 coefficient rule + 1 energy rule = 2
 	if len(bm1Rules) != 2 {
 		t.Fatalf("BM1: expected 2 rules, got %d", len(bm1Rules))
@@ -409,13 +436,13 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	})
 
 	// VM1 with parent BM1 (coefficient "0.4")
-	vm1 := &ResolvedDataCenterResource{
+	vm1 := &ruleFixture{
 		Name: testVM1, Type: DataCenterResourceTypeVM,
 		Parents: []ResolvedParent{
 			{Name: testBM1, Coefficient: "0.4"},
 		},
 	}
-	vm1Rules := BuildRecordingRules(vm1)
+	vm1Rules := testRuleBuilder(vm1).BuildRecordingRules()
 	// 1 coefficient + 1 energy = 2
 	if len(vm1Rules) != 2 {
 		t.Fatalf("VM1: expected 2 rules, got %d", len(vm1Rules))
@@ -426,14 +453,14 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	}
 
 	// VM2 with parent BM1 (coefficient "0.6")
-	vm2 := &ResolvedDataCenterResource{
+	vm2 := &ruleFixture{
 		Name: "vm2", Type: DataCenterResourceTypeVM,
 		ServiceId: "002793bc-e100-4953-ac07-a25d12b573d4",
 		Parents: []ResolvedParent{
 			{Name: testBM1, Coefficient: "0.6"},
 		},
 	}
-	vm2Rules := BuildRecordingRules(vm2)
+	vm2Rules := testRuleBuilder(vm2).BuildRecordingRules()
 	// 1 coefficient + 1 energy = 2
 	if len(vm2Rules) != 2 {
 		t.Fatalf("VM2: expected 2 rules, got %d", len(vm2Rules))
@@ -446,12 +473,12 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 
 func TestBuildRecordingRules_ManyToOneParents(t *testing.T) {
 	// BM with two PDU parents (many-to-one)
-	bm := &ResolvedDataCenterResource{
+	bm := &ruleFixture{
 		Name: testBM1, Type: DataCenterResourceTypeBaremetal,
 		Parents: []ResolvedParent{{Name: testPDU2}, {Name: testPDU1}}, // intentionally unsorted
 	}
 
-	rules := BuildRecordingRules(bm)
+	rules := testRuleBuilder(bm).BuildRecordingRules()
 	// Only 1 energy rule (no children)
 	if len(rules) != 1 {
 		t.Fatalf("Expected 1 rule, got %d", len(rules))

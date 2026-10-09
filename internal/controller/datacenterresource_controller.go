@@ -217,13 +217,13 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 	l := log.FromContext(ctx)
 
 	renderer := datacenterresource.NewTemplateRenderer(r.Client, dataCenterResource.Namespace)
-	resolvedDataCenterResource, err := renderer.ResolvedExpressions(ctx, dataCenterResource)
+	resolvedExpressions, err := renderer.ResolvedExpressions(ctx, dataCenterResource)
 	if err != nil {
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve templates: "+err.Error())
 		return steps.Error(err)
 	}
 
-	ruleFile := dcr.BuildRuleFile(resolvedDataCenterResource)
+	ruleFile := dcr.NewRuleBuilder(dataCenterResource, resolvedExpressions).BuildRuleFile()
 
 	if ruleFile == nil {
 		l.Info("No rule file found")

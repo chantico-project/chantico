@@ -26,12 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ResolvedDataCenterResource struct {
-	Name             string
-	Type             string
-	AdditionalLabels map[string]string
-	ServiceId        string
-
+type ResolvedExpressions struct {
 	EnergyMetric string
 	Parents      []ResolvedParent
 }
@@ -96,7 +91,7 @@ func (tr *TemplateRenderer) resolveParentCoefficientTemplate(ctx context.Context
 	return "", fmt.Errorf("no coefficient or coefficient template specified for parent %q", parent.Name)
 }
 
-func (tr *TemplateRenderer) ResolvedExpressions(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (*ResolvedDataCenterResource, error) {
+func (tr *TemplateRenderer) ResolvedExpressions(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (*ResolvedExpressions, error) {
 	energyMetric, err := tr.resolveEnergyMetricTemplate(ctx, dataCenterResource)
 	if err != nil {
 		return nil, err
@@ -114,12 +109,8 @@ func (tr *TemplateRenderer) ResolvedExpressions(ctx context.Context, dataCenterR
 		})
 	}
 
-	return &ResolvedDataCenterResource{
-		Name:             dataCenterResource.Name,
-		Type:             dataCenterResource.Spec.Type,
-		AdditionalLabels: dataCenterResource.Spec.AdditionalLabels,
-		ServiceId:        dataCenterResource.Spec.ServiceId,
-		EnergyMetric:     energyMetric,
-		Parents:          parents,
+	return &ResolvedExpressions{
+		EnergyMetric: energyMetric,
+		Parents:      parents,
 	}, nil
 }

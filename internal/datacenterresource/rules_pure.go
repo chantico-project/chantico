@@ -17,6 +17,7 @@ limitations under the License.
 package datacenterresource
 
 import (
+	chantico "chantico/api/v1alpha1"
 	"fmt"
 	"maps"
 	"sort"
@@ -39,6 +40,15 @@ type RuleGroup struct {
 // RuleFile represents a complete Prometheus rule file.
 type RuleFile struct {
 	Groups []RuleGroup `yaml:"groups"`
+}
+
+type RuleBuilder struct {
+	resource    *chantico.DataCenterResource
+	expressions *ResolvedExpressions
+}
+
+func NewRuleBuilder(resource *chantico.DataCenterResource, expressions *ResolvedExpressions) *RuleBuilder {
+	return &RuleBuilder{resource: resource, expressions: expressions}
 }
 
 // CoefficientMetricName is the Prometheus metric name for energy coefficients in the case where
@@ -81,21 +91,19 @@ func SanitizeMetricName(name string) string {
 //     energy for each parent). Uses the same `chantico_power_watts` name.
 //
 // Returns nil if no rules need to be written.
-func BuildRecordingRules(
-	dataCenterResource *ResolvedDataCenterResource,
-) []RecordingRule {
+func (b *RuleBuilder) BuildRecordingRules() []RecordingRule {
 	var rules []RecordingRule
 
 	// 1. Root-node alias: map raw energyMetric → canonical name
-	if aliasRule := BuildEnergyAliasRule(dataCenterResource); aliasRule != nil {
+	if aliasRule := b.BuildEnergyAliasRule(); aliasRule != nil {
 		rules = append(rules, *aliasRule)
 	}
 
 	// 2. Coefficient rules for each parent
-	rules = append(rules, BuildCoefficientRules(dataCenterResource)...)
+	rules = append(rules, b.BuildCoefficientRules()...)
 
 	// 3. Energy rule for this node (non-root only)
-	energyRule := BuildEnergyRule(dataCenterResource)
+	energyRule := b.BuildEnergyRule()
 	if energyRule != nil {
 		rules = append(rules, *energyRule)
 	}
@@ -112,9 +120,9 @@ func applyAdditionalLabels(base map[string]string, labels map[string]string) map
 	return base
 }
 
-func constructParentNamesLabel(dataCenterResource *ResolvedDataCenterResource) string {
+func (b *RuleBuilder) constructParentNamesLabel() string {
 	parents := []string{}
-	for _, parent := range dataCenterResource.Parents {
+	for _, parent := range b.resource.Spec.Parents {
 		parents = append(parents, parent.Name)
 	}
 	return strings.Join(parents, ",")
@@ -122,26 +130,26 @@ func constructParentNamesLabel(dataCenterResource *ResolvedDataCenterResource) s
 
 // buildSharedLabels builds the set of labels for the prometheus rule.
 // It includes the resource name, type, service ID, parent names, any base labels, and additional labels specified in the resource.
-func buildSharedLabels(dataCenterResource *ResolvedDataCenterResource, base map[string]string) map[string]string {
+func (b *RuleBuilder) buildSharedLabels(base map[string]string) map[string]string {
 	labels := map[string]string{
-		"resource": dataCenterResource.Name,
-		"type":     dataCenterResource.Type,
+		"resource": b.resource.Name,
+		"type":     b.resource.Spec.Type,
 	}
 
-	if dataCenterResource.ServiceId != "" {
-		labels["serviceId"] = dataCenterResource.ServiceId
+	if b.resource.Spec.ServiceId != "" {
+		labels["serviceId"] = b.resource.Spec.ServiceId
 	}
 
-	if len(dataCenterResource.Parents) > 0 {
-		labels["parents"] = constructParentNamesLabel(dataCenterResource)
+	if len(b.resource.Spec.Parents) > 0 {
+		labels["parents"] = b.constructParentNamesLabel()
 	}
 
 	if base != nil {
 		labels = applyAdditionalLabels(labels, base)
 	}
 
-	if dataCenterResource.AdditionalLabels != nil {
-		labels = applyAdditionalLabels(labels, dataCenterResource.AdditionalLabels)
+	if b.resource.Spec.AdditionalLabels != nil {
+		labels = applyAdditionalLabels(labels, b.resource.Spec.AdditionalLabels)
 	}
 
 	return labels
@@ -153,10 +161,8 @@ func buildSharedLabels(dataCenterResource *ResolvedDataCenterResource, base map[
 // children to reference the parent's energy using a uniform naming convention.
 //
 // Returns nil if it is not a root node (has parents).
-func BuildEnergyAliasRule(
-	dataCenterResource *ResolvedDataCenterResource,
-) *RecordingRule {
-	if len(dataCenterResource.Parents) > 0 {
+func (b *RuleBuilder) BuildEnergyAliasRule() *RecordingRule {
+	if len(b.resource.Spec.Parents) > 0 {
 		return nil
 	}
 
@@ -166,11 +172,11 @@ func BuildEnergyAliasRule(
 	}
 
 	// Add the defaults from the shared labels based on the resouce spec.
-	labels := buildSharedLabels(dataCenterResource, baseLabels)
+	labels := b.buildSharedLabels(baseLabels)
 
 	return &RecordingRule{
 		Record: EnergyMetricName,
-		Expr:   dataCenterResource.EnergyMetric,
+		Expr:   b.expressions.EnergyMetric,
 		Labels: labels,
 	}
 }
@@ -179,10 +185,8 @@ func BuildEnergyAliasRule(
 // coefficient set. The coefficient is defined on the child's ParentRef and
 // represents the proportional share of the parent's energy attributable to
 // this child.
-func BuildCoefficientRules(
-	dataCenterResource *ResolvedDataCenterResource,
-) []RecordingRule {
-	if len(dataCenterResource.Parents) == 0 {
+func (b *RuleBuilder) BuildCoefficientRules() []RecordingRule {
+	if len(b.expressions.Parents) == 0 {
 		return nil
 	}
 
@@ -193,7 +197,7 @@ func BuildCoefficientRules(
 		coeff      string
 	}
 	var pcs []parentCoeff
-	for _, p := range dataCenterResource.Parents {
+	for _, p := range b.expressions.Parents {
 		if p.Coefficient != "" {
 			pcs = append(pcs, parentCoeff{parentName: p.Name, coeff: p.Coefficient})
 		}
@@ -207,7 +211,7 @@ func BuildCoefficientRules(
 			Expr:   pc.coeff,
 			Labels: map[string]string{
 				"parent": pc.parentName,
-				"child":  dataCenterResource.Name,
+				"child":  b.resource.Name,
 			},
 		})
 	}
@@ -220,10 +224,8 @@ func BuildCoefficientRules(
 //
 // For root nodes (no parents), returns nil — the energy timeseries is
 // already present in Prometheus (e.g. from an SNMP exporter).
-func BuildEnergyRule(
-	dataCenterResource *ResolvedDataCenterResource,
-) *RecordingRule {
-	if len(dataCenterResource.Parents) == 0 {
+func (b *RuleBuilder) BuildEnergyRule() *RecordingRule {
+	if len(b.resource.Spec.Parents) == 0 {
 		return nil
 	}
 
@@ -232,12 +234,12 @@ func BuildEnergyRule(
 		// "customLabel": "exampleValue",
 	}
 	// Merge the shared labels into the initial set of labels.
-	maps.Copy(labels, buildSharedLabels(dataCenterResource, labels))
+	maps.Copy(labels, b.buildSharedLabels(labels))
 
 	// Construct the Prometheus aggregation expression for the energy recording rule.
 	expr := fmt.Sprintf(
 		`sum(%s{child="%s"} * on (parent) group_left () label_replace(%s, "parent", "$1", "resource", "(.*)"))`,
-		CoefficientMetricName, dataCenterResource.Name, EnergyMetricName,
+		CoefficientMetricName, b.resource.Name, EnergyMetricName,
 	)
 
 	return &RecordingRule{
@@ -249,10 +251,8 @@ func BuildEnergyRule(
 
 // BuildRuleFile wraps the recording rules into a complete Prometheus rule file
 // structure with a single group named after the resource.
-func BuildRuleFile(
-	dataCenterResource *ResolvedDataCenterResource,
-) *RuleFile {
-	rules := BuildRecordingRules(dataCenterResource)
+func (b *RuleBuilder) BuildRuleFile() *RuleFile {
+	rules := b.BuildRecordingRules()
 	if len(rules) == 0 {
 		return nil
 	}
@@ -260,7 +260,7 @@ func BuildRuleFile(
 	return &RuleFile{
 		Groups: []RuleGroup{
 			{
-				Name:  fmt.Sprintf("chantico_%s", SanitizeMetricName(dataCenterResource.Name)),
+				Name:  fmt.Sprintf("chantico_%s", SanitizeMetricName(b.resource.Name)),
 				Rules: rules,
 			},
 		},
