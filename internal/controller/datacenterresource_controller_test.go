@@ -30,6 +30,7 @@ import (
 	chantico "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
 	dcr "chantico/internal/datacenterresource"
+	"chantico/internal/k8s"
 	"chantico/internal/steps"
 
 	"go.yaml.in/yaml/v2"
@@ -415,15 +416,24 @@ func TestResolveAndApplyTemplate_ConfigMapTemplateWithIncludedParameter(t *testi
 		},
 	)
 
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
+	rendered, err := reconciler.renderTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
+		// ConfigMapKeyRef:
+		// chantico.TemplateConfigMapKeyRef{
+		// 	Name: "vm-attribution-coefficient-template",
+		// 	Key:  "template",
+		// },
+		ValueSource: k8s.ValueSource{
+			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "vm-attribution-coefficient-template"},
+				Key:                  "template",
+			},
 		},
-		Parameters: []corev1.EnvVar{
+		Parameters: []chantico.TemplateParameter{
 			{
-				Name:  "vmid",
-				Value: "3",
+				Name: "vmid",
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					Value: "3",
+				},
 			},
 		},
 	})
@@ -450,19 +460,25 @@ func TestResolveAndApplyTemplate_ConfigMapTemplateWithIncludedMultipleParameter(
 		},
 	)
 
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
+	rendered, err := reconciler.renderTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
+		ValueSource: k8s.ValueSource{
+			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "vm-attribution-coefficient-template"},
+				Key:                  "template",
+			},
 		},
-		Parameters: []corev1.EnvVar{
+		Parameters: []chantico.TemplateParameter{
 			{
-				Name:  "var1",
-				Value: "3",
+				Name: "var1",
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					Value: "3",
+				},
 			},
 			{
-				Name:  "var2",
-				Value: "4",
+				Name: "var2",
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					Value: "4",
+				},
 			},
 		},
 	})
@@ -498,27 +514,32 @@ func TestResolveAndApplyTemplate_ConfigMapTemplateWithParameterFromSecret(t *tes
 		},
 	)
 
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
+	rendered, err := reconciler.renderTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
+		ValueSource: k8s.ValueSource{
+			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "vm-attribution-coefficient-template"},
+				Key:                  "template",
+			},
 		},
-		Parameters: []corev1.EnvVar{
+
+		Parameters: []chantico.TemplateParameter{
 			{
 				Name: "vmid",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "vmid-secret",
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					ValueFrom: &k8s.ValueSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "vmid-secret",
+							},
+							Key: "vmid",
 						},
-						Key: "vmid",
 					},
 				},
 			},
 		},
 	})
 	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
+		t.Fatalf("renderTemplate returned error: %v", err)
 	}
 
 	expected := `vm_cpu_percentage{vmid="3"}`
@@ -549,27 +570,31 @@ func TestResolveAndApplyTemplate_ConfigMapTemplateWithParameterFromConfigMap(t *
 		},
 	)
 
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
+	rendered, err := reconciler.renderTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
+		ValueSource: k8s.ValueSource{
+			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "vm-attribution-coefficient-template"},
+				Key:                  "template",
+			},
 		},
-		Parameters: []corev1.EnvVar{
+		Parameters: []chantico.TemplateParameter{
 			{
 				Name: "vmid",
-				ValueFrom: &corev1.EnvVarSource{
-					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "vmid-configmap",
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					ValueFrom: &k8s.ValueSource{
+						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "vmid-configmap",
+							},
+							Key: "vmid",
 						},
-						Key: "vmid",
 					},
 				},
 			},
 		},
 	})
 	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
+		t.Fatalf("renderTemplate returned error: %v", err)
 	}
 
 	expected := `vm_cpu_percentage{vmid="3"}`
@@ -599,14 +624,18 @@ func TestResolveCoefficientTemplates(t *testing.T) {
 				{
 					Name: "pdu1",
 					CoefficientFrom: &chantico.TemplateFrom{
-						ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-							Name: "pdu-coefficient-template",
-							Key:  "template",
+						ValueSource: k8s.ValueSource{
+							ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: "pdu-coefficient-template"},
+								Key:                  "template",
+							},
 						},
-						Parameters: []corev1.EnvVar{
+						Parameters: []chantico.TemplateParameter{
 							{
-								Name:  "identifier",
-								Value: "pdu1",
+								Name: "identifier",
+								SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+									Value: "pdu1",
+								},
 							},
 						},
 					},
@@ -642,14 +671,18 @@ func TestResolveEnergyMetricTemplates(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			EnergyMetricFrom: &chantico.TemplateFrom{
-				ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-					Name: "pdu-energymetric-template",
-					Key:  "template",
+				ValueSource: k8s.ValueSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "pdu-energymetric-template"},
+						Key:                  "template",
+					},
 				},
-				Parameters: []corev1.EnvVar{
+				Parameters: []chantico.TemplateParameter{
 					{
-						Name:  "identifier",
-						Value: "pdu1",
+						Name: "identifier",
+						SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+							Value: "pdu1",
+						},
 					},
 				},
 			},

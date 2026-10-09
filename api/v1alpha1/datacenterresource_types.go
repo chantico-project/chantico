@@ -17,22 +17,23 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"chantico/internal/k8s"
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type TemplateConfigMapKeyRef struct {
-	// Name is the name of the ConfigMap.
-	Name string `json:"name"`
-	// Key is the key within the ConfigMap that contains the template.
-	Key string `json:"key,omitempty"`
+type TemplateParameter struct {
+	Name                        string `json:"name"`
+	k8s.SecretConfigMapSelector `json:"inline,omitempty"`
 }
 
 type TemplateFrom struct {
-	ConfigMapKeyRef TemplateConfigMapKeyRef `json:"configMapKeyRef"`
+	k8s.ValueSource `json:"inline,omitempty"`
 	// +optional
-	Parameters []corev1.EnvVar `json:"parameters,omitempty"`
+	Parameters []TemplateParameter `json:"parameters,omitempty"`
 }
 
 // ParentRef references a parent DataCenterResource and optionally carries
@@ -166,4 +167,24 @@ func (s *DataCenterResourceSpec) ParentNames() []string {
 		names[i] = p.Name
 	}
 	return names
+}
+
+func (p *TemplateParameter) Resolve(ctx context.Context, r client.Client, namespace string) (string, error) {
+	return p.SecretConfigMapSelector.Resolve(ctx, r, namespace)
+}
+
+func (p *TemplateFrom) ResolveTemplate(ctx context.Context, r client.Client, namespace string) (string, error) {
+	return p.ValueSource.Resolve(ctx, r, namespace)
+}
+
+func (p *TemplateFrom) ResolveParameters(ctx context.Context, r client.Client, namespace string) (map[string]string, error) {
+	result := make(map[string]string)
+	for _, param := range p.Parameters {
+		value, err := param.Resolve(ctx, r, namespace)
+		if err != nil {
+			return nil, err
+		}
+		result[param.Name] = value
+	}
+	return result, nil
 }

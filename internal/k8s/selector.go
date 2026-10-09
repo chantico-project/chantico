@@ -64,18 +64,25 @@ func fetchFromSecret(ctx context.Context, r client.Client, namespace string, ref
 	return string(value), nil
 }
 
+func (s ValueSource) Resolve(ctx context.Context, r client.Client, namespace string) (string, error) {
+	if ref := s.ConfigMapKeyRef; ref != nil {
+		return fetchFromConfigMap(ctx, r, namespace, ref)
+	}
+	if ref := s.SecretKeyRef; ref != nil {
+		return fetchFromSecret(ctx, r, namespace, ref)
+	}
+	return "", &errs.MissingOptionError{Parent: "ValueSource", Options: []string{"ConfigMapKeyRef", "SecretKeyRef"}}
+}
+
 func (s SecretConfigMapSelector) Resolve(ctx context.Context, r client.Client, namespace string) (string, error) {
 	// return the literal value if ValueFrom is not provided
 	if s.ValueFrom == nil {
 		return s.Value, nil
 	}
-	if ref := s.ValueFrom.ConfigMapKeyRef; ref != nil {
-		return fetchFromConfigMap(ctx, r, namespace, ref)
+	if s.ValueFrom.ConfigMapKeyRef == nil && s.ValueFrom.SecretKeyRef == nil {
+		return "", &errs.MissingOptionError{Parent: "SecretConfigMapSelector", Options: []string{"Value", "ValueFrom.ConfigMapKeyRef", "ValueFrom.SecretKeyRef"}}
 	}
-	if ref := s.ValueFrom.SecretKeyRef; ref != nil {
-		return fetchFromSecret(ctx, r, namespace, ref)
-	}
-	return "", &errs.MissingOptionError{Parent: "SecretConfigMapSelector", Options: []string{"Value", "ValueFrom.ConfigMapKeyRef", "ValueFrom.SecretKeyRef"}}
+	return s.ValueFrom.Resolve(ctx, r, namespace)
 }
 
 // DeepCopyInto implements a manual deep-copy for SecretConfigMapSelector

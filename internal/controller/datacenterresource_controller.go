@@ -8,12 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"text/template"
 
 	config "chantico/internal/configuration"
 	dcr "chantico/internal/datacenterresource"
@@ -277,28 +277,16 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 }
 
 // Helper function which resolves and performs the substitution for of the templates. Used for both the coefficient templates and energy metrics templates.
-func (r *DataCenterResourceReconciler) resolveAndApplyTemplate(ctx context.Context, namespace string, templateFrom *chantico.TemplateFrom) (string, error) {
+func (r *DataCenterResourceReconciler) renderTemplate(ctx context.Context, namespace string, templateFrom *chantico.TemplateFrom) (string, error) {
 	// Lookup the configmap and resolve retrieve the template text
-	configMap := &corev1.ConfigMap{}
-	if templateFrom == nil {
-		return "", fmt.Errorf("DataCenterResource does not have a template ConfigMap")
-	}
-	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: templateFrom.ConfigMapKeyRef.Name}, configMap); err != nil {
-		return "", fmt.Errorf("get template ConfigMap %q: %w", templateFrom.ConfigMapKeyRef.Name, err)
-	}
-	templateText, ok := configMap.Data[templateFrom.ConfigMapKeyRef.Key]
-	if !ok {
-		return "", fmt.Errorf("template ConfigMap %q does not contain key %q", templateFrom.ConfigMapKeyRef.Name, templateFrom.ConfigMapKeyRef.Key)
+	templateText, err := templateFrom.ResolveTemplate(ctx, r.Client, namespace)
+	if err != nil {
+		return "", err
 	}
 
-	// Gather all of the template parameters and resolve their values
-	parameters := make(map[string]string, len(templateFrom.Parameters))
-	for _, parameter := range templateFrom.Parameters {
-		value, err := r.resolveEnvVar(ctx, namespace, parameter)
-		if err != nil {
-			return "", fmt.Errorf("resolve template parameter %q: %w", parameter.Name, err)
-		}
-		parameters[parameter.Name] = value
+	parameters, err := templateFrom.ResolveParameters(ctx, r.Client, namespace)
+	if err != nil {
+		return "", err
 	}
 
 	// Apply the template with the resolved parameters
@@ -326,7 +314,7 @@ func (r *DataCenterResourceReconciler) resolveCoefficientTemplates(ctx context.C
 			return nil, fmt.Errorf("parent %q coefficient template requires both configMapKeyRef.name and configMapKeyRef.key", parent.Name)
 		}
 
-		rendered, err := r.resolveAndApplyTemplate(ctx, dataCenterResource.Namespace, parent.CoefficientFrom)
+		rendered, err := r.renderTemplate(ctx, dataCenterResource.Namespace, parent.CoefficientFrom)
 		if err != nil {
 			return nil, fmt.Errorf("resolve and apply coefficient template for parent %q: %w", parent.Name, err)
 		}
@@ -344,50 +332,13 @@ func (r *DataCenterResourceReconciler) resolveEnergyMetricTemplate(ctx context.C
 	if dataCenterResource.Spec.EnergyMetricFrom == nil {
 		return dataCenterResource, nil
 	}
-	rendered, err := r.resolveAndApplyTemplate(ctx, dataCenterResource.Namespace, dataCenterResource.Spec.EnergyMetricFrom)
+	rendered, err := r.renderTemplate(ctx, dataCenterResource.Namespace, dataCenterResource.Spec.EnergyMetricFrom)
 	if err != nil {
 		return nil, fmt.Errorf("resolve and apply energy metric template: %w", err)
 	}
 	dataCenterResource.Spec.EnergyMetric = rendered
 
 	return dataCenterResource, nil
-}
-
-// This uses the same struct as the kubernetes environment variable to resolve the parameters for a template.
-// It resolves the value of the parameter in the envVar variable, either directly from the Value field,
-// or from a ConfigMap or Secret if ValueFrom is specified.
-func (r *DataCenterResourceReconciler) resolveEnvVar(ctx context.Context, namespace string, variable corev1.EnvVar) (string, error) {
-
-	if variable.ValueFrom == nil {
-		return variable.Value, nil
-	}
-
-	// Resolve the value from a config map
-	if ref := variable.ValueFrom.ConfigMapKeyRef; ref != nil {
-		configMap := &corev1.ConfigMap{}
-		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ref.Name}, configMap); err != nil {
-			return "", fmt.Errorf("get ConfigMap %q: %w", ref.Name, err)
-		}
-		value, ok := configMap.Data[ref.Key]
-		if !ok {
-			return "", fmt.Errorf("ConfigMap %q does not contain key %q", ref.Name, ref.Key)
-		}
-		return value, nil
-	}
-
-	// Resolve the value from a secret
-	if ref := variable.ValueFrom.SecretKeyRef; ref != nil {
-		secret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ref.Name}, secret); err != nil {
-			return "", fmt.Errorf("get Secret %q: %w", ref.Name, err)
-		}
-		value, ok := secret.Data[ref.Key]
-		if !ok {
-			return "", fmt.Errorf("Secret %q does not contain key %q", ref.Name, ref.Key)
-		}
-		return string(value), nil
-	}
-	return "", fmt.Errorf("must specify configMapKeyRef or secretKeyRef")
 }
 
 func (r *DataCenterResourceReconciler) reconcileReady(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
