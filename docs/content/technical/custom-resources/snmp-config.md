@@ -43,7 +43,7 @@ for the desired metrics.
 | Field | Type | Description |
 |---|---|---|
 | `metadata.name` | `string` | The name of the resource. This is used to reference the resource in instances of other custom resource definitions. |
-| `spec.auth` | `SNMPAuth` | The authentication parameters for the SNMP device. This is based on the configuration of the [SNMP exporter](https://github.com/prometheus/snmp_exporter/blob/main/config/config.go) |
+| `spec.authFrom` | `SecretConfigMapSelector` | Source of the authentication parameters for the SNMP device. Exactly one of `value` or `valueFrom` (with either `secretKeyRef` or `configMapKeyRef`, in the same namespace) must be set. Value must be YAML following the auth format of the [SNMP exporter](https://github.com/prometheus/snmp_exporter/blob/main/config/config.go), e.g. `community`, `version`, `username`, `password`. |
 | `spec.walks` | list of `string` | The list of walks that are to be requested from devices using this type. Each walk corresponds to an OID, field or table in the MIB file, and may be namespaced to the base MIB file name. |
 
 Note that the OIDs may still be translated into field names once the metrics are 
