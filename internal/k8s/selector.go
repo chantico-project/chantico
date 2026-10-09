@@ -10,8 +10,31 @@ import (
 	errs "chantico/internal/errors"
 )
 
-type SecretConfigMapSelector corev1.EnvVar
-type ValueSource = corev1.EnvVarSource
+// SecretConfigMapSelector is a generic selector that resolves to a string value
+// coming from one of: a literal Value, a key in a ConfigMap, or a key in a Secret.
+type SecretConfigMapSelector struct {
+	// Value is a literal value for the selector.
+	// Mutually exclusive with ValueFrom.
+	// +optional
+	Value string `json:"value,omitempty"`
+
+	// ValueFrom selects a source for the selector's value. Supported sources are
+	// limited to ConfigMapKeyRef and SecretKeyRef.
+	// +optional
+	ValueFrom *ValueSource `json:"valueFrom,omitempty"`
+}
+
+// ValueSource is a limited representation containing only the fields used by
+// this controller (ConfigMapKeyRef and SecretKeyRef).
+type ValueSource struct {
+	// Selects a key of a ConfigMap to populate the value.
+	// +optional
+	ConfigMapKeyRef *corev1.ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
+
+	// Selects a key of a Secret to populate the value.
+	// +optional
+	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
+}
 
 func (s SecretConfigMapSelector) Resolve(ctx context.Context, r client.Client, namespace string) (string, error) {
 	// return the literal value if ValueFrom is not provided
@@ -43,4 +66,49 @@ func (s SecretConfigMapSelector) Resolve(ctx context.Context, r client.Client, n
 		return string(value), nil
 	}
 	return "", &errs.MissingOptionError{Parent: "SecretConfigMapSelector", Options: []string{"Value", "ValueFrom.ConfigMapKeyRef", "ValueFrom.SecretKeyRef"}}
+}
+
+// DeepCopyInto implements a manual deep-copy for SecretConfigMapSelector
+func (in *SecretConfigMapSelector) DeepCopyInto(out *SecretConfigMapSelector) {
+	*out = *in
+	if in.ValueFrom != nil {
+		in, out := &in.ValueFrom, &out.ValueFrom
+		*out = new(ValueSource)
+		(*in).DeepCopyInto(*out)
+	}
+}
+
+// DeepCopy creates a new deep-copied SecretConfigMapSelector.
+func (in *SecretConfigMapSelector) DeepCopy() *SecretConfigMapSelector {
+	if in == nil {
+		return nil
+	}
+	out := new(SecretConfigMapSelector)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto implements a manual deep-copy for ValueSource.
+func (in *ValueSource) DeepCopyInto(out *ValueSource) {
+	*out = *in
+	if in.ConfigMapKeyRef != nil {
+		in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef
+		*out = new(corev1.ConfigMapKeySelector)
+		**out = **in
+	}
+	if in.SecretKeyRef != nil {
+		in, out := &in.SecretKeyRef, &out.SecretKeyRef
+		*out = new(corev1.SecretKeySelector)
+		**out = **in
+	}
+}
+
+// DeepCopy creates a new deep-copied ValueSource.
+func (in *ValueSource) DeepCopy() *ValueSource {
+	if in == nil {
+		return nil
+	}
+	out := new(ValueSource)
+	in.DeepCopyInto(out)
+	return out
 }

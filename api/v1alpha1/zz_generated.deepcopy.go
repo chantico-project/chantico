@@ -213,11 +213,9 @@ func (in *MeasurementDeviceSpec) DeepCopyInto(out *MeasurementDeviceSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	out.Auth = in.Auth
 	if in.AuthFrom != nil {
 		in, out := &in.AuthFrom, &out.AuthFrom
-		*out = new(v1.SecretKeySelector)
-		(*in).DeepCopyInto(*out)
+		*out = (*in).DeepCopy()
 	}
 }
 

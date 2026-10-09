@@ -3,10 +3,12 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
 	errs "chantico/internal/errors"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -155,4 +157,120 @@ func TestSecretConfigMapSelectorResolve(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSecretConfigMapSelectorDeepCopy(t *testing.T) {
+	t.Run("DeepCopy returns an independent deep copy", func(t *testing.T) {
+		orig := &SecretConfigMapSelector{
+			Value: "orig-value",
+			ValueFrom: &ValueSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "cm"},
+					Key:                  "ck",
+				},
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "s"},
+					Key:                  "sk",
+				},
+			},
+		}
+
+		cp := orig.DeepCopy()
+		if cp == nil {
+			t.Fatalf("expected non-nil copy")
+		}
+		if !reflect.DeepEqual(orig, cp) {
+			t.Fatalf("deep copy not equal to original:\norig=%#v\ncopy=%#v", orig, cp)
+		}
+
+		// mutate original
+		orig.Value = "changed-value"
+		orig.ValueFrom.ConfigMapKeyRef.Name = "cm2"
+		orig.ValueFrom.ConfigMapKeyRef.Key = "ck2"
+		orig.ValueFrom.SecretKeyRef.Name = "s2"
+		orig.ValueFrom.SecretKeyRef.Key = "sk2"
+
+		// copied should remain with original values
+		if cp.ValueFrom == nil || cp.ValueFrom.ConfigMapKeyRef == nil || cp.ValueFrom.SecretKeyRef == nil {
+			t.Fatalf("unexpected nil in copy ValueFrom: %#v", cp)
+		}
+		if cp.ValueFrom.ConfigMapKeyRef.Name != "cm" || cp.ValueFrom.ConfigMapKeyRef.Key != "ck" {
+			t.Fatalf("copy ConfigMapKeyRef mutated: %#v", cp.ValueFrom.ConfigMapKeyRef)
+		}
+		if cp.ValueFrom.SecretKeyRef.Name != "s" || cp.ValueFrom.SecretKeyRef.Key != "sk" {
+			t.Fatalf("copy SecretKeyRef mutated: %#v", cp.ValueFrom.SecretKeyRef)
+		}
+	})
+
+	t.Run("DeepCopyInto copies into provided target", func(t *testing.T) {
+		in := &SecretConfigMapSelector{
+			Value: "in-value",
+			ValueFrom: &ValueSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "cm-in"},
+					Key:                  "k-in",
+				},
+			},
+		}
+		out := &SecretConfigMapSelector{}
+		in.DeepCopyInto(out)
+		if !reflect.DeepEqual(in, out) {
+			t.Fatalf("DeepCopyInto result mismatch:\nin=%#v\nout=%#v", in, out)
+		}
+
+		// mutate source and ensure target unchanged
+		in.Value = "changed"
+		in.ValueFrom.ConfigMapKeyRef.Name = "cm-in-2"
+		if out.Value != "in-value" || out.ValueFrom.ConfigMapKeyRef.Name != "cm-in" {
+			t.Fatalf("out changed after in mutated: out=%#v", out)
+		}
+	})
+
+	t.Run("DeepCopy handles nil receiver", func(t *testing.T) {
+		var in *SecretConfigMapSelector
+		if in.DeepCopy() != nil {
+			t.Fatalf("expected nil when deepcopying nil receiver")
+		}
+	})
+}
+
+func TestValueSourceDeepCopy(t *testing.T) {
+	t.Run("DeepCopy returns independent copy", func(t *testing.T) {
+		vs := &ValueSource{
+			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "cm-vs"},
+				Key:                  "k-vs",
+			},
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "s-vs"},
+				Key:                  "sk-vs",
+			},
+		}
+		cp := vs.DeepCopy()
+		if cp == nil {
+			t.Fatalf("expected non-nil copy")
+		}
+		if !reflect.DeepEqual(vs, cp) {
+			t.Fatalf("ValueSource deepcopy not equal:\norig=%#v\ncopy=%#v", vs, cp)
+		}
+
+		vs.ConfigMapKeyRef.Name = "cm-vs-2"
+		vs.ConfigMapKeyRef.Key = "changed"
+		vs.SecretKeyRef.Name = "s-vs-2"
+		vs.SecretKeyRef.Key = "changed-sk"
+
+		if cp.ConfigMapKeyRef.Name != "cm-vs" || cp.ConfigMapKeyRef.Key != "k-vs" {
+			t.Fatalf("copy ConfigMapKeyRef mutated: %#v", cp.ConfigMapKeyRef)
+		}
+		if cp.SecretKeyRef.Name != "s-vs" || cp.SecretKeyRef.Key != "sk-vs" {
+			t.Fatalf("copy SecretKeyRef mutated: %#v", cp.SecretKeyRef)
+		}
+	})
+
+	t.Run("DeepCopy handles nil receiver", func(t *testing.T) {
+		var vs *ValueSource
+		if vs.DeepCopy() != nil {
+			t.Fatalf("expected nil when deepcopying nil ValueSource")
+		}
+	})
 }
