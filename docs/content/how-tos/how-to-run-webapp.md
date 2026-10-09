@@ -24,6 +24,30 @@ The webapp Service is internal to the cluster by default. Forward it to your mac
 kubectl port-forward -n chantico service/chantico-visualisation-webapp 8080:80
 ```
 
+#### Use a locally built image in the development cluster
+
+When using the local development environment, `make cluster-configure` deploys 
+the webapp with the image from GHCR by default
+(`ghcr.io/chantico-project/images/chantico-visualisation-webapp:<current-version>`). 
+During development on the webapp, the image can be built and loaded into the 
+Kind cluster manually:
+
+```sh
+make docker-build-visualisation-webapp cluster-load-visualisation-webapp cluster-configure \
+  VISUALISATION_WEBAPP_REPOSITORY=chantico-visualisation-webapp \
+  VISUALISATION_WEBAPP_TAG=dev
+```
+
+After rebuilding the image with the tag, load it and restart the
+deployment to pick up the changes:
+
+```sh
+make docker-build-visualisation-webapp cluster-load-visualisation-webapp \
+  VISUALISATION_WEBAPP_REPOSITORY=chantico-visualisation-webapp \
+  VISUALISATION_WEBAPP_TAG=dev
+kubectl rollout restart -n chantico deployment/chantico-visualisation-webapp
+```
+
 ### TL;DR
 ```sh
 # Run webapp
