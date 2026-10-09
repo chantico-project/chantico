@@ -91,11 +91,13 @@ func (r *DataCenterResourceReconciler) dataCenterResourcesForConfigMap(ctx conte
 
 // Check if either energyMetricFrom or parent.CoefficientFrom references this configmap.
 func dataCenterResourceReferencesConfigMap(dataCenterResource *chantico.DataCenterResource, configMapName string) bool {
-	if dataCenterResource.Spec.EnergyMetricFrom != nil && dataCenterResource.Spec.EnergyMetricFrom.ConfigMapKeyRef.Name == configMapName {
+	energyMetricFrom := dataCenterResource.Spec.EnergyMetricFrom
+	if energyMetricFrom != nil && energyMetricFrom.ConfigMapKeyRef != nil && energyMetricFrom.ConfigMapKeyRef.Name == configMapName {
 		return true
 	}
 	for _, parent := range dataCenterResource.Spec.Parents {
-		if parent.CoefficientFrom != nil && parent.CoefficientFrom.ConfigMapKeyRef.Name == configMapName {
+		coefficientFrom := parent.CoefficientFrom
+		if coefficientFrom != nil && coefficientFrom.ConfigMapKeyRef != nil && coefficientFrom.ConfigMapKeyRef.Name == configMapName {
 			return true
 		}
 	}

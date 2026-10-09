@@ -27,11 +27,11 @@ import (
 
 type TemplateParameter struct {
 	Name                        string `json:"name"`
-	k8s.SecretConfigMapSelector `json:"inline,omitempty"`
+	k8s.SecretConfigMapSelector `json:",inline,omitempty"`
 }
 
 type TemplateFrom struct {
-	k8s.ValueSource `json:"inline,omitempty"`
+	k8s.ValueSource `json:",inline,omitempty"`
 	// +optional
 	Parameters []TemplateParameter `json:"parameters,omitempty"`
 }

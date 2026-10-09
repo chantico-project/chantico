@@ -68,173 +68,43 @@ spec:
                 type: string
               energyMetricFrom:
                 properties:
-                  inline:
-                    description: |-
-                      ValueSource is a limited representation containing only the fields used by
-                      this controller (ConfigMapKeyRef and SecretKeyRef).
+                  configMapKeyRef:
+                    description: Selects a key of a ConfigMap to populate the value.
                     properties:
-                      configMapKeyRef:
-                        description: Selects a key of a ConfigMap to populate the
-                          value.
-                        properties:
-                          key:
-                            description: The key to select.
-                            type: string
-                          name:
-                            default: ""
-                            description: |-
-                              Name of the referent.
-                              This field is effectively required, but due to backwards compatibility is
-                              allowed to be empty. Instances of this type with an empty value here are
-                              almost certainly wrong.
-                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            type: string
-                          optional:
-                            description: Specify whether the ConfigMap or its key
-                              must be defined
-                            type: boolean
-                        required:
-                        - key
-                        type: object
-                        x-kubernetes-map-type: atomic
-                      secretKeyRef:
-                        description: Selects a key of a Secret to populate the value.
-                        properties:
-                          key:
-                            description: The key of the secret to select from.  Must
-                              be a valid secret key.
-                            type: string
-                          name:
-                            default: ""
-                            description: |-
-                              Name of the referent.
-                              This field is effectively required, but due to backwards compatibility is
-                              allowed to be empty. Instances of this type with an empty value here are
-                              almost certainly wrong.
-                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            type: string
-                          optional:
-                            description: Specify whether the Secret or its key must
-                              be defined
-                            type: boolean
-                        required:
-                        - key
-                        type: object
-                        x-kubernetes-map-type: atomic
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the ConfigMap or its key must
+                          be defined
+                        type: boolean
+                    required:
+                    - key
                     type: object
-                    x-kubernetes-validations:
-                    - message: ConfigMapKeyRef and SecretKeyRef cannot be set simultaneously
-                      rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
+                    x-kubernetes-map-type: atomic
                   parameters:
                     items:
                       properties:
-                        inline:
-                          description: |-
-                            SecretConfigMapSelector is a generic selector that resolves to a string value
-                            coming from one of: a literal Value, a key in a ConfigMap, or a key in a Secret.
-                          properties:
-                            value:
-                              description: |-
-                                Value is a literal value for the selector.
-                                Mutually exclusive with ValueFrom.
-                              type: string
-                            valueFrom:
-                              description: |-
-                                ValueFrom selects a source for the selector's value. Supported sources are
-                                limited to ConfigMapKeyRef and SecretKeyRef.
-                              properties:
-                                configMapKeyRef:
-                                  description: Selects a key of a ConfigMap to populate
-                                    the value.
-                                  properties:
-                                    key:
-                                      description: The key to select.
-                                      type: string
-                                    name:
-                                      default: ""
-                                      description: |-
-                                        Name of the referent.
-                                        This field is effectively required, but due to backwards compatibility is
-                                        allowed to be empty. Instances of this type with an empty value here are
-                                        almost certainly wrong.
-                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      type: string
-                                    optional:
-                                      description: Specify whether the ConfigMap or
-                                        its key must be defined
-                                      type: boolean
-                                  required:
-                                  - key
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                                secretKeyRef:
-                                  description: Selects a key of a Secret to populate
-                                    the value.
-                                  properties:
-                                    key:
-                                      description: The key of the secret to select
-                                        from.  Must be a valid secret key.
-                                      type: string
-                                    name:
-                                      default: ""
-                                      description: |-
-                                        Name of the referent.
-                                        This field is effectively required, but due to backwards compatibility is
-                                        allowed to be empty. Instances of this type with an empty value here are
-                                        almost certainly wrong.
-                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      type: string
-                                    optional:
-                                      description: Specify whether the Secret or its
-                                        key must be defined
-                                      type: boolean
-                                  required:
-                                  - key
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                              type: object
-                              x-kubernetes-validations:
-                              - message: ConfigMapKeyRef and SecretKeyRef cannot be
-                                  set simultaneously
-                                rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
-                          type: object
-                          x-kubernetes-validations:
-                          - message: Value and ValueFrom cannot be set at the same
-                              time
-                            rule: '!(has(self.value) && has(self.valueFrom))'
                         name:
                           type: string
-                      required:
-                      - name
-                      type: object
-                    type: array
-                type: object
-              parents:
-                description: |-
-                  Parents lists the parent DataCenterResources that feed energy into
-                  this node. Each entry carries an optional coefficient representing
-                  the proportional share of the parent's energy attributable to this
-                  child. The coefficient is written as a Prometheus recording rule so
-                  that the energy formula can reference it.
-                items:
-                  description: |-
-                    ParentRef references a parent DataCenterResource and optionally carries
-                    the energy coefficient for the edge from that parent to this node.
-                    The coefficient represents what fraction of the parent's energy is
-                    attributable to this child.
-                  properties:
-                    coefficient:
-                      description: |-
-                        Coefficient is the energy coefficient for the edge from this parent
-                        to the current node. It is a PromQL expression (often a literal
-                        number) that will be written as a Prometheus recording rule.
-                      type: string
-                    coefficientFrom:
-                      properties:
-                        inline:
+                        value:
                           description: |-
-                            ValueSource is a limited representation containing only the fields used by
-                            this controller (ConfigMapKeyRef and SecretKeyRef).
+                            Value is a literal value for the selector.
+                            Mutually exclusive with ValueFrom.
+                          type: string
+                        valueFrom:
+                          description: |-
+                            ValueFrom selects a source for the selector's value. Supported sources are
+                            limited to ConfigMapKeyRef and SecretKeyRef.
                           properties:
                             configMapKeyRef:
                               description: Selects a key of a ConfigMap to populate
@@ -290,91 +160,192 @@ spec:
                           - message: ConfigMapKeyRef and SecretKeyRef cannot be set
                               simultaneously
                             rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
+                      required:
+                      - name
+                      type: object
+                      x-kubernetes-validations:
+                      - message: Value and ValueFrom cannot be set at the same time
+                        rule: '!(has(self.value) && has(self.valueFrom))'
+                    type: array
+                  secretKeyRef:
+                    description: Selects a key of a Secret to populate the value.
+                    properties:
+                      key:
+                        description: The key of the secret to select from.  Must be
+                          a valid secret key.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the Secret or its key must be
+                          defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
+                type: object
+                x-kubernetes-validations:
+                - message: ConfigMapKeyRef and SecretKeyRef cannot be set simultaneously
+                  rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
+              parents:
+                description: |-
+                  Parents lists the parent DataCenterResources that feed energy into
+                  this node. Each entry carries an optional coefficient representing
+                  the proportional share of the parent's energy attributable to this
+                  child. The coefficient is written as a Prometheus recording rule so
+                  that the energy formula can reference it.
+                items:
+                  description: |-
+                    ParentRef references a parent DataCenterResource and optionally carries
+                    the energy coefficient for the edge from that parent to this node.
+                    The coefficient represents what fraction of the parent's energy is
+                    attributable to this child.
+                  properties:
+                    coefficient:
+                      description: |-
+                        Coefficient is the energy coefficient for the edge from this parent
+                        to the current node. It is a PromQL expression (often a literal
+                        number) that will be written as a Prometheus recording rule.
+                      type: string
+                    coefficientFrom:
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap to populate the
+                            value.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
                         parameters:
                           items:
                             properties:
-                              inline:
-                                description: |-
-                                  SecretConfigMapSelector is a generic selector that resolves to a string value
-                                  coming from one of: a literal Value, a key in a ConfigMap, or a key in a Secret.
-                                properties:
-                                  value:
-                                    description: |-
-                                      Value is a literal value for the selector.
-                                      Mutually exclusive with ValueFrom.
-                                    type: string
-                                  valueFrom:
-                                    description: |-
-                                      ValueFrom selects a source for the selector's value. Supported sources are
-                                      limited to ConfigMapKeyRef and SecretKeyRef.
-                                    properties:
-                                      configMapKeyRef:
-                                        description: Selects a key of a ConfigMap
-                                          to populate the value.
-                                        properties:
-                                          key:
-                                            description: The key to select.
-                                            type: string
-                                          name:
-                                            default: ""
-                                            description: |-
-                                              Name of the referent.
-                                              This field is effectively required, but due to backwards compatibility is
-                                              allowed to be empty. Instances of this type with an empty value here are
-                                              almost certainly wrong.
-                                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                            type: string
-                                          optional:
-                                            description: Specify whether the ConfigMap
-                                              or its key must be defined
-                                            type: boolean
-                                        required:
-                                        - key
-                                        type: object
-                                        x-kubernetes-map-type: atomic
-                                      secretKeyRef:
-                                        description: Selects a key of a Secret to
-                                          populate the value.
-                                        properties:
-                                          key:
-                                            description: The key of the secret to
-                                              select from.  Must be a valid secret
-                                              key.
-                                            type: string
-                                          name:
-                                            default: ""
-                                            description: |-
-                                              Name of the referent.
-                                              This field is effectively required, but due to backwards compatibility is
-                                              allowed to be empty. Instances of this type with an empty value here are
-                                              almost certainly wrong.
-                                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                            type: string
-                                          optional:
-                                            description: Specify whether the Secret
-                                              or its key must be defined
-                                            type: boolean
-                                        required:
-                                        - key
-                                        type: object
-                                        x-kubernetes-map-type: atomic
-                                    type: object
-                                    x-kubernetes-validations:
-                                    - message: ConfigMapKeyRef and SecretKeyRef cannot
-                                        be set simultaneously
-                                      rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
-                                type: object
-                                x-kubernetes-validations:
-                                - message: Value and ValueFrom cannot be set at the
-                                    same time
-                                  rule: '!(has(self.value) && has(self.valueFrom))'
                               name:
                                 type: string
+                              value:
+                                description: |-
+                                  Value is a literal value for the selector.
+                                  Mutually exclusive with ValueFrom.
+                                type: string
+                              valueFrom:
+                                description: |-
+                                  ValueFrom selects a source for the selector's value. Supported sources are
+                                  limited to ConfigMapKeyRef and SecretKeyRef.
+                                properties:
+                                  configMapKeyRef:
+                                    description: Selects a key of a ConfigMap to populate
+                                      the value.
+                                    properties:
+                                      key:
+                                        description: The key to select.
+                                        type: string
+                                      name:
+                                        default: ""
+                                        description: |-
+                                          Name of the referent.
+                                          This field is effectively required, but due to backwards compatibility is
+                                          allowed to be empty. Instances of this type with an empty value here are
+                                          almost certainly wrong.
+                                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        type: string
+                                      optional:
+                                        description: Specify whether the ConfigMap
+                                          or its key must be defined
+                                        type: boolean
+                                    required:
+                                    - key
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  secretKeyRef:
+                                    description: Selects a key of a Secret to populate
+                                      the value.
+                                    properties:
+                                      key:
+                                        description: The key of the secret to select
+                                          from.  Must be a valid secret key.
+                                        type: string
+                                      name:
+                                        default: ""
+                                        description: |-
+                                          Name of the referent.
+                                          This field is effectively required, but due to backwards compatibility is
+                                          allowed to be empty. Instances of this type with an empty value here are
+                                          almost certainly wrong.
+                                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        type: string
+                                      optional:
+                                        description: Specify whether the Secret or
+                                          its key must be defined
+                                        type: boolean
+                                    required:
+                                    - key
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                type: object
+                                x-kubernetes-validations:
+                                - message: ConfigMapKeyRef and SecretKeyRef cannot
+                                    be set simultaneously
+                                  rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
                             required:
                             - name
                             type: object
+                            x-kubernetes-validations:
+                            - message: Value and ValueFrom cannot be set at the same
+                                time
+                              rule: '!(has(self.value) && has(self.valueFrom))'
                           type: array
+                        secretKeyRef:
+                          description: Selects a key of a Secret to populate the value.
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
                       type: object
+                      x-kubernetes-validations:
+                      - message: ConfigMapKeyRef and SecretKeyRef cannot be set simultaneously
+                        rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
                     name:
                       description: Name is the name of the parent DataCenterResource.
                       type: string
