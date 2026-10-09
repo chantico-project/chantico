@@ -1,3 +1,9 @@
+## 0.18.0 (2026-10-09)
+
+#### Feature
+
+* Move SNMP auth from measurementdevices into secrets and configmaps (#256) (0b91b13d)
+
 ## 0.17.2 (2026-10-05)
 
 #### Bug Fixes
