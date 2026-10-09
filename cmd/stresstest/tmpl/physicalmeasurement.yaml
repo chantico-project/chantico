@@ -1,0 +1,10 @@
+apiVersion: chantico-project.github.io/v1alpha1
+kind: PhysicalMeasurement
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: physicalmeasurement-pdu1-out
+spec:
+  ip: 10.5.1.1
+  measurementDevice: schleifenbauer-pdu

@@ -1,0 +1,20 @@
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: datacenterresource-pdu2
+spec:
+  type: pdu
+  physicalMeasurements:
+    - physicalMeasurement-pdu2-out
+  energyMetricFrom:
+    configMapKeyRef:
+      name: pdu-energymetric-template
+      key: template
+    parameters:
+    - name: jobName
+      value: tno-2
+    - name: resourceName
+      value: physicalmeasurement-pdu2-out
