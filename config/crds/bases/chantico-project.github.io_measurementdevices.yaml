@@ -116,7 +116,13 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                     type: object
+                    x-kubernetes-validations:
+                    - message: ConfigMapKeyRef and SecretKeyRef cannot be set simultaneously
+                      rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
                 type: object
+                x-kubernetes-validations:
+                - message: Value and ValueFrom cannot be set at the same time
+                  rule: '!(has(self.value) && has(self.valueFrom))'
               walks:
                 items:
                   type: string
