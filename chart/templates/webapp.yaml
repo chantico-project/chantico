@@ -1,0 +1,88 @@
+{{- if (index .Values "visualisationWebapp").include }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chantico-visualisation-webapp
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chantico-visualisation-webapp-datacenterresources
+rules:
+- apiGroups:
+  - chantico-project.github.io
+  resources:
+  - datacenterresources
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chantico-visualisation-webapp-datacenterresources
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chantico-visualisation-webapp-datacenterresources
+subjects:
+- kind: ServiceAccount
+  name: chantico-visualisation-webapp
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chantico-visualisation-webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chantico-visualisation-webapp
+  template:
+    metadata:
+      labels:
+        app: chantico-visualisation-webapp
+    spec:
+      serviceAccountName: chantico-visualisation-webapp
+      containers:
+        - name: chantico-visualisation-webapp
+          image: "{{ .Values.visualisationWebapp.image.repository }}:{{ .Values.visualisationWebapp.image.tag | default .Chart.AppVersion }}"
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          env:
+            - name: PORT
+              value: "80"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chantico-visualisation-webapp
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: {{ .Values.visualisationWebapp.service.type }}
+  selector:
+    app: chantico-visualisation-webapp
+  ports:
+    - protocol: TCP
+      port: 80
+      {{- if eq .Values.visualisationWebapp.service.type "NodePort" }}
+      nodePort: 30005
+      {{- else }}
+      targetPort: 80
+      {{- end }}
+{{- end }}

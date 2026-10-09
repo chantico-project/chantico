@@ -100,38 +100,48 @@ type config struct {
 
 type envGetter func(string) string
 
-func loadConfig(get envGetter) (config, error) {
-	cfg := config{
-		Port:           8080,
-		KubeconfigPath: "~/.kube/config",
-	}
-	var errs []error
+const DefaultPort = 8080
+const DefaultKubeconfigPath = "~/.kube/config"
 
+func loadConfig(get envGetter) (config, error) {
+	port, portErr := loadPortConfig(get)
+	kubeconfigPath, kubeconfigErr := loadKubeconfigPath(get)
+	if err := errors.Join(portErr, kubeconfigErr); err != nil {
+		return config{}, err
+	}
+
+	return config{
+		Port:           port,
+		KubeconfigPath: kubeconfigPath,
+	}, nil
+}
+
+func loadPortConfig(get envGetter) (int, error) {
 	if portStr := get("PORT"); portStr != "" {
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("PORT must be a valid integer"))
+			return 0, fmt.Errorf("PORT must be a valid integer")
 		} else if port < 1 || port > 65535 {
-			errs = append(errs, fmt.Errorf("PORT must be between 1 and 65535"))
+			return 0, fmt.Errorf("PORT must be between 1 and 65535")
 		} else {
-			cfg.Port = port
+			return port, nil
 		}
 	}
+	return DefaultPort, nil
+}
 
+func loadKubeconfigPath(get envGetter) (string, error) {
 	if kubeconfigPath := get("KUBECONFIG"); kubeconfigPath != "" {
 		if !pathExists(kubeconfigPath) {
-			errs = append(errs, fmt.Errorf("kubeconfig not found at %s", kubeconfigPath))
-		} else {
-			cfg.KubeconfigPath = kubeconfigPath
+			return "", fmt.Errorf("kubeconfig not found at %s", kubeconfigPath)
 		}
-	}
-	cfg.KubeconfigPath = expandPath(cfg.KubeconfigPath)
-
-	if len(errs) > 0 {
-		return config{}, errors.Join(errs...)
+		return kubeconfigPath, nil
 	}
 
-	return cfg, nil
+	if get("KUBERNETES_SERVICE_HOST") != "" {
+		return "", nil
+	}
+	return expandPath(DefaultKubeconfigPath), nil
 }
 
 func pathExists(p string) bool {

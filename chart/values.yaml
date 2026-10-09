@@ -30,6 +30,13 @@ grafana:
   anonymous: true
   service:
     type: "ClusterIP"
+visualisationWebapp:
+  include: false
+  image:
+    repository: "ghcr.io/chantico-project/images/chantico-visualisation-webapp"
+    tag: "" # defaults to Chart.version
+  service:
+    type: "ClusterIP"
 pv:
   include: false
   name: chantico-persistent-volume
