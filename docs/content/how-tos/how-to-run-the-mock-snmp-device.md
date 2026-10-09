@@ -14,7 +14,7 @@ The SNMP mock is an UDP server mocking a device using SNMP with a mock MIB file
 following metrics: `tnoPduEnergyValue` and `tnoPduPowerValue`. This file details 
 how to set up the mock device, and how to subsequently run a demo with it 
 including both the `PhysicalMeasurement` and `MeasurementDevice` custom 
-resources.
+resources. The development setup deploys two SNMP mock devices.
 
 ### Simulated values
 
@@ -103,7 +103,7 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
     ```
     Open http://localhost:19090/targets and verify the target is `UP`.
 
-> **Tip:** To add more devices beyond the second, copy the mock manifests, update the names (e.g. `chantico-snmp-mock-2`), pick a free NodePort, and create corresponding `MeasurementDevice` / `PhysicalMeasurement` resources. Prometheus will automatically pick up new targets via `file_sd_configs` — no restart required.
+> **Tip:** To add more devices beyond the second, copy the mock manifests, update the names (e.g. `chantico-snmp-mock-3`), pick a free NodePort, and create corresponding `MeasurementDevice` / `PhysicalMeasurement` resources. Prometheus will automatically pick up new targets via `file_sd_configs` — no restart required.
 
 ### Adding baremetal resources and linking them to the mock SNMP device
 
