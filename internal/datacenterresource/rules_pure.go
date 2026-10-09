@@ -21,8 +21,6 @@ import (
 	"maps"
 	"sort"
 	"strings"
-
-	chantico "chantico/api/v1alpha1"
 )
 
 // RecordingRule represents a single Prometheus recording rule.
@@ -84,7 +82,7 @@ func SanitizeMetricName(name string) string {
 //
 // Returns nil if no rules need to be written.
 func BuildRecordingRules(
-	dataCenterResource *chantico.DataCenterResource,
+	dataCenterResource *ResolvedDataCenterResource,
 ) []RecordingRule {
 	var rules []RecordingRule
 
@@ -114,27 +112,27 @@ func applyAdditionalLabels(base map[string]string, labels map[string]string) map
 	return base
 }
 
-func constructParentNamesLabel(dataCenterResource *chantico.DataCenterResource) string {
+func constructParentNamesLabel(dataCenterResource *ResolvedDataCenterResource) string {
 	parents := []string{}
-	for _, name := range dataCenterResource.Spec.ParentNames() {
-		parents = append(parents, name)
+	for _, parent := range dataCenterResource.Parents {
+		parents = append(parents, parent.Name)
 	}
 	return strings.Join(parents, ",")
 }
 
 // buildSharedLabels builds the set of labels for the prometheus rule.
 // It includes the resource name, type, service ID, parent names, any base labels, and additional labels specified in the resource.
-func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map[string]string) map[string]string {
+func buildSharedLabels(dataCenterResource *ResolvedDataCenterResource, base map[string]string) map[string]string {
 	labels := map[string]string{
 		"resource": dataCenterResource.Name,
-		"type":     dataCenterResource.Spec.Type,
+		"type":     dataCenterResource.Type,
 	}
 
-	if dataCenterResource.Spec.ServiceId != "" {
-		labels["serviceId"] = dataCenterResource.Spec.ServiceId
+	if dataCenterResource.ServiceId != "" {
+		labels["serviceId"] = dataCenterResource.ServiceId
 	}
 
-	if len(dataCenterResource.Spec.Parents) > 0 {
+	if len(dataCenterResource.Parents) > 0 {
 		labels["parents"] = constructParentNamesLabel(dataCenterResource)
 	}
 
@@ -142,8 +140,8 @@ func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map
 		labels = applyAdditionalLabels(labels, base)
 	}
 
-	if dataCenterResource.Spec.AdditionalLabels != nil {
-		labels = applyAdditionalLabels(labels, dataCenterResource.Spec.AdditionalLabels)
+	if dataCenterResource.AdditionalLabels != nil {
+		labels = applyAdditionalLabels(labels, dataCenterResource.AdditionalLabels)
 	}
 
 	return labels
@@ -156,9 +154,9 @@ func buildSharedLabels(dataCenterResource *chantico.DataCenterResource, base map
 //
 // Returns nil if it is not a root node (has parents).
 func BuildEnergyAliasRule(
-	dataCenterResource *chantico.DataCenterResource,
+	dataCenterResource *ResolvedDataCenterResource,
 ) *RecordingRule {
-	if len(dataCenterResource.Spec.Parents) > 0 {
+	if len(dataCenterResource.Parents) > 0 {
 		return nil
 	}
 
@@ -172,7 +170,7 @@ func BuildEnergyAliasRule(
 
 	return &RecordingRule{
 		Record: EnergyMetricName,
-		Expr:   dataCenterResource.Spec.EnergyMetric,
+		Expr:   dataCenterResource.EnergyMetric,
 		Labels: labels,
 	}
 }
@@ -182,9 +180,9 @@ func BuildEnergyAliasRule(
 // represents the proportional share of the parent's energy attributable to
 // this child.
 func BuildCoefficientRules(
-	dataCenterResource *chantico.DataCenterResource,
+	dataCenterResource *ResolvedDataCenterResource,
 ) []RecordingRule {
-	if len(dataCenterResource.Spec.Parents) == 0 {
+	if len(dataCenterResource.Parents) == 0 {
 		return nil
 	}
 
@@ -195,7 +193,7 @@ func BuildCoefficientRules(
 		coeff      string
 	}
 	var pcs []parentCoeff
-	for _, p := range dataCenterResource.Spec.Parents {
+	for _, p := range dataCenterResource.Parents {
 		if p.Coefficient != "" {
 			pcs = append(pcs, parentCoeff{parentName: p.Name, coeff: p.Coefficient})
 		}
@@ -223,9 +221,9 @@ func BuildCoefficientRules(
 // For root nodes (no parents), returns nil — the energy timeseries is
 // already present in Prometheus (e.g. from an SNMP exporter).
 func BuildEnergyRule(
-	dataCenterResource *chantico.DataCenterResource,
+	dataCenterResource *ResolvedDataCenterResource,
 ) *RecordingRule {
-	if len(dataCenterResource.Spec.Parents) == 0 {
+	if len(dataCenterResource.Parents) == 0 {
 		return nil
 	}
 
@@ -252,7 +250,7 @@ func BuildEnergyRule(
 // BuildRuleFile wraps the recording rules into a complete Prometheus rule file
 // structure with a single group named after the resource.
 func BuildRuleFile(
-	dataCenterResource *chantico.DataCenterResource,
+	dataCenterResource *ResolvedDataCenterResource,
 ) *RuleFile {
 	rules := BuildRecordingRules(dataCenterResource)
 	if len(rules) == 0 {

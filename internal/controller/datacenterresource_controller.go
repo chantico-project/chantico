@@ -1,14 +1,13 @@
 package controller
 
 import (
-	"bytes"
 	chantico "chantico/api/v1alpha1"
+	"chantico/internal/datacenterresource"
 	ph "chantico/internal/patch"
 	"chantico/internal/steps"
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
 	"net"
 	"net/http"
 	"net/url"
@@ -217,19 +216,13 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
 	l := log.FromContext(ctx)
 
-	// Resolve the coefficient templates and apply them to the data center resource
-	resolvedDataCenterResource := dataCenterResource.DeepCopy()
-	resolvedDataCenterResource, err := r.resolveCoefficientTemplates(ctx, resolvedDataCenterResource)
+	renderer := datacenterresource.NewTemplateRenderer(r.Client, dataCenterResource.Namespace)
+	resolvedDataCenterResource, err := renderer.ResolvedExpressions(ctx, dataCenterResource)
 	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve coefficient template: "+err.Error())
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve templates: "+err.Error())
 		return steps.Error(err)
 	}
-	// Resolve the energy metric template and apply it
-	resolvedDataCenterResource, err = r.resolveEnergyMetricTemplate(ctx, resolvedDataCenterResource)
-	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve energy metric template: "+err.Error())
-		return steps.Error(err)
-	}
+
 	ruleFile := dcr.BuildRuleFile(resolvedDataCenterResource)
 
 	if ruleFile == nil {
@@ -274,71 +267,6 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 
 	dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Recording rule file applied successfully")
 	return steps.Continue()
-}
-
-// Helper function which resolves and performs the substitution for of the templates. Used for both the coefficient templates and energy metrics templates.
-func (r *DataCenterResourceReconciler) renderTemplate(ctx context.Context, namespace string, templateFrom *chantico.TemplateFrom) (string, error) {
-	// Lookup the configmap and resolve retrieve the template text
-	templateText, err := templateFrom.ResolveTemplate(ctx, r.Client, namespace)
-	if err != nil {
-		return "", err
-	}
-
-	parameters, err := templateFrom.ResolveParameters(ctx, r.Client, namespace)
-	if err != nil {
-		return "", err
-	}
-
-	// Apply the template with the resolved parameters
-	tmpl, err := template.New(templateFrom.ConfigMapKeyRef.Name).Option("missingkey=error").Parse(templateText)
-	if err != nil {
-		return "", fmt.Errorf("parse template from ConfigMap %q: %w", templateFrom.ConfigMapKeyRef.Name, err)
-	}
-	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, parameters); err != nil {
-		return "", fmt.Errorf("render template from ConfigMap %q: %w", templateFrom.ConfigMapKeyRef.Name, err)
-	}
-	return rendered.String(), nil
-}
-
-// Resolves the coefficient template for each parent in the DataCenterResource spec.
-// The resolved template is put back into the `Coefficient` field of each parent.
-func (r *DataCenterResourceReconciler) resolveCoefficientTemplates(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (*chantico.DataCenterResource, error) {
-	for index := range dataCenterResource.Spec.Parents {
-		parent := &dataCenterResource.Spec.Parents[index]
-		if parent.CoefficientFrom == nil {
-			continue
-		}
-		configMapRef := parent.CoefficientFrom.ConfigMapKeyRef
-		if configMapRef.Name == "" || configMapRef.Key == "" {
-			return nil, fmt.Errorf("parent %q coefficient template requires both configMapKeyRef.name and configMapKeyRef.key", parent.Name)
-		}
-
-		rendered, err := r.renderTemplate(ctx, dataCenterResource.Namespace, parent.CoefficientFrom)
-		if err != nil {
-			return nil, fmt.Errorf("resolve and apply coefficient template for parent %q: %w", parent.Name, err)
-		}
-
-		// Write it back into the parent coefficient field
-		parent.Coefficient = rendered
-	}
-
-	return dataCenterResource, nil
-}
-
-// Resolves the energy metric template and puts the value (after substituting in the template variables) into
-// the `EnergyMetric` field of the DataCenterResource spec.
-func (r *DataCenterResourceReconciler) resolveEnergyMetricTemplate(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (*chantico.DataCenterResource, error) {
-	if dataCenterResource.Spec.EnergyMetricFrom == nil {
-		return dataCenterResource, nil
-	}
-	rendered, err := r.renderTemplate(ctx, dataCenterResource.Namespace, dataCenterResource.Spec.EnergyMetricFrom)
-	if err != nil {
-		return nil, fmt.Errorf("resolve and apply energy metric template: %w", err)
-	}
-	dataCenterResource.Spec.EnergyMetric = rendered
-
-	return dataCenterResource, nil
 }
 
 func (r *DataCenterResourceReconciler) reconcileReady(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
