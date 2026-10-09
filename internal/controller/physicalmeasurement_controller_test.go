@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -72,6 +73,7 @@ func TestReconcileTargetFile_WritesTargetFile(t *testing.T) {
 		Spec: chantico.PhysicalMeasurementSpec{
 			MeasurementDevice: "device-a",
 			Ip:                "192.168.1.10",
+			Type:              chantico.PhysicalMeasurementTypeSNMP,
 		},
 	}
 
@@ -83,7 +85,7 @@ func TestReconcileTargetFile_WritesTargetFile(t *testing.T) {
 		t.Fatalf("expected Continue, got %v", res.Action)
 	}
 
-	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir)
+	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir, "snmp")
 	targets := readFileSDTargets(t, filepath.Join(targetsDir, "physical-measurement.json"))
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 target group, got %d", len(targets))
@@ -107,6 +109,7 @@ func TestReconcileTargetFile_SkipsWriteWhenUnchanged(t *testing.T) {
 		Spec: chantico.PhysicalMeasurementSpec{
 			MeasurementDevice: "device-a",
 			Ip:                "192.168.1.10",
+			Type:              chantico.PhysicalMeasurementTypeSNMP,
 		},
 	}
 
@@ -114,7 +117,7 @@ func TestReconcileTargetFile_SkipsWriteWhenUnchanged(t *testing.T) {
 		t.Fatalf("first reconcileTargetFile errored: %v", res.Err)
 	}
 
-	targetPath := filepath.Join(tmpDir, prometheusTargetsDir, "physical-measurement.json")
+	targetPath := filepath.Join(tmpDir, prometheusTargetsDir, "snmp", "physical-measurement.json")
 	before, err := os.Stat(targetPath)
 	if err != nil {
 		t.Fatalf("stat target file %s: %v", targetPath, err)
@@ -137,7 +140,7 @@ func TestReconcileTargetFile_SkipsWriteWhenUnchanged(t *testing.T) {
 func TestReconcileTargetFile_CreatesMissingTargetsDir(t *testing.T) {
 	tmpDir, reconciler := setupPhysicalMeasurementTest(t)
 
-	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir)
+	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir, "snmp")
 	if err := os.RemoveAll(targetsDir); err != nil {
 		t.Fatalf("remove targets directory %s: %v", targetsDir, err)
 	}
@@ -146,6 +149,7 @@ func TestReconcileTargetFile_CreatesMissingTargetsDir(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
 		Spec: chantico.PhysicalMeasurementSpec{
 			MeasurementDevice: "device-a",
+			Type:              chantico.PhysicalMeasurementTypeSNMP,
 			Ip:                "192.168.1.10",
 		},
 	}
@@ -164,6 +168,7 @@ func TestReconcileTargetFile_OverwritesExisting(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
 		Spec: chantico.PhysicalMeasurementSpec{
 			MeasurementDevice: "device-a",
+			Type:              chantico.PhysicalMeasurementTypeSNMP,
 			Ip:                "192.168.1.10",
 		},
 	}
@@ -176,7 +181,7 @@ func TestReconcileTargetFile_OverwritesExisting(t *testing.T) {
 		t.Fatalf("second reconcileTargetFile errored: %v", res.Err)
 	}
 
-	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir)
+	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir, "snmp")
 	targets := readFileSDTargets(t, filepath.Join(targetsDir, "physical-measurement.json"))
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 target group, got %d", len(targets))
@@ -200,6 +205,7 @@ func TestReconcileTargetFile_MultipleMeasurements(t *testing.T) {
 					Spec: chantico.PhysicalMeasurementSpec{
 						MeasurementDevice: "device-type-a",
 						Ip:                "192.168.1.10",
+						Type:              chantico.PhysicalMeasurementTypeSNMP,
 					},
 				},
 				{
@@ -207,12 +213,13 @@ func TestReconcileTargetFile_MultipleMeasurements(t *testing.T) {
 					Spec: chantico.PhysicalMeasurementSpec{
 						MeasurementDevice: "device-type-b",
 						Ip:                "192.168.1.20",
+						Type:              chantico.PhysicalMeasurementTypeSNMP,
 					},
 				},
 			},
 			expectedModules: map[string]string{
-				"measurement-1.json": "device-type-a",
-				"measurement-2.json": "device-type-b",
+				"snmp/measurement-1.json": "device-type-a",
+				"snmp/measurement-2.json": "device-type-b",
 			},
 		},
 		"two measurements for same device": {
@@ -222,6 +229,7 @@ func TestReconcileTargetFile_MultipleMeasurements(t *testing.T) {
 					Spec: chantico.PhysicalMeasurementSpec{
 						MeasurementDevice: "same-device",
 						Ip:                "192.168.1.10",
+						Type:              chantico.PhysicalMeasurementTypeSNMP,
 					},
 				},
 				{
@@ -229,12 +237,37 @@ func TestReconcileTargetFile_MultipleMeasurements(t *testing.T) {
 					Spec: chantico.PhysicalMeasurementSpec{
 						MeasurementDevice: "same-device",
 						Ip:                "192.168.1.20",
+						Type:              chantico.PhysicalMeasurementTypeSNMP,
 					},
 				},
 			},
 			expectedModules: map[string]string{
-				"measurement-1.json": "same-device",
-				"measurement-2.json": "same-device",
+				"snmp/measurement-1.json": "same-device",
+				"snmp/measurement-2.json": "same-device",
+			},
+		},
+		"one snmp and one prometheus exporter measurement": {
+			physicalMeasurements: []*chantico.PhysicalMeasurement{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "measurement-1", UID: types.UID("uid-1")},
+					Spec: chantico.PhysicalMeasurementSpec{
+						MeasurementDevice: "device-type-a",
+						Ip:                "192.168.1.10",
+						Type:              chantico.PhysicalMeasurementTypeSNMP,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "measurement-2", UID: types.UID("uid-2")},
+					Spec: chantico.PhysicalMeasurementSpec{
+						MeasurementDevice: "device-type-b",
+						Ip:                "192.168.1.20",
+						Type:              chantico.PhysicalMeasurementTypePrometheusExporter,
+					},
+				},
+			},
+			expectedModules: map[string]string{
+				"snmp/measurement-1.json":                "device-type-a",
+				"prometheus-exporter/measurement-2.json": "device-type-b",
 			},
 		},
 	}
@@ -258,19 +291,72 @@ func TestReconcileTargetFile_MultipleMeasurements(t *testing.T) {
 					t.Errorf("expected 1 target group in %s, got %d", fileName, len(targets))
 					continue
 				}
-				if got := targets[0].Labels["__param_module"]; got != expectedModule {
-					t.Errorf("in %s: expected module %q, got %q", fileName, expectedModule, got)
+				if targets[0].Labels["type"] == "snmp" {
+					if got := targets[0].Labels["__param_module"]; got != expectedModule {
+						t.Errorf("in %s: expected module %q, got %q", fileName, expectedModule, got)
+					}
 				}
 			}
 		})
 	}
 }
 
+func TestReconcileTargetFile_PrometheusExporter(t *testing.T) {
+	tmpDir, reconciler := setupPhysicalMeasurementTest(t)
+
+	physicalMeasurement := &chantico.PhysicalMeasurement{
+		ObjectMeta: metav1.ObjectMeta{Name: "exporter"},
+		Spec: chantico.PhysicalMeasurementSpec{
+			Ip:   "192.168.1.10:9100",
+			Type: chantico.PhysicalMeasurementTypePrometheusExporter,
+		},
+	}
+
+	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action != steps.ActionContinue {
+		t.Fatalf("expected Continue, got %v (err: %v)", res.Action, res.Err)
+	}
+
+	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir)
+	assertTargetFiles(t, targetsDir, []string{"prometheus-exporter/exporter.json"})
+
+	targets := readFileSDTargets(t, filepath.Join(targetsDir, "prometheus-exporter", "exporter.json"))
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 target group, got %d", len(targets))
+	}
+	if want := []string{physicalMeasurement.Spec.Ip}; !slices.Equal(targets[0].Targets, want) {
+		t.Errorf("expected targets %v, got %v", want, targets[0].Targets)
+	}
+	wantLabels := map[string]string{"name": "exporter", "instance": physicalMeasurement.Spec.Ip, "type": "prometheus-exporter"}
+	if !maps.Equal(targets[0].Labels, wantLabels) {
+		t.Errorf("expected labels %v, got %v", wantLabels, targets[0].Labels)
+	}
+}
+
+func TestReconcileTargetFile_UnsupportedType(t *testing.T) {
+	_, reconciler := setupPhysicalMeasurementTest(t)
+
+	physicalMeasurement := &chantico.PhysicalMeasurement{
+		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
+		Spec: chantico.PhysicalMeasurementSpec{
+			Ip:   "192.168.1.10",
+			Type: "unknown",
+		},
+	}
+
+	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action != steps.ActionError {
+		t.Fatalf("expected Error, got %v", res.Action)
+	}
+	assertPhysicalMeasurementCondition(t, physicalMeasurement, chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed)
+}
+
 func TestReconcilePhysicalMeasurementDeletion_RemovesTargetFile(t *testing.T) {
 	tmpDir, reconciler := setupPhysicalMeasurementTest(t)
 
 	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir)
-	targetPath := filepath.Join(targetsDir, "physical-measurement.json")
+	targetPath := filepath.Join(targetsDir, "snmp", "physical-measurement.json")
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		t.Fatalf("create directory for %s: %v", targetPath, err)
+	}
 	if err := os.WriteFile(targetPath, []byte("[]"), 0644); err != nil {
 		t.Fatalf("write %s: %v", targetPath, err)
 	}
@@ -283,6 +369,7 @@ func TestReconcilePhysicalMeasurementDeletion_RemovesTargetFile(t *testing.T) {
 			DeletionTimestamp: &now,
 			Finalizers:        []string{chantico.PhysicalMeasurementFinalizer},
 		},
+		Spec: chantico.PhysicalMeasurementSpec{Type: chantico.PhysicalMeasurementTypeSNMP},
 	}
 
 	res := reconciler.reconcileDeletion(t.Context(), physicalMeasurement)
@@ -311,6 +398,7 @@ func TestReconcilePhysicalMeasurementDeletion_NonExistentTargetFile(t *testing.T
 			DeletionTimestamp: &now,
 			Finalizers:        []string{chantico.PhysicalMeasurementFinalizer},
 		},
+		Spec: chantico.PhysicalMeasurementSpec{Type: chantico.PhysicalMeasurementTypeSNMP},
 	}
 
 	res := reconciler.reconcileDeletion(t.Context(), physicalMeasurement)
@@ -466,15 +554,20 @@ func assertPhysicalMeasurementCondition(t *testing.T, physicalMeasurement *chant
 func assertTargetFiles(t *testing.T, targetsDir string, want []string) {
 	t.Helper()
 
-	entries, err := os.ReadDir(targetsDir)
-	if err != nil {
-		t.Fatalf("read targets directory %s: %v", targetsDir, err)
-	}
 	got := []string{}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			got = append(got, entry.Name())
+	err := filepath.WalkDir(targetsDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
 		}
+		rel, err := filepath.Rel(targetsDir, path)
+		if err != nil {
+			return err
+		}
+		got = append(got, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk targets directory %s: %v", targetsDir, err)
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected target files %v, got %v", want, got)
