@@ -84,41 +84,6 @@ func sanitizeMetricName(name string) string {
 	}, name)
 }
 
-// BuildRecordingRules generates the set of Prometheus recording rules for a
-// DataCenterResource node, following the energy accounting design:
-//
-//  1. For root nodes (spec.energyMetric is set), an alias rule mapping the raw
-//     energy metric to a labeled series under the `chantico_power_watts` name.
-//  2. One coefficient recording rule per parent that has a coefficient set
-//     (from the ParentRef entries in spec.parents).
-//  3. One energy recording rule for non-root nodes (sum of coefficient * parent
-//     energy for each parent). Uses the same `chantico_power_watts` name.
-//
-// Returns nil if no rules need to be written.
-func BuildRecordingRules(
-	dataCenterResource *chantico.DataCenterResource,
-) []RecordingRule {
-	var rules []RecordingRule
-
-	// 1. Root-node alias: map raw energyMetric → canonical name
-	if aliasRule := BuildEnergyAliasRule(dataCenterResource); aliasRule != nil {
-		rules = append(rules, *aliasRule)
-	}
-
-	// 2. Coefficient rules for each parent
-	rules = append(rules, BuildCoefficientRules(dataCenterResource)...)
-
-	// 3. Energy rule for this node (non-root only)
-	energyRule := BuildEnergyRule(dataCenterResource)
-	if energyRule != nil {
-		rules = append(rules, *energyRule)
-	}
-
-	rules = append(rules, *BuildOverheadCoefficientRule(dataCenterResource))
-
-	return rules
-}
-
 func applyAdditionalLabels(base map[string]string, labels map[string]string) map[string]string {
 	for k, v := range labels {
 		if _, exists := base[k]; !exists {
