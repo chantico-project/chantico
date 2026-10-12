@@ -10,6 +10,7 @@ import (
 	"time"
 
 	chapi "chantico/api/v1alpha1"
+	k8s "chantico/internal/k8s"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,6 +72,10 @@ func generateMeasurementDevice(allWalks []string, idx int) chapi.MeasurementDevi
 		},
 		Spec: chapi.MeasurementDeviceSpec{
 			Walks: walks,
+			AuthFrom: &k8s.SecretConfigMapSelector{
+				Value: `community: public
+version: 2`,
+			},
 		},
 	}
 	return md
@@ -112,7 +117,7 @@ func main() {
 	ctx := context.Background()
 
 	// Generate and create 5 MeasurementDevice resources
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10; i++ {
 		md := generateMeasurementDevice(allWalks, i)
 		fmt.Printf("Creating MeasurementDevice %s in namespace %s with %d walks\n", md.Name, md.Namespace, len(md.Spec.Walks))
 		if err := cli.Create(ctx, &md); err != nil {
