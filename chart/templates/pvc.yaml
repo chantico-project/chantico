@@ -4,6 +4,12 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Values.persistentVolumeClaimName }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chantico.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if .Values.pvc.volumeName }}
   volumeName: {{ .Values.pvc.volumeName }}

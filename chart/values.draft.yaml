@@ -1,0 +1,146 @@
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  defaultStorageClass: ""
+
+nameOverride: ""
+fullnameOverride: ""
+commonLabels: {}
+commonAnnotations: {}
+
+## Workspace written by the operator; read by prometheus, snmp, generator jobs, filebrowser
+sharedStorage:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  accessModes: 
+  - ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+  selector: {}
+
+controller:
+  enabled: true
+  image:
+    registry: ghcr.io
+    repository: chantico-project/images/chantico
+    tag: ""            # defaults to Chart.AppVersion
+    digest: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests: { cpu: 10m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 128Mi }
+  serviceAccount: { create: true, name: "", annotations: {} }
+  rbac: { create: true }
+  extraEnvVars: []
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+prometheus:
+  enabled: true
+  image: { registry: docker.io, repository: prom/prometheus, tag: v3.7.3 }
+  retention: 5h
+  enableLifecycle: true
+  resources: {}
+  persistence:
+    enabled: true      # false -> emptyDir
+    existingClaim: ""
+    subPath: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 2Gi
+    annotations: {}
+  service:
+    type: ClusterIP
+    ports: { http: 9090 }
+    nodePorts: { http: "" }
+    annotations: {}
+  ingress: &ingressDefaults
+    enabled: false
+    ingressClassName: ""
+    hostname: prometheus.local
+    path: /
+    pathType: Prefix
+    annotations: {}
+    tls: false
+    extraHosts: []
+    extraTls: []
+
+victoriametrics:
+  enabled: true
+  image: { registry: docker.io, repository: victoriametrics/victoria-metrics, tag: v1.115.0 }
+  retentionPeriod: 12
+  resources: {}
+  vmalert:
+    enabled: true
+    image: { registry: docker.io, repository: victoriametrics/vmalert, tag: v1.115.0 }
+    resources: {}
+  persistence:
+    enabled: true
+    existingClaim: ""
+    subPath: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 10Gi
+    annotations: {}
+  service:
+    type: ClusterIP
+    ports: { http: 8428 }
+    nodePorts: { http: "" }
+    annotations: {}
+  ingress:
+    <<: *ingressDefaults
+    hostname: victoriametrics.local
+
+grafana:
+  enabled: true
+  image: { registry: docker.io, repository: grafana/grafana, tag: 11.3.0 }
+  auth:
+    adminUser: admin
+    adminPassword: ""  # empty -> random, stored in Secret
+    existingSecret: ""
+    existingSecretPasswordKey: admin-password
+  anonymous: { enabled: true, role: Viewer }
+  resources: {}
+  persistence:
+    enabled: false
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 1Gi
+  service:
+    type: ClusterIP
+    ports: { http: 3000 }
+    nodePorts: { http: "" }
+    annotations: {}
+  ingress:
+    <<: *ingressDefaults
+    hostname: grafana.local
+
+snmpExporter:
+  enabled: true
+  image: { registry: docker.io, repository: ricardbejarano/snmp_exporter, tag: 0.26.0 }
+  resources: {}
+  service:
+    type: ClusterIP
+    ports: { http: 9116 }
+    nodePorts: { http: "" }
+    annotations: {}
+
+filebrowser:
+  enabled: true
+  image: { registry: docker.io, repository: filebrowser/filebrowser, tag: v2.32.2 }
+  auth:
+    username: admin
+    password: ""       # empty -> random, stored in Secret
+    existingSecret: ""
+  resources: {}
+  service:
+    type: ClusterIP
+    ports: { http: 80 }
+    nodePorts: { http: "" }
+    annotations: {}
+  ingress:
+    <<: *ingressDefaults
+    hostname: filebrowser.local

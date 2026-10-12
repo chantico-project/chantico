@@ -1,8 +1,15 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: chantico-prometheus-config
+  name: {{ include "chantico.fullname" . }}-prometheus-config
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chantico.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 data:
   prometheus.yml: |-
     global:
@@ -13,7 +20,7 @@ data:
       - /tmp/prometheus-volume/rules/*.yml
     {{- if .Values.victoriaMetrics.include }}
     remote_write:
-      - url: http://chantico-victoriametrics:8428/api/v1/write
+      - url: http://{{ include "chantico.fullname" . }}-victoriametrics:8428/api/v1/write
     {{- end }}
     scrape_configs:
       - job_name: prometheus
@@ -31,24 +38,31 @@ data:
           - source_labels: [__param_target]
             target_label: instance
           - target_label: __address__
-            replacement: {{ .Values.snmpExporterAddress }}
+            replacement: {{ .Values.snmpExporterAddress | default (printf "%s-snmp:9116" (include "chantico.fullname" .)) }}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: chantico
-  name: chantico-prometheus
+    {{- include "chantico.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  name: {{ include "chantico.fullname" . }}-prometheus
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: chantico-prometheus
+      app: {{ include "chantico.fullname" . }}-prometheus
   template:
     metadata:
       labels:
-        app: chantico-prometheus
+        app: {{ include "chantico.fullname" . }}-prometheus
+        {{- include "chantico.labels" . | nindent 8 }}
+        app.kubernetes.io/component: prometheus
     spec:
       securityContext:
         runAsNonRoot: true
@@ -108,18 +122,25 @@ spec:
           claimName: {{ .Values.persistentVolumeClaimName }}
       - name: chantico-prometheus-config
         configMap:
-          name: chantico-prometheus-config
+          name: {{ include "chantico.fullname" . }}-prometheus-config
       restartPolicy: Always
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: chantico-prometheus
+  name: {{ include "chantico.fullname" . }}-prometheus
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chantico.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.prometheus.service.type }}
   selector:
-    app: chantico-prometheus
+    app: {{ include "chantico.fullname" . }}-prometheus
   ports:
     - protocol: TCP
       port: 9090

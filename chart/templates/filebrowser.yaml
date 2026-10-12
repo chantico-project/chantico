@@ -1,17 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: chantico-filebrowser
+  name: {{ include "chantico.fullname" . }}-filebrowser
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chantico.labels" . | nindent 4 }}
+    app.kubernetes.io/component: filebrowser
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: chantico-filebrowser
+      app: {{ include "chantico.fullname" . }}-filebrowser
   template:
     metadata:
       labels:
-        app: chantico-filebrowser
+        app: {{ include "chantico.fullname" . }}-filebrowser
+        {{- include "chantico.labels" . | nindent 8 }}
+        app.kubernetes.io/component: filebrowser
     spec:
       securityContext:
         runAsNonRoot: true
@@ -51,12 +60,19 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: chantico-filebrowser
+  name: {{ include "chantico.fullname" . }}-filebrowser
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chantico.labels" . | nindent 4 }}
+    app.kubernetes.io/component: filebrowser
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.filebrowser.service.type }}
   selector:
-    app: chantico-filebrowser
+    app: {{ include "chantico.fullname" . }}-filebrowser
   ports:
     - protocol: TCP
       port: 80

@@ -3,7 +3,14 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: chantico-manager-role
+  name: {{ include "chantico.fullname" . }}-manager-role
+  labels:
+    {{- include "chantico.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 rules:
 - apiGroups:
   - ""
@@ -78,22 +85,36 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: chantico-manager-rolebinding
+  name: {{ include "chantico.fullname" . }}-manager-rolebinding
+  labels:
+    {{- include "chantico.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: chantico-manager-role
+  name: {{ include "chantico.fullname" . }}-manager-role
 subjects:
 - kind: ServiceAccount
-  name: chantico-controller-manager
+  name: {{ include "chantico.fullname" . }}-controller-manager
   namespace: {{ .Release.Namespace }}
 ---
 # Leader election — namespaced Role
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: chantico-leader-election-role
+  name: {{ include "chantico.fullname" . }}-leader-election-role
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chantico.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 rules:
 - apiGroups:
   - ""
@@ -130,14 +151,21 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: chantico-leader-election-rolebinding
+  name: {{ include "chantico.fullname" . }}-leader-election-rolebinding
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chantico.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: chantico-leader-election-role
+  name: {{ include "chantico.fullname" . }}-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: chantico-controller-manager
+  name: {{ include "chantico.fullname" . }}-controller-manager
   namespace: {{ .Release.Namespace }}
 {{- end }}
