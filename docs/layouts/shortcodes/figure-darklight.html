@@ -1,0 +1,15 @@
+<figure>
+  {{ with .Get "link" }}<a href="{{ . }}">{{ end }}
+  <div class="theme-content theme-dark-only">
+    <picture>
+      <img src="{{ .Get "dark-src" }}" alt="{{ .Get "alt" }}" width="{{ .Get "width" }}" height="{{ .Get "height" }}">
+    </picture>
+  </div>
+  <div class="theme-content theme-light-only">
+    <picture>
+      <img src="{{ .Get "light-src" }}" alt="{{ .Get "alt" }}" width="{{ .Get "width" }}" height="{{ .Get "height" }}">
+    </picture>
+  </div>
+  {{ with .Get "caption" }}<figcaption>{{ . }}</figcaption>{{ end }}
+  {{ with .Get "link" }}</a>{{ end }}
+</figure>
