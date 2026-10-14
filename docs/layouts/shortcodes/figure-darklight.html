@@ -1,13 +1,19 @@
+{{ $darkSrc := .Get "dark-src" }}
+{{ $lightSrc := .Get "light-src" }}
+
+{{ with resources.Get $darkSrc }}{{ .Publish }}{{ end }}
+{{ with resources.Get $lightSrc }}{{ .Publish }}{{ end }}
+
 <figure>
   {{ with .Get "link" }}<a href="{{ . }}">{{ end }}
   <div class="theme-content theme-dark-only">
     <picture>
-      <img src="{{ .Get "dark-src" }}" alt="{{ .Get "alt" }}" width="{{ .Get "width" }}" height="{{ .Get "height" }}">
+      <img src="{{ $darkSrc }}" alt="{{ .Get "alt" }}" width="{{ .Get "width" }}" height="{{ .Get "height" }}">
     </picture>
   </div>
   <div class="theme-content theme-light-only">
     <picture>
-      <img src="{{ .Get "light-src" }}" alt="{{ .Get "alt" }}" width="{{ .Get "width" }}" height="{{ .Get "height" }}">
+      <img src="{{ $lightSrc }}" alt="{{ .Get "alt" }}" width="{{ .Get "width" }}" height="{{ .Get "height" }}">
     </picture>
   </div>
   {{ with .Get "caption" }}<figcaption>{{ . }}</figcaption>{{ end }}
