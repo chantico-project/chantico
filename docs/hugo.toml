@@ -16,7 +16,7 @@ allowContent = ['.*']
 disableInlineCopyToClipBoard = true
 themeVariant = [
   { identifier = 'relearn-light' },
-  { identifier = 'relearn-dark', logo = { src = 'logo/chantico-dark.png' } }
+  { identifier = 'relearn-dark' }
 ]
 linkTitle = " " # only show logo in sidebar
 
@@ -31,5 +31,5 @@ linkTitle = " " # only show logo in sidebar
 
 [params.logo]
   direction = 'column'
-  src = 'logo/chantico.png'
+  src = 'logo/chantico-dark.png'
 
