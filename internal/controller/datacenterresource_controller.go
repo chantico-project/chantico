@@ -3,7 +3,6 @@ package controller
 import (
 	"bytes"
 	chantico "chantico/api/v1alpha1"
-	ph "chantico/internal/patch"
 	"chantico/internal/steps"
 	"context"
 	"errors"
@@ -206,7 +205,7 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 		items := mergeUnique(visited, references.Items, children.Items)
 
 		for _, item := range items {
-			r.clearReferencedValidation(ctx, dataCenterResource, &item)
+			r.clearReferencedValidation(ctx, dataCenterResource, &item, l)
 		}
 		dataCenterResource.Status.InvolvedResource = ""
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
@@ -434,13 +433,20 @@ func (r *DataCenterResourceReconciler) clearReferencedValidation(
 	ctx context.Context,
 	dataCenterResource *chantico.DataCenterResource,
 	referenced *chantico.DataCenterResource,
+	l logr.Logger,
 ) {
 	referenced.GetConditions()
 	// Revalidate if previously failed or current item is being removed
 	if meta.IsStatusConditionFalse(*referenced.GetConditions(), string(chantico.ConditionValidated)) || meta.IsStatusConditionFalse(*dataCenterResource.GetConditions(), string(chantico.ConditionValidated)) {
-		patch := ph.Initialize(ctx, r.Client, referenced)
+		patcher, err := patch.NewHelper(referenced, r.Client)
+		if err != nil {
+			l.Error(err, "Failed to create patch helper for referenced DataCenterResource", "referenced", referenced.Name)
+			return
+		}
 		referenced.Status.InvolvedResource = ""
-		_ = patch.PatchStatus()
+		if err := patcher.Patch(ctx, referenced, patch.WithStatusObservedGeneration{}); err != nil {
+			l.Error(err, "Failed to patch referenced DataCenterResource", "referenced", referenced.Name)
+		}
 	}
 }
 func reloadPrometheus(ctx context.Context) error {
