@@ -50,6 +50,7 @@ spec:
       containers:
         - name: chantico-visualisation-webapp
           image: "{{ .Values.visualisationWebapp.image.repository }}:{{ .Values.visualisationWebapp.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.visualisationWebapp.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - containerPort: 80
           livenessProbe:

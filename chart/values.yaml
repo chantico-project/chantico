@@ -35,6 +35,7 @@ visualisationWebapp:
   image:
     repository: "ghcr.io/chantico-project/images/chantico-visualisation-webapp"
     tag: "" # defaults to Chart.version
+    pullPolicy: IfNotPresent
   service:
     type: "ClusterIP"
 pv:
