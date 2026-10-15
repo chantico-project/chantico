@@ -5,7 +5,6 @@ import (
 	"chantico/internal/filestore"
 	"context"
 	"encoding/json"
-	"fmt"
 
 	chantico "chantico/api/v1alpha1"
 )
@@ -22,9 +21,8 @@ type FileSDTarget struct {
 // CreateFileSDTarget creates a file_sd_configs target entry for a PhysicalMeasurement.
 // The labels __param_module and __param_auth are used by the SNMP exporter relabel
 // configs in prometheus.yml to route scrapes through the correct SNMP module.
-func CreateFileSDTarget(physicalMeasurement *chantico.PhysicalMeasurement) (FileSDTarget, error) {
-	switch physicalMeasurement.Spec.Type {
-	case chantico.PhysicalMeasurementTypePrometheusExporter:
+func CreateFileSDTarget(physicalMeasurement *chantico.PhysicalMeasurement) FileSDTarget {
+	if physicalMeasurement.Spec.Type == chantico.PhysicalMeasurementTypePrometheusExporter {
 		return FileSDTarget{
 			Targets: []string{physicalMeasurement.Spec.Ip},
 			Labels: map[string]string{
@@ -32,21 +30,20 @@ func CreateFileSDTarget(physicalMeasurement *chantico.PhysicalMeasurement) (File
 				"instance": physicalMeasurement.Spec.Ip,
 				"type":     "prometheus-exporter",
 			},
-		}, nil
-	case chantico.PhysicalMeasurementTypeSNMP:
-		return FileSDTarget{
-			Targets: []string{physicalMeasurement.Spec.Ip},
-			Labels: map[string]string{
-				"__param_module": physicalMeasurement.Spec.MeasurementDevice,
-				"__param_auth":   physicalMeasurement.Spec.MeasurementDevice,
-				"job":            physicalMeasurement.Spec.MeasurementDevice,
-				"name":           physicalMeasurement.Name,
-				"instance":       physicalMeasurement.Spec.Ip,
-				"type":           "snmp",
-			},
-		}, nil
+		}
 	}
-	return FileSDTarget{}, fmt.Errorf("unsupported physical measurement type: %q", physicalMeasurement.Spec.Type)
+	// Default to SNMP configuration.
+	return FileSDTarget{
+		Targets: []string{physicalMeasurement.Spec.Ip},
+		Labels: map[string]string{
+			"__param_module": physicalMeasurement.Spec.MeasurementDevice,
+			"__param_auth":   physicalMeasurement.Spec.MeasurementDevice,
+			"job":            physicalMeasurement.Spec.MeasurementDevice,
+			"name":           physicalMeasurement.Name,
+			"instance":       physicalMeasurement.Spec.Ip,
+			"type":           "snmp",
+		},
+	}
 }
 
 // MarshalFileSDTargets renders the targets as the JSON content of a file_sd_configs file.

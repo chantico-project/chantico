@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -46,13 +45,6 @@ import (
 
 const prometheusTargetsDir = "prometheus/targets"
 
-type typeToSubdirMap map[chantico.PhysicalMeasurementType]string
-
-var targetFileSubdirs = typeToSubdirMap{
-	chantico.PhysicalMeasurementTypeSNMP:               "snmp",
-	chantico.PhysicalMeasurementTypePrometheusExporter: "prometheus-exporter",
-}
-
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/finalizers,verbs=create;update;patch
@@ -64,12 +56,12 @@ type PhysicalMeasurementReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-func getTargetFileSubdir(physicalMeasurement *chantico.PhysicalMeasurement) (string, error) {
-	subdir, ok := targetFileSubdirs[physicalMeasurement.Spec.Type]
-	if !ok {
-		return "", fmt.Errorf("unsupported physical measurement type: %s", physicalMeasurement.Spec.Type)
+// The subdir which prometheus reads for the different scrape_job configurations (see `chart/templates/prometheus.yaml`)
+func getTargetFileSubdir(physicalMeasurement *chantico.PhysicalMeasurement) string {
+	if physicalMeasurement.Spec.Type == chantico.PhysicalMeasurementTypePrometheusExporter {
+		return "prometheus-exporter"
 	}
-	return subdir, nil
+	return "snmp"
 }
 
 func (r *PhysicalMeasurementReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -132,16 +124,12 @@ func (r *PhysicalMeasurementReconciler) reconcileDeletion(ctx context.Context, p
 	l := log.FromContext(ctx)
 
 	volumePath := config.ValidatedEnv.VolumeLocation
-	subdir, err := getTargetFileSubdir(physicalMeasurement)
-	if err != nil {
-		log.FromContext(ctx).Error(err, "Error determining target file subdirectory")
-		return steps.Error(err)
-	}
+	subdir := getTargetFileSubdir(physicalMeasurement)
 	targetPath := filepath.Join(volumePath, prometheusTargetsDir, subdir, physicalMeasurement.Name+".json")
 
 	l.Info("Deleting target file", "path", targetPath)
 
-	err = os.Remove(targetPath)
+	err := os.Remove(targetPath)
 	if err != nil && !os.IsNotExist(err) {
 		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting target file: "+err.Error())
 		return steps.Error(err)
@@ -162,10 +150,6 @@ func (r *PhysicalMeasurementReconciler) ensureFinalizerIsSet(ctx context.Context
 func (r *PhysicalMeasurementReconciler) reconcileValidation(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
 	deviceName := physicalMeasurement.Spec.MeasurementDevice
 	if deviceName == "" {
-		if physicalMeasurement.Spec.Type == chantico.PhysicalMeasurementTypeSNMP {
-			physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ReasonInvalidSpec, "measurementDevice is required for type snmp")
-			return steps.Stop()
-		}
 		physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
 		return steps.Continue()
 	}
@@ -188,11 +172,7 @@ func (r *PhysicalMeasurementReconciler) reconcileValidation(ctx context.Context,
 func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
 	l := log.FromContext(ctx)
 
-	target, err := pm.CreateFileSDTarget(physicalMeasurement)
-	if err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error creating target: "+err.Error())
-		return steps.Error(err)
-	}
+	target := pm.CreateFileSDTarget(physicalMeasurement)
 
 	desired, err := pm.MarshalFileSDTargets([]pm.FileSDTarget{target})
 	if err != nil {
@@ -201,11 +181,7 @@ func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context,
 	}
 
 	volumePath := config.ValidatedEnv.VolumeLocation
-	subdir, err := getTargetFileSubdir(physicalMeasurement)
-	if err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error determining target file subdirectory: "+err.Error())
-		return steps.Error(err)
-	}
+	subdir := getTargetFileSubdir(physicalMeasurement)
 	targetsDir := filepath.Join(volumePath, prometheusTargetsDir, subdir)
 	targetPath := filepath.Join(targetsDir, physicalMeasurement.Name+".json")
 
