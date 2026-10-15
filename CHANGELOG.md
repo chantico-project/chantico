@@ -1,3 +1,9 @@
+## 0.18.1 (2026-10-15)
+
+#### Bug Fixes
+
+* Remove patch helper, use external patch package for referenced DCR (#262) (fd56a8cb)
+
 ## 0.18.0 (2026-10-09)
 
 #### Feature
