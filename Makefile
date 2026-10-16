@@ -11,6 +11,9 @@ CHANTICO_DATA_PATH ?= .chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
 CHANTICO_NAMESPACE ?= chantico
+VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visualisation-webapp
+VISUALISATION_WEBAPP_TAG ?= latest
+VISUALISATION_WEBAPP_IMG ?= $(VISUALISATION_WEBAPP_REPOSITORY):$(VISUALISATION_WEBAPP_TAG)
 
 LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
 LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
@@ -141,7 +144,15 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 		--set filebrowser.service.type="NodePort" \
 		--set prometheus.service.type="NodePort" \
 		--set victoriaMetrics.service.type="NodePort" \
-		--set grafana.service.type="NodePort"
+		--set grafana.service.type="NodePort" \
+		--set visualisationWebapp.include=true \
+		--set visualisationWebapp.image.repository="$(VISUALISATION_WEBAPP_REPOSITORY)" \
+		--set visualisationWebapp.image.tag="$(VISUALISATION_WEBAPP_TAG)" \
+		--set visualisationWebapp.service.type="NodePort"
+
+.PHONY: cluster-load-visualisation-webapp
+cluster-load-visualisation-webapp: kind ## Load the locally built visualisation webapp image into the Kind cluster
+	$(KIND) load docker-image $(VISUALISATION_WEBAPP_IMG) --name $(KIND_CLUSTER_NAME)
 
 .PHONY: cluster-load-mock-images
 cluster-load-mock-images:
@@ -188,6 +199,13 @@ docker-build: ## Build docker image with the manager.
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
+
+.PHONY: docker-build-visualisation-webapp
+docker-build-visualisation-webapp: ## Build docker image with the visualisation webapp.
+	$(CONTAINER_TOOL) build -t $(VISUALISATION_WEBAPP_IMG) -f Dockerfile.webapp .
+
+docker-push-visualisation-webapp: 
+	$(CONTAINER_TOOL) push $(VISUALISATION_WEBAPP_IMG)
 
 .PHONY: docker-pull-mocks
 docker-pull-mocks:

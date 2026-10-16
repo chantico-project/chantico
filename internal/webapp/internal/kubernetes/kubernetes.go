@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,21 +22,13 @@ type KubernetesClient struct {
 }
 
 func New(kubeconfigPath string) (*KubernetesClient, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	config, currentContext, err := loadRESTConfig(kubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
 
-	rawConfig, err := clientcmd.LoadFromFile(kubeconfigPath)
+	scheme, err := newScheme()
 	if err != nil {
-		return nil, err
-	}
-
-	scheme := runtime.NewScheme()
-	if err := corev1.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
 
@@ -46,36 +39,48 @@ func New(kubeconfigPath string) (*KubernetesClient, error) {
 
 	return &KubernetesClient{
 		client:         k,
-		CurrentContext: rawConfig.CurrentContext,
+		CurrentContext: currentContext,
 		Host:           config.Host,
 	}, nil
+}
+
+func loadRESTConfig(kubeconfigPath string) (*rest.Config, string, error) {
+	if kubeconfigPath == "" {
+		config, err := rest.InClusterConfig()
+		return config, "in-cluster", err
+	}
+
+	return loadKubeconfig(kubeconfigPath)
+}
+
+func loadKubeconfig(kubeconfigPath string) (*rest.Config, string, error) {
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	rawConfig, err := clientcmd.LoadFromFile(kubeconfigPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return config, rawConfig.CurrentContext, nil
+}
+
+func newScheme() (*runtime.Scheme, error) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+	if err := v1alpha1.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+	return scheme, nil
 }
 
 type Pod struct {
 	Namespace string
 	Name      string
-}
-
-func (k *KubernetesClient) GetPods() ([]Pod, error) {
-	pods := &corev1.PodList{}
-	if err := k.client.List(context.Background(), pods); err != nil {
-		return nil, fmt.Errorf("failed to list Pods: %w", err)
-	}
-
-	p := make([]Pod, 0, pods.Size())
-
-	for _, pod := range pods.Items {
-		p = append(p, Pod{Namespace: pod.Namespace, Name: pod.Name})
-	}
-	return p, nil
-}
-
-func (k *KubernetesClient) GetNamespaces() (*corev1.NamespaceList, error) {
-	namespaces := &corev1.NamespaceList{}
-	if err := k.client.List(context.TODO(), namespaces); err != nil {
-		return nil, fmt.Errorf("failed to list Namespaces: %w", err)
-	}
-	return namespaces, nil
 }
 
 func (k *KubernetesClient) GetDataCenterResources() ([]*graph.Node, error) {
