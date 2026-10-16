@@ -67,14 +67,14 @@ spec:
                 - snmp
                 - prometheus-exporter
                 type: string
-                x-kubernetes-validations:
-                - message: measurementDevice is required when type is snmp
-                  rule: self.type != 'snmp' || (has(self.measurementDevice) && self.measurementDevice
-                    != '')
             required:
             - ip
             - type
             type: object
+            x-kubernetes-validations:
+            - message: measurementDevice is required when type is snmp
+              rule: self.type != "snmp" || (has(self.measurementDevice) && self.measurementDevice
+                != "")
           status:
             description: PhysicalMeasurementStatus defines the observed state of PhysicalMeasurement
             properties:
