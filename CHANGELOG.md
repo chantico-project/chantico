@@ -1,3 +1,9 @@
+## 0.18.2 (2026-10-16)
+
+#### Bug Fixes
+
+* Deployment for dcr graph visualisation webapp (#254) (385a2354)
+
 ## 0.18.1 (2026-10-15)
 
 #### Bug Fixes
