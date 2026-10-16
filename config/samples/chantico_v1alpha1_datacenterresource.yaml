@@ -4,7 +4,15 @@ metadata:
   name: pdu-energymetric-template
 data:
   template: |
-    tnoPduPowerValue{job="{{ .jobName }}", name="{{ .resourceName }}"}
+    tnoPduPowerValue{name="{{ .resourceName }}"}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vm-attribution-coefficient-template
+data:
+  template: |
+    sum(vm_attribution_coefficient{resource_consumer_id="/qemu.slice/{{ .vmid }}.scope"})
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -22,8 +30,6 @@ spec:
       name: pdu-energymetric-template
       key: template
     parameters:
-    - name: jobName
-      value: tno
     - name: resourceName
       value: physicalmeasurement-pdu1-out
 ---
@@ -43,8 +49,6 @@ spec:
       name: pdu-energymetric-template
       key: template
     parameters:
-    - name: jobName
-      value: tno-2
     - name: resourceName
       value: physicalmeasurement-pdu2-out
 ---
@@ -57,11 +61,48 @@ metadata:
   name: datacenterresource-misd-gbm-01
 spec:
   type: baremetal
-  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
   parents:
     - name: datacenterresource-pdu1
       coefficient: "1"
     - name: datacenterresource-pdu2
       coefficient: "1"
-  additionalLabels:
-    exampleLabel: exampleValue
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: datacenterresource-misd-gbm-01-vm-120
+spec:
+  type: vm
+  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55ba
+  parents:
+    - name: datacenterresource-misd-gbm-01
+      coefficientFrom:
+        configMapKeyRef:
+          name: vm-attribution-coefficient-template
+          key: template
+        parameters:
+        - name: vmid
+          value: "120"
+---
+apiVersion: chantico-project.github.io/v1alpha1
+kind: DataCenterResource
+metadata:
+  labels:
+    app.kubernetes.io/name: chantico
+    app.kubernetes.io/managed-by: kustomize
+  name: datacenterresource-misd-gbm-01-vm-121
+spec:
+  type: vm
+  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
+  parents:
+    - name: datacenterresource-misd-gbm-01
+      coefficientFrom:
+        configMapKeyRef:
+          name: vm-attribution-coefficient-template
+          key: template
+        parameters:
+        - name: vmid
+          value: "121"

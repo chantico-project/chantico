@@ -171,7 +171,6 @@ cluster-mocks: cluster-load-mock-images ## Apply the mock deployments and servic
 .PHONY: cluster-mock-resources
 cluster-mock-resources: ## Apply the sample configurations for the mocks
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
-	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock2.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 
@@ -414,7 +413,7 @@ DOC2GO ?= $(LOCALBIN)/doc2go
 KUSTOMIZE_VERSION ?= v5.4.3
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.19
-GOLANGCI_LINT_VERSION ?= v2.13.2
+GOLANGCI_LINT_VERSION ?= v2.14.0
 KIND_VERSION ?= v0.30.0
 HUGO_VERSION ?= v0.163.3
 MUFFET_VERSION ?= v2.11.2
