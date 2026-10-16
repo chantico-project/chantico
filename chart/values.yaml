@@ -7,6 +7,7 @@ controller:
   image:
     repository: "ghcr.io/chantico-project/images/chantico"
     tag: "" # defaults to Chart.version
+  watchNamespace: "" # defaults to the namespace of the release, "*" to watch resources in all namespaces
 snmp:
   service:
     type: "ClusterIP"
