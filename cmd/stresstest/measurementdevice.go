@@ -4,6 +4,7 @@ import (
 	"bufio"
 	k8s "chantico/internal/k8s"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"regexp"
@@ -80,7 +81,7 @@ func generateMeasurementDevices(path string, n int) []chapi.MeasurementDevice {
 
 	allWalks, err := parseMIB(path)
 	if err != nil || len(allWalks) == 0 {
-		fmt.Fprintf(os.Stderr, "failed to parse MIB %s: %v\n", mibPath, err)
+		log.Fatalf("failed to parse MIB %s: %v\n", path, err)
 		os.Exit(1)
 	}
 
