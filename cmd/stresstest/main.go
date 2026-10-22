@@ -1,11 +1,11 @@
 package main
 
 import (
-	// "context"
-	// "log"
-	// "time"
+	"context"
 	"fmt"
+	"log"
 	"os"
+	"time"
 
 	chapi "chantico/api/v1alpha1"
 
@@ -16,9 +16,17 @@ import (
 
 const (
 	mibPath                                    = "./dev/mibs/TNO-PDU-MIB.txt"
-	nbMeasurementDevices                       = 100
-	nbPhysicalMeasurementPerMeasurementDevices = 10
+	nbMeasurementDevices                       = 2
+	nbPhysicalMeasurementPerMeasurementDevices = 4
+	nbDataCenterResourcePerMeasurement         = 3
+
+	delay = 100 * time.Millisecond
 )
+
+type MeasurementDevicePhysicalMeasurementCombination struct {
+	MeasurementDevice    *chapi.MeasurementDevice
+	PhysicalMeasurements *chapi.PhysicalMeasurement
+}
 
 func createKubernetesClient() client.Client {
 	// Build scheme and add our API types
@@ -44,25 +52,48 @@ func createKubernetesClient() client.Client {
 }
 
 func main() {
-	// client := createKubernetesClient()
-	// ctx := context.Background()
+	client := createKubernetesClient()
+	ctx := context.Background()
 
 	// Generate the resources
 	mds := generateMeasurementDevices(mibPath, nbMeasurementDevices)
-	pms := generatePhysicalMeasurements(mds, nbPhysicalMeasurementPerMeasurementDevices)
+	pms, mdpms := generatePhysicalMeasurements(mds, nbPhysicalMeasurementPerMeasurementDevices)
+	dcrs := generateDataCenterResources(mdpms, nbDataCenterResourcePerMeasurement)
 
-	// Visualize resources
-	for _, md := range mds {
-		fmt.Printf("MD: %s, Walk: %v\n", md.Name, md.Spec.Walks)
+	fmt.Printf("Generated %d MeasurementDevices, %d PhysicalMeasurements, and %d DataCenterResources\n", len(mds), len(pms), len(dcrs))
+
+	seen := map[string]int{}
+	for _, d := range dcrs {
+		seen[d.Name]++
 	}
-	for _, pm := range pms {
-		fmt.Printf("PM: %s, MD: %s, Ip: %s\n", pm.Name, pm.Spec.MeasurementDevice, pm.Spec.Ip)
+	dups := 0
+	for n, c := range seen {
+		if c > 1 {
+			fmt.Printf("duplicate name: %s (x%d)\n", n, c)
+			dups += c - 1
+		}
 	}
+	fmt.Printf("total=%d unique=%d duplicates=%d\n", len(dcrs), len(seen), dups)
 
 	// Apply the resources
-	// for _, md := range mds {
-	// 	if err := client.Create(ctx, &md); err != nil {
-	// 		log.Printf("Failed to create %s: %v", md.Name, err)
-	// 	}
-	// }
+	for _, md := range mds {
+		if err := client.Create(ctx, &md); err != nil {
+			log.Printf("Failed to create %s: %v", md.Name, err)
+		}
+		time.Sleep(delay)
+	}
+
+	for _, pm := range pms {
+		if err := client.Create(ctx, &pm); err != nil {
+			log.Printf("Failed to create %s: %v", pm.Name, err)
+		}
+		time.Sleep(delay)
+	}
+
+	for _, dcr := range dcrs {
+		if err := client.Create(ctx, &dcr); err != nil {
+			log.Printf("Failed to create %s: %v", dcr.Name, err)
+		}
+		time.Sleep(delay)
+	}
 }

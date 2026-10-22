@@ -39,21 +39,26 @@ func generatePhysicalMeasurement(measurementDevice chapi.MeasurementDevice, idx 
 	return pm
 }
 
-func generatePhysicalMeasurements(measurementDevices []chapi.MeasurementDevice, nbMeasurementPerPhysicalMeasurement int) []chapi.PhysicalMeasurement {
+func generatePhysicalMeasurements(measurementDevices []chapi.MeasurementDevice, nbMeasurementPerPhysicalMeasurement int) ([]chapi.PhysicalMeasurement, []MeasurementDevicePhysicalMeasurementCombination) {
 	if nbMeasurementPerPhysicalMeasurement <= 0 || len(measurementDevices) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	total := len(measurementDevices) * nbMeasurementPerPhysicalMeasurement
 	out := make([]chapi.PhysicalMeasurement, 0, total)
+	outCombinations := make([]MeasurementDevicePhysicalMeasurementCombination, 0, total)
 
 	idx := 0
 	for _, md := range measurementDevices {
 		for range nbMeasurementPerPhysicalMeasurement {
 			pm := generatePhysicalMeasurement(md, idx, ips)
 			out = append(out, pm)
+			outCombinations = append(outCombinations, MeasurementDevicePhysicalMeasurementCombination{
+				MeasurementDevice:    &md,
+				PhysicalMeasurements: &pm,
+			})
 			idx++
 		}
 	}
-	return out
+	return out, outCombinations
 }
