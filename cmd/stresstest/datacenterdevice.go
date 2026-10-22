@@ -71,7 +71,6 @@ func (d *DataCenterResourceBuilder) Build() chapi.DataCenterResource {
 }
 
 func generateDcRootLayer(mdPmCombination []MeasurementDevicePhysicalMeasurementCombination) []chapi.DataCenterResource {
-	// TODO improve that .Walks[0] to have something random
 	dcrs := make([]chapi.DataCenterResource, 0, len(mdPmCombination))
 	for idx, mdPm := range mdPmCombination {
 		walks := mdPm.MeasurementDevice.Spec.Walks
@@ -81,7 +80,6 @@ func generateDcRootLayer(mdPmCombination []MeasurementDevicePhysicalMeasurementC
 			SetType("pdu").
 			Build()
 		dcrs = append(dcrs, dcr)
-		fmt.Printf("ROOT - idx: %s\n", dcr.Name)
 	}
 	return dcrs
 }
@@ -95,7 +93,6 @@ func generateDcFirstLayer(rootDCRS []chapi.DataCenterResource, expansionRate int
 	dcrBuilders := make([]DataCenterResourceBuilder, 0, m)
 	for i := range m {
 		newDcrb := NewDataCenterResourceBuilder().SetName(i + n).SetType("baremetal")
-		fmt.Printf("ROOT - idx: %s\n", newDcrb.Name)
 		dcrBuilders = append(dcrBuilders, *newDcrb)
 	}
 
@@ -109,14 +106,12 @@ func generateDcFirstLayer(rootDCRS []chapi.DataCenterResource, expansionRate int
 		for range expansionRate {
 			dcrBuilders[childId] = *dcrBuilders[childId].AddParent(pref)
 			childId = (childId + 1) % m
-			// fmt.Println(childId, " <- ", dcr.Name)
 		}
 	}
 
 	// Build the dcr
 	dcrs := make([]chapi.DataCenterResource, 0, m)
 	for _, dcrb := range dcrBuilders {
-		fmt.Printf("CHECK - idx: %s\n", dcrb.Name)
 		dcrs = append(dcrs, dcrb.Build())
 	}
 
