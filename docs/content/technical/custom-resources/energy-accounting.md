@@ -27,7 +27,7 @@ timeseries. The `resource` label identifies the node, while labels such as
 
 | Rule kind | When generated | Example |
 |---|---|---|
-| **Alias rule** | Root node (has `energyMetric` set) | `chantico_power_watts{resource="pdu1", type="pdu"} = tnoPduPowerValue{job="tno"}` |
+| **Alias rule** | Root node (has `energyMetricFrom` set) | `chantico_power_watts{resource="pdu1", type="pdu"} = tnoPduPowerValue{job="tno"}` |
 | **Coefficient rule** | Child node, per parent with a coefficient | `chantico_power_coefficient{child="bm1", parent="pdu1"} = 1` |
 | **Energy rule** | Child node (has parents) | `chantico_power_watts{resource="bm1", type="baremetal", parents="pdu1"} = sum(chantico_power_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_power_watts, "parent", "$1", "resource", "(.*)"))` | 
 
@@ -38,18 +38,23 @@ timeseries. The `resource` label identifies the node, while labels such as
 ### `TemplateFrom`
 
 ```go
-type TemplateConfigMapKeyRef struct {
+type TemplateParameter struct {
   Name string `json:"name"`
-  Key  string `json:"key,omitempty"`
+  SecretConfigMapSelector `json:",inline,omitempty"`
 }
 
 type TemplateFrom struct {
   SecretConfigMapSelector `json:",inline,omitempty"`
-  TemplateParameters      []TemplateParameter `json:"templateParameters,omitempty"`
+  TemplateParameters []TemplateParameter `json:"templateParameters,omitempty"`
 }
 ```
 
-The embedded selector provides the template as either a literal `value` or a `valueFrom` reference. The `TemplateFrom.TemplateParameters` field provides values for the template's placeholders.
+The embedded selector supplies the PromQL expression or template. Set `value` to
+provide it inline, or `valueFrom` to load it from a ConfigMap or Secret. The
+optional `templateParameters` field supplies named values for Go-template
+placeholders. Each parameter accepts a `value` or `valueFrom`, so its value can
+be provided inline or loaded from a ConfigMap or Secret. If your expression has
+no placeholders, omit `templateParameters`.
 
 When a template ConfigMap is updated, Chantico reconciles every
 DataCenterResource in the same namespace that references it through
@@ -60,37 +65,37 @@ DataCenterResource in the same namespace that references it through
 ```go
 type ParentRef struct {
   Name            string       `json:"name"`
-  Coefficient     string       `json:"coefficient,omitempty"`
-  CoefficientFrom TemplateFrom `json:"coefficientFrom,omitempty"`
+  CoefficientFrom *TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 ```
 
 Each entry in `spec.parents` references a parent DataCenterResource by name
-and carries a coefficient (a PromQL expression). A child node may also have an `energyMetric`,
-for example from a self-reported source local to that node,
-however the energy derived from its parent nodes is used as the source of truth.
-There are 2 cases:
+and must provide `coefficientFrom`, which supplies the PromQL expression for
+that parent-child edge. A simple coefficient such as `1` is written under
+`coefficientFrom.value`. If the expression comes from a ConfigMap- or Secret, use
+`coefficientFrom.valueFrom`. The coefficient can also be a Go template when
+`templateParameters` are provided. Examples include:
 
-1. All of the energy of a parent flows to a child, then the coefficient is set to `1` (eg. baremetal connected to a PDU socket)
-2. Only part of the parents energy flows to the child (eg. a VM running on a baremetal server), `coefficient` is either a fractional literal (eg. `0.5`) or a promql expression which uses other metrics to determine the share (eg. based on CPU utilisation of the VM).
+- All of a parent's energy flows to the child: use `value: "1"`.
+- Part of a parent's energy flows to the child: use a fraction or PromQL
+  expression.
 
-If a coefficient expression is reused across many resources, the `coefficientFrom` 
-can load a PromQL template from a ConfigMap and render it with named parameters.
+Root resources (those without parents) must provide `energyMetricFrom` in the
+same `TemplateFrom` shape. Resources with parents may also provide it, but
+their energy is calculated from the parent coefficients.
 
 ### `DataCenterResourceSpec` (relevant fields)
 
 | Field | Type | Description |
 |---|---|---|
-| `parents` | `[]ParentRef` | Parent resources with optional coefficients |
-| `energyMetric` | `string` | Raw Prometheus metric expression for root nodes (e.g. `tnoPduPowerValue{job="tno"}`) |
-| `energyMetricFrom` | `TemplateFrom` | ConfigMap-backed, parameterized alternative to `energyMetric` |
+| `parents` | `[]ParentRef` | Parent resources; each entry requires a coefficient expression in `coefficientFrom` |
+| `energyMetricFrom` | `TemplateFrom` | PromQL expression source for root nodes; accepts inline `value` or a `valueFrom` reference, with optional template parameters |
 | `additionalLabels` | `map[string]string` | Additional labels to attach to the resource's Prometheus timeseries |
 
-`TemplateFrom` identifies `configMapKeyRef.name` and `configMapKeyRef.key`,
-then supplies template values through `templateParameters`. Templates use Go template
-syntax such as `{{ .vmid }}`. Parameter entries follow the Kubernetes `EnvVar`
-shape and support the use of a `value`, `valueFrom.configMapKeyRef`, and
-`valueFrom.secretKeyRef`. See [How to register
+`valueFrom` supports `configMapKeyRef` and `secretKeyRef`. Template text uses Go
+template syntax such as `{{ .vmid }}`; provide matching entries in
+`templateParameters` to render those placeholders. Each template parameter
+accepts a literal `value` or a `valueFrom` reference. See [How to register
 data center resources]({{% relref "how-tos/how-to-register-data-center-resources.md" %}})
 for examples.
 
@@ -116,7 +121,7 @@ Ensure that the keys do not conflict with the default labels, as conflicting add
 
 ### Example CRs
 
-**Root node (PDU)** — has `energyMetric`, no parents:
+**Root node (PDU)** — has `energyMetricFrom`, no parents:
 
 ```yaml
 apiVersion: chantico-project.github.io/v1alpha1
@@ -128,10 +133,11 @@ spec:
   type: pdu
   physicalMeasurements:
     - physicalMeasurement-pdu1-out
-  energyMetric: tnoPduPowerValue{job="tno"}
+  energyMetricFrom:
+    value: 'tnoPduPowerValue{job="tno"}'
 ```
 
-**Child node (bare metal)** — has parents with coefficients, no `energyMetric`:
+**Child node (bare metal)** — has parents with coefficients:
 
 ```yaml
 apiVersion: chantico-project.github.io/v1alpha1
@@ -143,9 +149,11 @@ spec:
   type: baremetal
   parents:
     - name: datacenterresource-pdu1
-      coefficient: "1"
+      coefficientFrom:
+        value: "1"
     - name: datacenterresource-pdu2
-      coefficient: "1"
+      coefficientFrom:
+        value: "1"
 ```
 
 ---
@@ -156,7 +164,7 @@ spec:
 
 | File | Purpose |
 |---|---|
-| `api/v1alpha1/datacenterresource_types.go` | CRD types (`ParentRef`, `EnergyMetric`) |
+| `api/v1alpha1/datacenterresource_types.go` | CRD types (`ParentRef`, `DataCenterResourceSpec`) |
 | `internal/datacenterresource/rules_pure.go` | Pure rule-generation logic — no I/O, no K8s dependencies |
 | `internal/datacenterresource/rules_io.go` | File I/O: write / delete YAML rule files on the shared volume |
 | `internal/datacenterresource/action.go` | State machine wiring: `WriteRuleFile` on entry, `DeleteRuleFile` on delete |
@@ -242,9 +250,11 @@ kubectl apply -n chantico -f config/samples/chantico_v1alpha1_datacenterresource
 
 The sample file defines:
 
-- **datacenterresource-pdu1** — root node, `energyMetric: tnoPduPowerValue{job="tno"}`
-- **datacenterresource-pdu2** — root node, `energyMetric: tnoPduPowerValue{job="tno-2"}`
-- **datacenterresource-misd-gbm-01** — child of both PDUs, `coefficient: "1"` for each
+- **datacenterresource-pdu1** and **datacenterresource-pdu2** — root nodes whose
+  `energyMetricFrom.valueFrom` references a shared ConfigMap template, with
+  `templateParameters` supplying each PDU's labels.
+- **datacenterresource-misd-gbm-01** — child of both PDUs, with each parent's
+  coefficient supplied as `coefficientFrom.value: "1"`.
 
 ### 4. Verify the rule files
 
@@ -332,10 +342,11 @@ chantico_power_watts{resource="datacenterresource-pdu1"}
    (no file system, no K8s client). `rules_io.go` handles the file writes.
    This makes the rule generation logic easy to unit-test.
 
-5. **Coefficients are PromQL expressions, not literals.** The `coefficient`
-   field in `spec.parents` accepts any PromQL expression — a literal (`"1"`,
-   `"0.5"`) or an expression which can reference externally published metric. 
-   Chantico always records it under the shared `chantico_power_coefficient` 
+5. **Coefficients are PromQL expressions.** The `coefficientFrom` field in
+  `spec.parents` accepts an inline value, a `valueFrom` reference, or a
+  templated expression using `templateParameters`. Examples include a literal
+  (`"1"`, `"0.5"`) or an expression referencing an externally published
+  metric. Chantico always records it under the shared `chantico_power_coefficient`
    metric with `parent` and `child` labels, so the power rule is decoupled 
    from whatever name the external source uses.
 
@@ -348,7 +359,8 @@ chantico_power_watts{resource="datacenterresource-pdu1"}
    spec:
      parents:
        - name: datacenterresource-misd-gbm-01
-         coefficient: "external_provider_power_share_vm1"
+         coefficientFrom:
+           value: "external_provider_power_share_vm1"
    ```
 
    Chantico records this as:

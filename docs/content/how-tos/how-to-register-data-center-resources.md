@@ -41,7 +41,9 @@ metadata:
 spec:
   type: pdu
   parents:
-    - datacenterresource-misd-gbm-01
+    - name: datacenterresource-misd-gbm-01
+      coefficientFrom:
+        value: "1"
   physicalMeasurements:
     - physicalMeasurement-pdu2-out
 ```
@@ -58,13 +60,35 @@ kubectl describe -n chantico datacenterresource datacenterresource-pdu2
 1. Revert your changes and apply the file again, to check that the validation 
    message disappears.
 
+## Set energy metrics and coefficients
+
+Root resources must define `energyMetricFrom`. Each parent listed by a child
+must define `coefficientFrom`. Both fields use the same selector: provide the
+PromQL expression inline with `value`, or load it from a ConfigMap or Secret
+with `valueFrom`. For example, an inline PDU metric is:
+
+```yaml
+energyMetricFrom:
+  value: 'tnoPduPowerValue{job="tno"}'
+```
+
+An inline coefficient on a parent reference is:
+
+```yaml
+parents:
+  - name: datacenterresource-pdu1
+    coefficientFrom:
+      value: "1"
+```
+
 ## Reuse PromQL with ConfigMap templates
 
 Use a ConfigMap template when the same PromQL expression is needed for more
 than one resource and only a few labels or values differ. Chantico reads the
 template from the ConfigMap in the same namespace as the `DataCenterResource`,
-renders it using Go template syntax (the same syntax as Helm), and uses the 
-result as the metric or coefficient expression.
+renders it using Go template syntax, and uses the result as the metric or
+coefficient expression. You can also put template text directly in `value`;
+provide `templateParameters` whenever placeholders need substituting.
 
 1. Create a ConfigMap with the PromQL expression under a named key. Template
    values use the parameter name, for example `{{ .job }}`:
@@ -79,8 +103,9 @@ data:
   template: |
     tnoPduPowerValue{job="{{ .job }}"}
 ```
-2. Reference the template from `spec.energyMetricFrom`. Each entry in `parameters` 
-supplies a template value by name:
+2. Reference the template from `spec.energyMetricFrom` or
+  `spec.parents[].coefficientFrom`. Each entry in `templateParameters`
+  supplies a named template value:
 
 ```yaml
 apiVersion: chantico-project.github.io/v1alpha1
