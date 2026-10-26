@@ -63,9 +63,9 @@ kubectl describe -n chantico datacenterresource datacenterresource-pdu2
 ## Set energy metrics and coefficients
 
 Root resources must define `energyMetricFrom`. Each parent listed by a child
-must define `coefficientFrom`. Both fields use the same selector: provide the
-PromQL expression inline with `value`, or load it from a ConfigMap or Secret
-with `valueFrom`. For example, an inline PDU metric is:
+must define `coefficientFrom`. Provide the PromQL expression inline with `value`, 
+or load it from a ConfigMap or Secret with `valueFrom`. For example, an 
+inline PDU metric is:
 
 ```yaml
 energyMetricFrom:

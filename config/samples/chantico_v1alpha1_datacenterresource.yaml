@@ -88,10 +88,11 @@ spec:
   parents:
     - name: datacenterresource-misd-gbm-01
       coefficientFrom:
-        configMapKeyRef:
-          name: vm-attribution-coefficient-template
-          key: template
-        parameters:
+        valueFrom:
+          configMapKeyRef:
+            name: vm-attribution-coefficient-template
+            key: template
+        templateParameters:
         - name: vmid
           value: "120"
 ---
@@ -108,9 +109,10 @@ spec:
   parents:
     - name: datacenterresource-misd-gbm-01
       coefficientFrom:
-        configMapKeyRef:
-          name: vm-attribution-coefficient-template
-          key: template
-        parameters:
+        valueFrom:
+          configMapKeyRef:
+            name: vm-attribution-coefficient-template
+            key: template
+        templateParameters:
         - name: vmid
           value: "121"
