@@ -14,7 +14,6 @@ type TemplateParameter struct {
 	SecretConfigMapSelector `json:",inline,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!(has(self.value) && has(self.valueFrom))",message="Value and ValueFrom cannot be set at the same time"
 type TemplateFrom struct {
 	SecretConfigMapSelector `json:",inline,omitempty"`
 	// +optional

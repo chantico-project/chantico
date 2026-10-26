@@ -10,9 +10,10 @@ import (
 	errs "chantico/internal/errors"
 )
 
-// +kubebuilder:validation:XValidation:rule="!(has(self.value) && has(self.valueFrom))",message="Value and ValueFrom cannot be set at the same time"
 // SecretConfigMapSelector is a generic selector that resolves to a string value
 // coming from one of: a literal Value, a key in a ConfigMap, or a key in a Secret.
+// +kubebuilder:validation:XValidation:rule="!(has(self.value) && has(self.valueFrom))",message="Value and ValueFrom cannot be set at the same time"
+// +kubebuilder:validation:XValidation:rule="has(self.value)||has(self.valueFrom)",message="Value or ValueFrom must be set"
 type SecretConfigMapSelector struct {
 	// Value is a literal value for the selector.
 	// Mutually exclusive with ValueFrom.

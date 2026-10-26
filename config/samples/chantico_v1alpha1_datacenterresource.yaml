@@ -18,9 +18,10 @@ spec:
   physicalMeasurements:
     - physicalMeasurement-pdu1-out
   energyMetricFrom:
-    configMapKeyRef:
-      name: pdu-energymetric-template
-      key: template
+    valueFrom:
+      configMapKeyRef:
+        name: pdu-energymetric-template
+        key: template
     parameters:
     - name: jobName
       value: tno
@@ -39,9 +40,10 @@ spec:
   physicalMeasurements:
     - physicalMeasurement-pdu2-out
   energyMetricFrom:
-    configMapKeyRef:
-      name: pdu-energymetric-template
-      key: template
+    valueFrom:
+      configMapKeyRef:
+        name: pdu-energymetric-template
+        key: template
     parameters:
     - name: jobName
       value: tno-2
@@ -60,8 +62,10 @@ spec:
   serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
   parents:
     - name: datacenterresource-pdu1
-      coefficient: "1"
+      coefficientFrom: 
+        value: "1"
     - name: datacenterresource-pdu2
-      coefficient: "1"
+      coefficientFrom:
+        value: "1"
   additionalLabels:
     exampleLabel: exampleValue
