@@ -3,6 +3,7 @@ package controller
 import (
 	chantico "chantico/api/v1alpha1"
 	"chantico/internal/datacenterresource"
+	"chantico/internal/k8s"
 	ph "chantico/internal/patch"
 	"chantico/internal/steps"
 	"context"
@@ -69,6 +70,7 @@ func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Complete(r)
 }
 
+// TODO: Add a secrets check since the templates can also reference secrets. Needs another watcher
 func (r *DataCenterResourceReconciler) dataCenterResourcesForConfigMap(ctx context.Context, configMap client.Object) []reconcile.Request {
 	dataCenterResources := &chantico.DataCenterResourceList{}
 	if err := r.List(ctx, dataCenterResources, client.InNamespace(configMap.GetNamespace())); err != nil {
@@ -89,15 +91,22 @@ func (r *DataCenterResourceReconciler) dataCenterResourcesForConfigMap(ctx conte
 	return requests
 }
 
+func configMapNameMatchesSelector(configMapName string, selector *k8s.SecretConfigMapSelector) bool {
+	if selector == nil || selector.ValueFrom == nil || selector.ValueFrom.ConfigMapKeyRef == nil {
+		return false
+	}
+	return selector.ValueFrom.ConfigMapKeyRef.Name == configMapName
+}
+
 // Check if either energyMetricFrom or parent.CoefficientFrom references this configmap.
 func dataCenterResourceReferencesConfigMap(dataCenterResource *chantico.DataCenterResource, configMapName string) bool {
 	energyMetricFrom := dataCenterResource.Spec.EnergyMetricFrom
-	if energyMetricFrom != nil && energyMetricFrom.ConfigMapKeyRef != nil && energyMetricFrom.ConfigMapKeyRef.Name == configMapName {
+	if configMapNameMatchesSelector(configMapName, &energyMetricFrom.SecretConfigMapSelector) {
 		return true
 	}
 	for _, parent := range dataCenterResource.Spec.Parents {
 		coefficientFrom := parent.CoefficientFrom
-		if coefficientFrom != nil && coefficientFrom.ConfigMapKeyRef != nil && coefficientFrom.ConfigMapKeyRef.Name == configMapName {
+		if configMapNameMatchesSelector(configMapName, &coefficientFrom.SecretConfigMapSelector) {
 			return true
 		}
 	}

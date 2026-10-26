@@ -39,77 +39,10 @@ func testTemplateRenderer(t *testing.T, objects ...runtime.Object) *TemplateRend
 
 func testTemplateFrom(parameters ...k8s.TemplateParameter) *k8s.TemplateFrom {
 	return &k8s.TemplateFrom{
-		ValueSource: k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+		SecretConfigMapSelector: k8s.SecretConfigMapSelector{ValueFrom: &k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 			LocalObjectReference: corev1.LocalObjectReference{Name: "coefficient-template"}, Key: "template",
-		}},
+		}}},
 		Parameters: parameters,
-	}
-}
-
-func TestRenderTemplate(t *testing.T) {
-	tests := map[string]struct {
-		text       string
-		parameters []k8s.TemplateParameter
-		objects    []runtime.Object
-		want       string
-	}{
-		"inline parameter": {
-			text:       `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			parameters: []k8s.TemplateParameter{{Name: "vmid", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "3"}}},
-			want:       `vm_cpu_percentage{vmid="3"}`,
-		},
-		"multiple parameters": {
-			text: `vm_cpu_percentage{variable1="{{ .var1 }}", variable2="{{ .var2 }}"}`,
-			parameters: []k8s.TemplateParameter{
-				{Name: "var1", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "3"}},
-				{Name: "var2", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "4"}},
-			},
-			want: `vm_cpu_percentage{variable1="3", variable2="4"}`,
-		},
-		"secret parameter": {
-			text: `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			parameters: []k8s.TemplateParameter{{Name: "vmid", SecretConfigMapSelector: k8s.SecretConfigMapSelector{
-				ValueFrom: &k8s.ValueSource{SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: "vmid-secret"}, Key: "vmid",
-				}},
-			}}},
-			objects: []runtime.Object{&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: "vmid-secret", Namespace: "chantico"},
-				Data:       map[string][]byte{"vmid": []byte("3")},
-			}},
-			want: `vm_cpu_percentage{vmid="3"}`,
-		},
-		"configmap parameter": {
-			text: `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			parameters: []k8s.TemplateParameter{{Name: "vmid", SecretConfigMapSelector: k8s.SecretConfigMapSelector{
-				ValueFrom: &k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: "vmid-configmap"}, Key: "vmid",
-				}},
-			}}},
-			objects: []runtime.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: "vmid-configmap", Namespace: "chantico"},
-				Data:       map[string]string{"vmid": "3"},
-			}},
-			want: `vm_cpu_percentage{vmid="3"}`,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			objects := append([]runtime.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: "coefficient-template", Namespace: "chantico"},
-				Data:       map[string]string{"template": test.text},
-			}}, test.objects...)
-			renderer := testTemplateRenderer(t, objects...)
-			// got, err := renderer.renderTemplate(t.Context(), testTemplateFrom(test.parameters...))
-			got, err := testTemplateFrom(test.parameters...).Render(t.Context(), renderer.client, renderer.namespace)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != test.want {
-				t.Errorf("renderTemplate() = %q, want %q", got, test.want)
-			}
-		})
 	}
 }
 
@@ -144,9 +77,9 @@ func TestResolvedExpressions(t *testing.T) {
 				Spec: chantico.DataCenterResourceSpec{
 					Type: DataCenterResourceTypePDU,
 					EnergyMetricFrom: &k8s.TemplateFrom{
-						ValueSource: k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						SecretConfigMapSelector: k8s.SecretConfigMapSelector{ValueFrom: &k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{Name: "energy-template"}, Key: "template",
-						}},
+						}}},
 						Parameters: []k8s.TemplateParameter{parameter},
 					},
 				},

@@ -14,8 +14,9 @@ type TemplateParameter struct {
 	SecretConfigMapSelector `json:",inline,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!(has(self.value) && has(self.valueFrom))",message="Value and ValueFrom cannot be set at the same time"
 type TemplateFrom struct {
-	ValueSource `json:",inline,omitempty"`
+	SecretConfigMapSelector `json:",inline,omitempty"`
 	// +optional
 	Parameters []TemplateParameter `json:"parameters,omitempty"`
 }
@@ -24,10 +25,15 @@ func (p *TemplateParameter) Resolve(ctx context.Context, r client.Client, namesp
 	return p.SecretConfigMapSelector.Resolve(ctx, r, namespace)
 }
 
+// Gets the template string from either the Value or the ValueFrom field of the TemplateFrom struct.
 func (p *TemplateFrom) ResolveTemplate(ctx context.Context, r client.Client, namespace string) (string, error) {
-	return p.ValueSource.Resolve(ctx, r, namespace)
+	if p.Value != "" {
+		return p.Value, nil
+	}
+	return p.ValueFrom.Resolve(ctx, r, namespace)
 }
 
+// Resolves all the parameters and converts them to a map which the template renderer can use to substitute the values into the template.
 func (p *TemplateFrom) ResolveParameters(ctx context.Context, r client.Client, namespace string) (map[string]string, error) {
 	result := make(map[string]string)
 	for _, param := range p.Parameters {
@@ -52,13 +58,13 @@ func (tf *TemplateFrom) Render(ctx context.Context, client client.Client, namesp
 	}
 
 	// Apply the template with the resolved parameters
-	tmpl, err := template.New(tf.ConfigMapKeyRef.Name).Option("missingkey=error").Parse(templateText)
+	tmpl, err := template.New("template").Option("missingkey=error").Parse(templateText)
 	if err != nil {
-		return "", fmt.Errorf("parse template from ConfigMap %q: %w", tf.ConfigMapKeyRef.Name, err)
+		return "", fmt.Errorf("parse template: %w", err)
 	}
 	var rendered bytes.Buffer
 	if err := tmpl.Execute(&rendered, parameters); err != nil {
-		return "", fmt.Errorf("render template from ConfigMap %q: %w", tf.ConfigMapKeyRef.Name, err)
+		return "", fmt.Errorf("render template: %w", err)
 	}
 	return rendered.String(), nil
 }
