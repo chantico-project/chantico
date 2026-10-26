@@ -1,0 +1,35 @@
+# TODO: Create add grafana to the solution
+services:
+  stresstest:
+    image: golang:1.26
+    working_dir: /app
+    network_mode: host
+    volumes:
+      - ../..:/app
+      - ${KUBECONFIG_FILE:?set KUBECONFIG_FILE}:/kubeconfig:ro
+    command: >
+      sh -c "go run ./dev/stresstest-observability/main.go"
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    network_mode: host
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    depends_on:
+      - stresstest
+
+  grafana:
+    image: grafana/grafana:latest
+    network_mode: host
+    environment:
+      - GF_AUTH_BASIC_ENABLED=false
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus

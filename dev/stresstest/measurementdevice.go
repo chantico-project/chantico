@@ -50,7 +50,7 @@ func generateMeasurementDevice(allWalks []string, idx int) chapi.MeasurementDevi
 
 	perm := rand.Perm(n)
 	walks := make([]string, 0, subCount)
-	for i := 0; i < subCount; i++ {
+	for i := range subCount {
 		walks = append(walks, allWalks[perm[i]])
 	}
 
