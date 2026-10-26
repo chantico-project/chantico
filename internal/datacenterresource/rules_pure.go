@@ -24,11 +24,13 @@ import (
 	"strings"
 )
 
+type labels = map[string]string
+
 // RecordingRule represents a single Prometheus recording rule.
 type RecordingRule struct {
-	Record string            `yaml:"record"`
-	Expr   string            `yaml:"expr"`
-	Labels map[string]string `yaml:"labels,omitempty"`
+	Record string `yaml:"record"`
+	Expr   string `yaml:"expr"`
+	Labels labels `yaml:"labels,omitempty"`
 }
 
 // RuleGroup represents a Prometheus rule group.
@@ -130,8 +132,8 @@ func (b *RuleBuilder) constructParentNamesLabel() string {
 
 // buildSharedLabels builds the set of labels for the prometheus rule.
 // It includes the resource name, type, service ID, parent names, any base labels, and additional labels specified in the resource.
-func (b *RuleBuilder) buildSharedLabels(base map[string]string) map[string]string {
-	labels := map[string]string{
+func (b *RuleBuilder) buildSharedLabels(base labels) labels {
+	labels := labels{
 		"resource": b.resource.Name,
 		"type":     b.resource.Spec.Type,
 	}
@@ -209,7 +211,7 @@ func (b *RuleBuilder) BuildCoefficientRules() []RecordingRule {
 		rules = append(rules, RecordingRule{
 			Record: CoefficientMetricName,
 			Expr:   pc.coeff,
-			Labels: map[string]string{
+			Labels: labels{
 				"parent": pc.parentName,
 				"child":  b.resource.Name,
 			},
@@ -230,7 +232,7 @@ func (b *RuleBuilder) BuildEnergyRule() *RecordingRule {
 	}
 
 	// Construct the initial set of labels for the recording rule.
-	labels := map[string]string{
+	labels := labels{
 		// "customLabel": "exampleValue",
 	}
 	// Merge the shared labels into the initial set of labels.

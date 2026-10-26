@@ -79,9 +79,6 @@ func (s SecretConfigMapSelector) Resolve(ctx context.Context, r client.Client, n
 	if s.ValueFrom == nil {
 		return s.Value, nil
 	}
-	if s.ValueFrom.ConfigMapKeyRef == nil && s.ValueFrom.SecretKeyRef == nil {
-		return "", &errs.MissingOptionError{Parent: "SecretConfigMapSelector", Options: []string{"Value", "ValueFrom.ConfigMapKeyRef", "ValueFrom.SecretKeyRef"}}
-	}
 	return s.ValueFrom.Resolve(ctx, r, namespace)
 }
 
