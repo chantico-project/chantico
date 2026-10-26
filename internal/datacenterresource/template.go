@@ -17,11 +17,9 @@ limitations under the License.
 package datacenterresource
 
 import (
-	"bytes"
 	chantico "chantico/api/v1alpha1"
 	"context"
 	"fmt"
-	"html/template"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -48,42 +46,17 @@ func NewTemplateRenderer(client client.Client, namespace string) *TemplateRender
 	}
 }
 
-// Helper function which resolves and performs the substitution for of the templates. Used for both the coefficient templates and energy metrics templates.
-func (tr *TemplateRenderer) renderTemplate(ctx context.Context, templateFrom *chantico.TemplateFrom) (string, error) {
-	// Lookup the configmap and resolve retrieve the template text
-	templateText, err := templateFrom.ResolveTemplate(ctx, tr.client, tr.namespace)
-	if err != nil {
-		return "", err
-	}
-
-	parameters, err := templateFrom.ResolveParameters(ctx, tr.client, tr.namespace)
-	if err != nil {
-		return "", err
-	}
-
-	// Apply the template with the resolved parameters
-	tmpl, err := template.New(templateFrom.ConfigMapKeyRef.Name).Option("missingkey=error").Parse(templateText)
-	if err != nil {
-		return "", fmt.Errorf("parse template from ConfigMap %q: %w", templateFrom.ConfigMapKeyRef.Name, err)
-	}
-	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, parameters); err != nil {
-		return "", fmt.Errorf("render template from ConfigMap %q: %w", templateFrom.ConfigMapKeyRef.Name, err)
-	}
-	return rendered.String(), nil
-}
-
 func (tr *TemplateRenderer) resolveEnergyMetricTemplate(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (string, error) {
 	spec := dataCenterResource.Spec
 	if spec.EnergyMetricFrom != nil {
-		return tr.renderTemplate(ctx, spec.EnergyMetricFrom)
+		return spec.EnergyMetricFrom.Render(ctx, tr.client, tr.namespace)
 	}
 	return spec.EnergyMetric, nil
 }
 
 func (tr *TemplateRenderer) resolveParentCoefficientTemplate(ctx context.Context, parent *chantico.ParentRef) (string, error) {
 	if parent.CoefficientFrom != nil {
-		return tr.renderTemplate(ctx, parent.CoefficientFrom)
+		return parent.CoefficientFrom.Render(ctx, tr.client, tr.namespace)
 	}
 	if parent.Coefficient != "" {
 		return parent.Coefficient, nil

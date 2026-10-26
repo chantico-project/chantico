@@ -18,23 +18,10 @@ package v1alpha1
 
 import (
 	"chantico/internal/k8s"
-	"context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-type TemplateParameter struct {
-	Name                        string `json:"name"`
-	k8s.SecretConfigMapSelector `json:",inline,omitempty"`
-}
-
-type TemplateFrom struct {
-	k8s.ValueSource `json:",inline,omitempty"`
-	// +optional
-	Parameters []TemplateParameter `json:"parameters,omitempty"`
-}
 
 // ParentRef references a parent DataCenterResource and optionally carries
 // the energy coefficient for the edge from that parent to this node.
@@ -52,7 +39,7 @@ type ParentRef struct {
 	// +optional
 	Coefficient string `json:"coefficient,omitempty"`
 	// +optional
-	CoefficientFrom *TemplateFrom `json:"coefficientFrom,omitempty"`
+	CoefficientFrom *k8s.TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
@@ -82,7 +69,7 @@ type DataCenterResourceSpec struct {
 	EnergyMetric string `json:"energyMetric,omitempty"`
 
 	// +optional
-	EnergyMetricFrom *TemplateFrom `json:"energyMetricFrom,omitempty"`
+	EnergyMetricFrom *k8s.TemplateFrom `json:"energyMetricFrom,omitempty"`
 
 	// ServiceId is the identifier of the service that this resource belongs to.
 	// Define on a resource to make it part of a service, or make a separate
@@ -167,24 +154,4 @@ func (s *DataCenterResourceSpec) ParentNames() []string {
 		names[i] = p.Name
 	}
 	return names
-}
-
-func (p *TemplateParameter) Resolve(ctx context.Context, r client.Client, namespace string) (string, error) {
-	return p.SecretConfigMapSelector.Resolve(ctx, r, namespace)
-}
-
-func (p *TemplateFrom) ResolveTemplate(ctx context.Context, r client.Client, namespace string) (string, error) {
-	return p.ValueSource.Resolve(ctx, r, namespace)
-}
-
-func (p *TemplateFrom) ResolveParameters(ctx context.Context, r client.Client, namespace string) (map[string]string, error) {
-	result := make(map[string]string)
-	for _, param := range p.Parameters {
-		value, err := param.Resolve(ctx, r, namespace)
-		if err != nil {
-			return nil, err
-		}
-		result[param.Name] = value
-	}
-	return result, nil
 }

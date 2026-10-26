@@ -37,8 +37,8 @@ func testTemplateRenderer(t *testing.T, objects ...runtime.Object) *TemplateRend
 	return NewTemplateRenderer(fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objects...).Build(), "chantico")
 }
 
-func testTemplateFrom(parameters ...chantico.TemplateParameter) *chantico.TemplateFrom {
-	return &chantico.TemplateFrom{
+func testTemplateFrom(parameters ...k8s.TemplateParameter) *k8s.TemplateFrom {
+	return &k8s.TemplateFrom{
 		ValueSource: k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 			LocalObjectReference: corev1.LocalObjectReference{Name: "coefficient-template"}, Key: "template",
 		}},
@@ -49,18 +49,18 @@ func testTemplateFrom(parameters ...chantico.TemplateParameter) *chantico.Templa
 func TestRenderTemplate(t *testing.T) {
 	tests := map[string]struct {
 		text       string
-		parameters []chantico.TemplateParameter
+		parameters []k8s.TemplateParameter
 		objects    []runtime.Object
 		want       string
 	}{
 		"inline parameter": {
 			text:       `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			parameters: []chantico.TemplateParameter{{Name: "vmid", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "3"}}},
+			parameters: []k8s.TemplateParameter{{Name: "vmid", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "3"}}},
 			want:       `vm_cpu_percentage{vmid="3"}`,
 		},
 		"multiple parameters": {
 			text: `vm_cpu_percentage{variable1="{{ .var1 }}", variable2="{{ .var2 }}"}`,
-			parameters: []chantico.TemplateParameter{
+			parameters: []k8s.TemplateParameter{
 				{Name: "var1", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "3"}},
 				{Name: "var2", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "4"}},
 			},
@@ -68,7 +68,7 @@ func TestRenderTemplate(t *testing.T) {
 		},
 		"secret parameter": {
 			text: `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			parameters: []chantico.TemplateParameter{{Name: "vmid", SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+			parameters: []k8s.TemplateParameter{{Name: "vmid", SecretConfigMapSelector: k8s.SecretConfigMapSelector{
 				ValueFrom: &k8s.ValueSource{SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{Name: "vmid-secret"}, Key: "vmid",
 				}},
@@ -81,7 +81,7 @@ func TestRenderTemplate(t *testing.T) {
 		},
 		"configmap parameter": {
 			text: `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			parameters: []chantico.TemplateParameter{{Name: "vmid", SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+			parameters: []k8s.TemplateParameter{{Name: "vmid", SecretConfigMapSelector: k8s.SecretConfigMapSelector{
 				ValueFrom: &k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{Name: "vmid-configmap"}, Key: "vmid",
 				}},
@@ -101,7 +101,8 @@ func TestRenderTemplate(t *testing.T) {
 				Data:       map[string]string{"template": test.text},
 			}}, test.objects...)
 			renderer := testTemplateRenderer(t, objects...)
-			got, err := renderer.renderTemplate(t.Context(), testTemplateFrom(test.parameters...))
+			// got, err := renderer.renderTemplate(t.Context(), testTemplateFrom(test.parameters...))
+			got, err := testTemplateFrom(test.parameters...).Render(t.Context(), renderer.client, renderer.namespace)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -120,7 +121,7 @@ func TestResolvedExpressions(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "energy-template", Namespace: "chantico"},
 		Data:       map[string]string{"template": `power_watts{identifier="{{ .identifier }}"}`},
 	})
-	parameter := chantico.TemplateParameter{Name: "identifier", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "pdu1"}}
+	parameter := k8s.TemplateParameter{Name: "identifier", SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "pdu1"}}
 	tests := map[string]struct {
 		resource *chantico.DataCenterResource
 		want     ResolvedExpressions
@@ -142,11 +143,11 @@ func TestResolvedExpressions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pdu1", Namespace: "chantico"},
 				Spec: chantico.DataCenterResourceSpec{
 					Type: DataCenterResourceTypePDU,
-					EnergyMetricFrom: &chantico.TemplateFrom{
+					EnergyMetricFrom: &k8s.TemplateFrom{
 						ValueSource: k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{Name: "energy-template"}, Key: "template",
 						}},
-						Parameters: []chantico.TemplateParameter{parameter},
+						Parameters: []k8s.TemplateParameter{parameter},
 					},
 				},
 			},
