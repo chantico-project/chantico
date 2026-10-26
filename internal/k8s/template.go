@@ -17,7 +17,7 @@ type TemplateParameter struct {
 type TemplateFrom struct {
 	SecretConfigMapSelector `json:",inline,omitempty"`
 	// +optional
-	Parameters []TemplateParameter `json:"parameters,omitempty"`
+	TemplateParameters []TemplateParameter `json:"templateParameters,omitempty"`
 }
 
 func (p *TemplateParameter) Resolve(ctx context.Context, r client.Client, namespace string) (string, error) {
@@ -32,10 +32,10 @@ func (p *TemplateFrom) ResolveTemplate(ctx context.Context, r client.Client, nam
 	return p.ValueFrom.Resolve(ctx, r, namespace)
 }
 
-// Resolves all the parameters and converts them to a map which the template renderer can use to substitute the values into the template.
-func (p *TemplateFrom) ResolveParameters(ctx context.Context, r client.Client, namespace string) (map[string]string, error) {
+// Resolves all template parameters into values the renderer can substitute into the template.
+func (p *TemplateFrom) ResolveTemplateParameters(ctx context.Context, r client.Client, namespace string) (map[string]string, error) {
 	result := make(map[string]string)
-	for _, param := range p.Parameters {
+	for _, param := range p.TemplateParameters {
 		value, err := param.Resolve(ctx, r, namespace)
 		if err != nil {
 			return nil, err
@@ -51,19 +51,24 @@ func (tf *TemplateFrom) Render(ctx context.Context, client client.Client, namesp
 		return "", err
 	}
 
-	parameters, err := tf.ResolveParameters(ctx, client, namespace)
+	parameters, err := tf.ResolveTemplateParameters(ctx, client, namespace)
 	if err != nil {
 		return "", err
 	}
 
-	// Apply the template with the resolved parameters
-	tmpl, err := template.New("template").Option("missingkey=error").Parse(templateText)
-	if err != nil {
-		return "", fmt.Errorf("parse template: %w", err)
+	if len(parameters) == 0 {
+		// Short circuit if there are no template parameters to substitute
+		return templateText, nil
+	} else {
+		// Apply the template with the resolved parameters
+		tmpl, err := template.New("template").Option("missingkey=error").Parse(templateText)
+		if err != nil {
+			return "", fmt.Errorf("parse template: %w", err)
+		}
+		var rendered bytes.Buffer
+		if err := tmpl.Execute(&rendered, parameters); err != nil {
+			return "", fmt.Errorf("render template: %w", err)
+		}
+		return rendered.String(), nil
 	}
-	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, parameters); err != nil {
-		return "", fmt.Errorf("render template: %w", err)
-	}
-	return rendered.String(), nil
 }

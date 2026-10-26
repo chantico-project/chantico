@@ -91,15 +91,16 @@ metadata:
 spec:
   type: pdu
   energyMetricFrom:
-    configMapKeyRef:
-      name: tno-pdu-energy-metric-template
-      key: template
-    parameters:
+    valueFrom:
+      configMapKeyRef:
+        name: tno-pdu-energy-metric-template
+        key: template
+    templateParameters:
       - name: job
         value: tno
 ```
 
-Parameter values can be provided directly with `value`, or loaded with
+Template parameter values can be provided directly with `value`, or loaded with
 `valueFrom.configMapKeyRef` or `valueFrom.secretKeyRef`. All resources 
 referenced must be in the same namespace as the DataCenterResource. 
 IN case of a missing parameter or an invalid key reference, the resource 

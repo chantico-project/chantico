@@ -48,8 +48,8 @@ func (in *SecretConfigMapSelector) DeepCopy() *SecretConfigMapSelector {
 func (in *TemplateFrom) DeepCopyInto(out *TemplateFrom) {
 	*out = *in
 	in.SecretConfigMapSelector.DeepCopyInto(&out.SecretConfigMapSelector)
-	if in.Parameters != nil {
-		in, out := &in.Parameters, &out.Parameters
+	if in.TemplateParameters != nil {
+		in, out := &in.TemplateParameters, &out.TemplateParameters
 		*out = make([]TemplateParameter, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

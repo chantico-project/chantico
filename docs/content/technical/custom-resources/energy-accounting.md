@@ -44,12 +44,12 @@ type TemplateConfigMapKeyRef struct {
 }
 
 type TemplateFrom struct {
-  ConfigMapKeyRef TemplateConfigMapKeyRef `json:"configMapKeyRef"`
-  Parameters      []corev1.EnvVar         `json:"parameters,omitempty"`
+  SecretConfigMapSelector `json:",inline,omitempty"`
+  TemplateParameters      []TemplateParameter `json:"templateParameters,omitempty"`
 }
 ```
 
-`TemplateConfigMapKeyRef.Name` identifies a ConfigMap which contains the template, and the `TemplateConfigMapKeyRef.Key` identifies the specific key within that ConfigMap. The `TemplateFrom.Parameters` field provides values for the template's placeholders.
+The embedded selector provides the template as either a literal `value` or a `valueFrom` reference. The `TemplateFrom.TemplateParameters` field provides values for the template's placeholders.
 
 When a template ConfigMap is updated, Chantico reconciles every
 DataCenterResource in the same namespace that references it through
@@ -87,7 +87,7 @@ can load a PromQL template from a ConfigMap and render it with named parameters.
 | `additionalLabels` | `map[string]string` | Additional labels to attach to the resource's Prometheus timeseries |
 
 `TemplateFrom` identifies `configMapKeyRef.name` and `configMapKeyRef.key`,
-then supplies template values through `parameters`. Templates use Go template
+then supplies template values through `templateParameters`. Templates use Go template
 syntax such as `{{ .vmid }}`. Parameter entries follow the Kubernetes `EnvVar`
 shape and support the use of a `value`, `valueFrom.configMapKeyRef`, and
 `valueFrom.secretKeyRef`. See [How to register

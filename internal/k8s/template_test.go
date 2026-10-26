@@ -40,7 +40,7 @@ func testTemplateFrom(parameters ...TemplateParameter) *TemplateFrom {
 		SecretConfigMapSelector: SecretConfigMapSelector{ValueFrom: &ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 			LocalObjectReference: corev1.LocalObjectReference{Name: "coefficient-template"}, Key: "template",
 		}}},
-		Parameters: parameters,
+		TemplateParameters: parameters,
 	}
 }
 

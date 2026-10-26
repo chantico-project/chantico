@@ -66,7 +66,7 @@ spec:
                   of this resource. Only set for root nodes (e.g. PDUs) whose energy
                   timeseries is produced directly by hardware / an exporter.
                 properties:
-                  parameters:
+                  templateParameters:
                     items:
                       properties:
                         name:
@@ -232,7 +232,7 @@ spec:
                         to the current node. It is a PromQL expression (often a literal
                         number) that will be written as a Prometheus recording rule.
                       properties:
-                        parameters:
+                        templateParameters:
                           items:
                             properties:
                               name:

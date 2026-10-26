@@ -22,7 +22,7 @@ spec:
       configMapKeyRef:
         name: pdu-energymetric-template
         key: template
-    parameters:
+    templateParameters:
     - name: jobName
       value: tno
     - name: resourceName
@@ -44,7 +44,7 @@ spec:
       configMapKeyRef:
         name: pdu-energymetric-template
         key: template
-    parameters:
+    templateParameters:
     - name: jobName
       value: tno-2
     - name: resourceName

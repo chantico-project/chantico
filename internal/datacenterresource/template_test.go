@@ -42,7 +42,7 @@ func testTemplateFrom(parameters ...k8s.TemplateParameter) *k8s.TemplateFrom {
 		SecretConfigMapSelector: k8s.SecretConfigMapSelector{ValueFrom: &k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 			LocalObjectReference: corev1.LocalObjectReference{Name: "coefficient-template"}, Key: "template",
 		}}},
-		Parameters: parameters,
+		TemplateParameters: parameters,
 	}
 }
 
@@ -80,7 +80,7 @@ func TestResolvedExpressions(t *testing.T) {
 						SecretConfigMapSelector: k8s.SecretConfigMapSelector{ValueFrom: &k8s.ValueSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{Name: "energy-template"}, Key: "template",
 						}}},
-						Parameters: []k8s.TemplateParameter{parameter},
+						TemplateParameters: []k8s.TemplateParameter{parameter},
 					},
 				},
 			},
