@@ -37,11 +37,13 @@ jobs:
         run: |
           if [ ! -z "${{ inputs.version }}" ]; then
             echo "controller=images/chantico" >> $GITHUB_OUTPUT
+            echo "visualisation_webapp=images/chantico-visualisation-webapp" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
             echo "vm_attribution_mock=images/chantico-vm-attribution-mock" >> $GITHUB_OUTPUT
             echo "tag=v${{ inputs.version }}" >> $GITHUB_OUTPUT
           elif [ ! -z "${{ inputs.pr }}" ]; then
             echo "controller=images/chantico-pr" >> $GITHUB_OUTPUT
+            echo "visualisation_webapp=images/chantico-visualisation-webapp-pr" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock-pr" >> $GITHUB_OUTPUT
             echo "vm_attribution_mock=images/chantico-vm-attribution-mock-pr" >> $GITHUB_OUTPUT
             echo "tag=pr-${{ inputs.pr }}" >> $GITHUB_OUTPUT
@@ -51,6 +53,7 @@ jobs:
             fi
           else
             echo "controller=images/chantico" >> $GITHUB_OUTPUT
+            echo "visualisation_webapp=images/chantico-visualisation-webapp" >> $GITHUB_OUTPUT
             echo "snmp=images/chantico-snmp-mock" >> $GITHUB_OUTPUT
             echo "vm_attribution_mock=images/chantico-vm-attribution-mock" >> $GITHUB_OUTPUT
             echo "tag=latest" >> $GITHUB_OUTPUT
@@ -72,6 +75,16 @@ jobs:
           tags: |
             ${{ format('ghcr.io/{0}/{1}:{2}', github.repository_owner, steps.meta.outputs.controller, steps.meta.outputs.tag) }}
             ${{ steps.meta.outputs.sha_tag && format('ghcr.io/{0}/{1}:{2}', github.repository_owner, steps.meta.outputs.controller, steps.meta.outputs.sha_tag) || '' }}
+
+      - name: Build and push visualisation webapp
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.webapp
+          push: true
+          tags: |
+            ${{ format('ghcr.io/{0}/{1}:{2}', github.repository_owner, steps.meta.outputs.visualisation_webapp, steps.meta.outputs.tag) }}
+            ${{ steps.meta.outputs.sha_tag && format('ghcr.io/{0}/{1}:{2}', github.repository_owner, steps.meta.outputs.visualisation_webapp, steps.meta.outputs.sha_tag) || '' }}
 
       - name: Build and push snmp-mock
         uses: docker/build-push-action@v7

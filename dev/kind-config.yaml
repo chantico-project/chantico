@@ -22,3 +22,5 @@ nodes:
         protocol: UDP
       - hostPort: 30909 # vm-attribution-mock
         containerPort: 30909
+      - hostPort: 38080 # visualisation-webapp
+        containerPort: 30005
