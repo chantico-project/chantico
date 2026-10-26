@@ -91,7 +91,7 @@ func (r *DataCenterResourceReconciler) dataCenterResourcesForConfigMap(ctx conte
 	return requests
 }
 
-func configMapNameMatchesSelector(configMapName string, selector *k8s.SecretConfigMapSelector) bool {
+func configMapNameMatchesSelector(configMapName string, selector *k8s.TemplateFrom) bool {
 	if selector == nil || selector.ValueFrom == nil || selector.ValueFrom.ConfigMapKeyRef == nil {
 		return false
 	}
@@ -101,12 +101,12 @@ func configMapNameMatchesSelector(configMapName string, selector *k8s.SecretConf
 // Check if either energyMetricFrom or parent.CoefficientFrom references this configmap.
 func dataCenterResourceReferencesConfigMap(dataCenterResource *chantico.DataCenterResource, configMapName string) bool {
 	energyMetricFrom := dataCenterResource.Spec.EnergyMetricFrom
-	if configMapNameMatchesSelector(configMapName, &energyMetricFrom.SecretConfigMapSelector) {
+	if configMapNameMatchesSelector(configMapName, energyMetricFrom) {
 		return true
 	}
 	for _, parent := range dataCenterResource.Spec.Parents {
 		coefficientFrom := parent.CoefficientFrom
-		if configMapNameMatchesSelector(configMapName, &coefficientFrom.SecretConfigMapSelector) {
+		if configMapNameMatchesSelector(configMapName, coefficientFrom) {
 			return true
 		}
 	}

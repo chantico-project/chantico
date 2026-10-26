@@ -30,6 +30,7 @@ import (
 	chantico "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
 	dcr "chantico/internal/datacenterresource"
+	"chantico/internal/k8s"
 	"chantico/internal/steps"
 
 	"go.yaml.in/yaml/v2"
@@ -143,7 +144,11 @@ func TestReconcileWriteRuleFile_NonRootNode(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "0.6"},
+				{Name: "pdu1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.6",
+					},
+				}},
 			},
 		},
 	}
@@ -186,8 +191,12 @@ func TestReconcileWriteRuleFile_RootNodeWithEnergyMetric(t *testing.T) {
 	pdu := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
 		Spec: chantico.DataCenterResourceSpec{
-			Type:         dcr.DataCenterResourceTypePDU,
-			EnergyMetric: "snmp_pdu1_power_watts",
+			Type: dcr.DataCenterResourceTypePDU,
+			EnergyMetricFrom: &k8s.TemplateFrom{
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					Value: "snmp_pdu1_power_watts",
+				},
+			},
 		},
 	}
 
@@ -212,7 +221,11 @@ func TestReconcileWriteRuleFile_OverwritesExisting(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "0.5"},
+				{Name: "pdu1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.5",
+					},
+				}},
 			},
 		},
 	}
@@ -220,7 +233,7 @@ func TestReconcileWriteRuleFile_OverwritesExisting(t *testing.T) {
 	if res := reconciler.reconcileWriteRuleFile(t.Context(), bm); res.Action == steps.ActionError {
 		t.Fatalf("first reconcileWriteRuleFile errored: %v", res.Err)
 	}
-	bm.Spec.Parents[0].Coefficient = "0.8"
+	bm.Spec.Parents[0].CoefficientFrom.SecretConfigMapSelector.Value = "0.8"
 	if res := reconciler.reconcileWriteRuleFile(t.Context(), bm); res.Action == steps.ActionError {
 		t.Fatalf("second reconcileWriteRuleFile errored: %v", res.Err)
 	}
@@ -293,8 +306,12 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 	pdu1 := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
 		Spec: chantico.DataCenterResourceSpec{
-			Type:         dcr.DataCenterResourceTypePDU,
-			EnergyMetric: "snmp_pdu1_power_watts",
+			Type: dcr.DataCenterResourceTypePDU,
+			EnergyMetricFrom: &k8s.TemplateFrom{
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					Value: "snmp_pdu1_power_watts",
+				},
+			},
 		},
 	}
 	bm1 := &chantico.DataCenterResource{
@@ -302,7 +319,11 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "1"},
+				{Name: "pdu1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "1",
+					},
+				}},
 			},
 		},
 	}
@@ -311,7 +332,11 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeVM,
 			Parents: []chantico.ParentRef{
-				{Name: "bm1", Coefficient: "0.4"},
+				{Name: "bm1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.4",
+					},
+				}},
 			},
 		},
 	}
@@ -320,7 +345,11 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeVM,
 			Parents: []chantico.ParentRef{
-				{Name: "bm1", Coefficient: "0.6"},
+				{Name: "bm1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.6",
+					},
+				}},
 			},
 		},
 	}

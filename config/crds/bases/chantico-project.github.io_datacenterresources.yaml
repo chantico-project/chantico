@@ -60,13 +60,11 @@ spec:
                   AdditionalLabels are applied directly to the prometheus time series for this resource to
                   add additional identification information. If a label conflicts with existing labels, the additional label is skipped.
                 type: object
-              energyMetric:
+              energyMetricFrom:
                 description: |-
                   EnergyMetric is the Prometheus metric name for the raw energy timeseries
                   of this resource. Only set for root nodes (e.g. PDUs) whose energy
                   timeseries is produced directly by hardware / an exporter.
-                type: string
-              energyMetricFrom:
                 properties:
                   parameters:
                     items:
@@ -226,13 +224,11 @@ spec:
                     The coefficient represents what fraction of the parent's energy is
                     attributable to this child.
                   properties:
-                    coefficient:
+                    coefficientFrom:
                       description: |-
                         Coefficient is the energy coefficient for the edge from this parent
                         to the current node. It is a PromQL expression (often a literal
                         number) that will be written as a Prometheus recording rule.
-                      type: string
-                    coefficientFrom:
                       properties:
                         parameters:
                           items:

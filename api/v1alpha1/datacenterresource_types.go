@@ -36,9 +36,6 @@ type ParentRef struct {
 	// Coefficient is the energy coefficient for the edge from this parent
 	// to the current node. It is a PromQL expression (often a literal
 	// number) that will be written as a Prometheus recording rule.
-	// +optional
-	Coefficient string `json:"coefficient,omitempty"`
-	// +optional
 	CoefficientFrom *k8s.TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 
@@ -65,10 +62,6 @@ type DataCenterResourceSpec struct {
 	// EnergyMetric is the Prometheus metric name for the raw energy timeseries
 	// of this resource. Only set for root nodes (e.g. PDUs) whose energy
 	// timeseries is produced directly by hardware / an exporter.
-	// +optional
-	EnergyMetric string `json:"energyMetric,omitempty"`
-
-	// +optional
 	EnergyMetricFrom *k8s.TemplateFrom `json:"energyMetricFrom,omitempty"`
 
 	// ServiceId is the identifier of the service that this resource belongs to.
