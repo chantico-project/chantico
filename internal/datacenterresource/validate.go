@@ -10,8 +10,17 @@ import (
 )
 
 const (
-	DataCenterResourceTypePDU        = "pdu"
+	DataCenterResourceTypeGrid      = "grid"
+	DataCenterResourceTypeSolar     = "solar"
+	DataCenterResourceTypeWind      = "wind"
+	DataCenterResourceTypeGenerator = "generator"
+	DataCenterResourceTypeBattery   = "battery"
+
+	DataCenterResourceTypePowerFeed = "power-feed"
+	DataCenterResourceTypeOutlet    = "outlet"
+
 	DataCenterResourceTypeBaremetal  = "baremetal"
+	DataCenterResourceTypeHypervisor = "hypervisor"
 	DataCenterResourceTypeVM         = "vm"
 	DataCenterResourceTypeKubernetes = "kubernetes"
 	DataCenterResourceTypeHeat       = "heat"
@@ -135,7 +144,20 @@ func validateGraph(
 // Ensure the resource type is in the list of known types.
 func validateResourceType(dataCenterResource *chantico.DataCenterResource) error {
 	switch dataCenterResource.Spec.Type {
-	case "", DataCenterResourceTypePDU, DataCenterResourceTypeBaremetal, DataCenterResourceTypeVM, DataCenterResourceTypeKubernetes, DataCenterResourceTypeHeat:
+	case
+		"",
+		DataCenterResourceTypeOutlet,
+		DataCenterResourceTypeBaremetal,
+		DataCenterResourceTypeVM,
+		DataCenterResourceTypeKubernetes,
+		DataCenterResourceTypeHeat,
+		DataCenterResourceTypeGrid,
+		DataCenterResourceTypeSolar,
+		DataCenterResourceTypeWind,
+		DataCenterResourceTypeBattery,
+		DataCenterResourceTypePowerFeed,
+		DataCenterResourceTypeGenerator,
+		DataCenterResourceTypeHypervisor:
 		return nil
 	default:
 		return ErrorUnknownType{Type: dataCenterResource.Spec.Type}
