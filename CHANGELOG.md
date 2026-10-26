@@ -1,3 +1,9 @@
+## 0.19.0 (2026-10-26)
+
+#### Feature
+
+* Physical measurement type prometheus exporter (#240) (68e08403)
+
 ## 0.18.2 (2026-10-16)
 
 #### Bug Fixes
