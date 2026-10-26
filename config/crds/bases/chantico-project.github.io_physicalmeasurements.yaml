@@ -61,10 +61,20 @@ spec:
                 items:
                   type: string
                 type: array
+              type:
+                default: snmp
+                enum:
+                - snmp
+                - prometheus-exporter
+                type: string
             required:
             - ip
-            - measurementDevice
+            - type
             type: object
+            x-kubernetes-validations:
+            - message: measurementDevice is required when type is snmp
+              rule: self.type != "snmp" || (has(self.measurementDevice) && self.measurementDevice
+                != "")
           status:
             description: PhysicalMeasurementStatus defines the observed state of PhysicalMeasurement
             properties:
