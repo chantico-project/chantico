@@ -149,6 +149,8 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 	)
 }
 
+// Resolves the shorthand of EnergyMetric and Coefficient fields into their respective From fields.
+// If the EnergyMetric or Coefficient fields are set, it populates the corresponding From fields with a TemplateFrom referencing the value.
 func normalizeDataCenterResource(dataCenterResource *chantico.DataCenterResource) {
 	if dataCenterResource.Spec.EnergyMetric != "" {
 		dataCenterResource.Spec.EnergyMetricFrom = &k8s.TemplateFrom{
