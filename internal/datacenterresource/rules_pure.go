@@ -123,10 +123,7 @@ func applyAdditionalLabels(base map[string]string, labels map[string]string) map
 }
 
 func (b *RuleBuilder) constructParentNamesLabel() string {
-	parents := []string{}
-	for _, parent := range b.resource.Spec.Parents {
-		parents = append(parents, parent.Name)
-	}
+	parents := b.resource.Spec.ParentNames()
 	return strings.Join(parents, ",")
 }
 
@@ -169,7 +166,7 @@ func (b *RuleBuilder) BuildEnergyAliasRule() *RecordingRule {
 		// "customLabel": "exampleValue",
 	}
 
-	// Add the defaults from the shared labels based on the resouce spec.
+	// Add the defaults from the shared labels based on the resource spec.
 	labels := b.buildSharedLabels(baseLabels)
 
 	return &RecordingRule{
