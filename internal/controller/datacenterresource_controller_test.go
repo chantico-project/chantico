@@ -89,9 +89,9 @@ func newDataCenterResourceReconciler(t *testing.T, objs ...runtime.Object) *Data
 		Build()
 
 	return &DataCenterResourceReconciler{
-		Client:     client,
-		Scheme:     scheme,
-		RuleWriter: &dcr.FileWriter{Client: client},
+		Client:         client,
+		Scheme:         scheme,
+		RuleConfigurer: &dcr.FileRecordingRules{Client: client},
 	}
 }
 

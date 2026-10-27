@@ -173,7 +173,7 @@ cluster-mocks: cluster-load-mock-images ## Apply the mock deployments and servic
 cluster-mock-resources: ## Apply the sample configurations for the mocks
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
-# 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_datacenterresource.yaml
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
@@ -187,7 +187,7 @@ build: manifests generate ## Build manager binary.
 
 .PHONY: run
 run: manifests generate ## Run a controller from your host.
-	go run ./cmd/operator/main.go --disable-prometheus-reload
+	go run ./cmd/operator/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.

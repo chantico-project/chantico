@@ -182,7 +182,7 @@ func main() {
 	if err := (&controller.DataCenterResourceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		RuleWriter: &datacenterresource.FileWriter{
+		RuleConfigurer: &datacenterresource.KubePrometheusRecordingRules{
 			Client: mgr.GetClient(),
 		},
 	}).SetupWithManager(mgr); err != nil {

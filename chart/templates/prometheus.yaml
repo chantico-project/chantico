@@ -193,6 +193,12 @@ metadata:
   namespace: chantico
 spec:
   serviceAccountName: prometheus
+  ruleSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: chantico
+  ruleNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: chantico
   scrapeConfigSelector:
     matchLabels:
       app.kubernetes.io/managed-by: chantico

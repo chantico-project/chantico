@@ -17,6 +17,8 @@ limitations under the License.
 package physicalmeasurement
 
 import (
+	"context"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -24,10 +26,12 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func setupKubePrometheusTargetsTest(t *testing.T) (*KubePrometheusTargets, *chantico.PhysicalMeasurement) {
@@ -168,5 +172,52 @@ func TestKubePrometheusTargetsReconcile_RemovesSNMPRelabelingsForDirectExporter(
 	}
 	if observed.Spec.MetricsPath == nil || *observed.Spec.MetricsPath != "/metrics" {
 		t.Fatalf("expected direct exporter metrics path, got %v", observed.Spec.MetricsPath)
+	}
+}
+
+func TestKubePrometheusTargetsDelete_RemovesMatchingScrapeConfig(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+	other := &monitoringv1alpha1.ScrapeConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: measurement.Name, Namespace: "other"},
+	}
+	if err := targets.Client.Create(t.Context(), other); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := targets.Delete(t.Context(), measurement); err != nil {
+		t.Fatal(err)
+	}
+	if err := targets.Client.Get(t.Context(), client.ObjectKeyFromObject(measurement), observed); !apierrors.IsNotFound(err) {
+		t.Fatalf("expected deleted scrape config to be absent, got %v", err)
+	}
+	if err := targets.Client.Get(t.Context(), client.ObjectKeyFromObject(other), other); err != nil {
+		t.Fatalf("scrape config in another namespace was affected: %v", err)
+	}
+	if err := targets.Delete(t.Context(), measurement); err != nil {
+		t.Fatalf("repeated deletion failed: %v", err)
+	}
+}
+
+func TestKubePrometheusTargetsDelete_MissingScrapeConfig(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	if err := targets.Delete(t.Context(), measurement); err != nil {
+		t.Fatalf("deleting an absent scrape config failed: %v", err)
+	}
+}
+
+func TestKubePrometheusTargetsDelete_ReturnsClientError(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	wantErr := errors.New("delete denied")
+	targets.Client = fake.NewClientBuilder().
+		WithScheme(targets.Client.Scheme()).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Delete: func(ctx context.Context, kubeClient client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+				return wantErr
+			},
+		}).Build()
+
+	if err := targets.Delete(t.Context(), measurement); !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped client error %v, got %v", wantErr, err)
 	}
 }

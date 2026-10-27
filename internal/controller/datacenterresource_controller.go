@@ -29,7 +29,7 @@ import (
 
 const prometheusRulesDir = "prometheus/rules"
 
-type RuleWriter interface {
+type RecordingRuleConfigurer interface {
 	Reconcile(context.Context, *chantico.DataCenterResource) error
 	Delete(context.Context, *chantico.DataCenterResource) error
 }
@@ -45,8 +45,8 @@ type RuleWriter interface {
 // DataCenterResourceReconciler reconciles a DataCenterResource object
 type DataCenterResourceReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	RuleWriter *dcr.FileWriter
+	Scheme         *runtime.Scheme
+	RuleConfigurer RecordingRuleConfigurer
 }
 
 func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -153,7 +153,7 @@ func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, da
 		return steps.Stop()
 	}
 
-	if err := r.RuleWriter.Delete(ctx, dataCenterResource); err != nil {
+	if err := r.RuleConfigurer.Delete(ctx, dataCenterResource); err != nil {
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Failed to delete recording rules: "+err.Error())
 		return steps.Error(err)
 	}
@@ -211,7 +211,7 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 
 func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
 
-	if err := r.RuleWriter.Reconcile(ctx, dataCenterResource); err != nil {
+	if err := r.RuleConfigurer.Reconcile(ctx, dataCenterResource); err != nil {
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to reconcile recording rules: "+err.Error())
 		return steps.Error(err)
 	}

@@ -184,6 +184,14 @@ func (targets *KubePrometheusTargets) Delete(
 	ctx context.Context,
 	measurement *chantico.PhysicalMeasurement,
 ) error {
-	// Implement the deletion logic for KubePrometheusTargets here
+	scrapeConfig := &monitoringv1alpha1.ScrapeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      measurement.Name,
+			Namespace: measurement.Namespace,
+		},
+	}
+	if err := client.IgnoreNotFound(targets.Client.Delete(ctx, scrapeConfig)); err != nil {
+		return fmt.Errorf("delete scrape config: %w", err)
+	}
 	return nil
 }

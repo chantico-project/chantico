@@ -182,11 +182,11 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 		if errors.Is(err, fs.ErrNotExist) {
 			desired, derr := r.desiredGeneratorConfig(ctx, measurementDevice)
 			if derr != nil {
-				measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to marshal generator config: "+err.Error())
+				measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to marshal generator config: "+derr.Error())
 				return steps.Error(derr)
 			}
 			if werr := r.Filestore.Write(ctx, path, bytes.NewReader(desired)); werr != nil {
-				measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to marshal generator config: "+err.Error())
+				measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to write generator config: "+werr.Error())
 				return steps.Error(werr)
 			}
 			log.FromContext(ctx).Info("Generator file has been generated successfully.", "path", path)
@@ -220,6 +220,10 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 }
 
 func (r *MeasurementDeviceReconciler) desiredGeneratorConfig(ctx context.Context, measurementDevice *chantico.MeasurementDevice) ([]byte, error) {
+	if measurementDevice.Spec.AuthFrom == nil {
+		return nil, fmt.Errorf("spec.authFrom is required")
+	}
+
 	authString, err := measurementDevice.Spec.AuthFrom.Resolve(ctx, r.Client, measurementDevice.Namespace)
 
 	if err != nil {
