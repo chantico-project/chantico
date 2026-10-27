@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -30,6 +31,7 @@ import (
 	chantico "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
 	dcr "chantico/internal/datacenterresource"
+	"chantico/internal/k8s"
 	"chantico/internal/steps"
 
 	"go.yaml.in/yaml/v2"
@@ -135,6 +137,52 @@ func serverHostPort(t *testing.T, server *httptest.Server) (string, string) {
 	return host, port
 }
 
+func TestNormalizeDataCenterResource(t *testing.T) {
+	explicit := &k8s.TemplateFrom{
+		SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "existing_expression"},
+	}
+	tests := []struct {
+		name string
+		spec chantico.DataCenterResourceSpec
+	}{
+		{name: "energy metric", spec: chantico.DataCenterResourceSpec{EnergyMetric: "pdu_power_watts"}},
+		{name: "coefficients", spec: chantico.DataCenterResourceSpec{Parents: []chantico.ParentRef{
+			{Name: "pdu1", Coefficient: "0.5"},
+			{Name: "pdu2", Coefficient: "0"},
+			{Name: "pdu3", CoefficientFrom: explicit},
+		}}},
+		{name: "explicit template", spec: chantico.DataCenterResourceSpec{EnergyMetricFrom: explicit}},
+		{name: "empty", spec: chantico.DataCenterResourceSpec{}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resource := &chantico.DataCenterResource{Spec: test.spec}
+			normalizeDataCenterResource(resource)
+			if test.spec.EnergyMetric != "" {
+				if resource.Spec.EnergyMetricFrom == nil || resource.Spec.EnergyMetricFrom.Value != test.spec.EnergyMetric {
+					t.Fatalf("energy metric was not expanded: %#v", resource.Spec.EnergyMetricFrom)
+				}
+			} else if !reflect.DeepEqual(resource.Spec.EnergyMetricFrom, test.spec.EnergyMetricFrom) {
+				t.Fatal("explicit energy metric template changed")
+			}
+			for _, parent := range resource.Spec.Parents {
+				if parent.Coefficient != "" {
+					if parent.CoefficientFrom == nil || parent.CoefficientFrom.Value != parent.Coefficient {
+						t.Fatalf("coefficient for %s was not expanded: %#v", parent.Name, parent.CoefficientFrom)
+					}
+				} else if !reflect.DeepEqual(parent.CoefficientFrom, explicit) {
+					t.Fatal("explicit coefficient template changed")
+				}
+			}
+			first := resource.DeepCopy()
+			normalizeDataCenterResource(resource)
+			if !reflect.DeepEqual(resource, first) {
+				t.Fatal("normalization is not idempotent")
+			}
+		})
+	}
+}
+
 func TestReconcileWriteRuleFile_NonRootNode(t *testing.T) {
 	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
 
@@ -143,7 +191,11 @@ func TestReconcileWriteRuleFile_NonRootNode(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "0.6"},
+				{Name: "pdu1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.6",
+					},
+				}},
 			},
 		},
 	}
@@ -186,8 +238,12 @@ func TestReconcileWriteRuleFile_RootNodeWithEnergyMetric(t *testing.T) {
 	pdu := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
 		Spec: chantico.DataCenterResourceSpec{
-			Type:         dcr.DataCenterResourceTypePDU,
-			EnergyMetric: "snmp_pdu1_power_watts",
+			Type: dcr.DataCenterResourceTypePDU,
+			EnergyMetricFrom: &k8s.TemplateFrom{
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					Value: "snmp_pdu1_power_watts",
+				},
+			},
 		},
 	}
 
@@ -212,7 +268,11 @@ func TestReconcileWriteRuleFile_OverwritesExisting(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "0.5"},
+				{Name: "pdu1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.5",
+					},
+				}},
 			},
 		},
 	}
@@ -220,7 +280,7 @@ func TestReconcileWriteRuleFile_OverwritesExisting(t *testing.T) {
 	if res := reconciler.reconcileWriteRuleFile(t.Context(), bm); res.Action == steps.ActionError {
 		t.Fatalf("first reconcileWriteRuleFile errored: %v", res.Err)
 	}
-	bm.Spec.Parents[0].Coefficient = "0.8"
+	bm.Spec.Parents[0].CoefficientFrom.SecretConfigMapSelector.Value = "0.8"
 	if res := reconciler.reconcileWriteRuleFile(t.Context(), bm); res.Action == steps.ActionError {
 		t.Fatalf("second reconcileWriteRuleFile errored: %v", res.Err)
 	}
@@ -293,8 +353,12 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 	pdu1 := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
 		Spec: chantico.DataCenterResourceSpec{
-			Type:         dcr.DataCenterResourceTypePDU,
-			EnergyMetric: "snmp_pdu1_power_watts",
+			Type: dcr.DataCenterResourceTypePDU,
+			EnergyMetricFrom: &k8s.TemplateFrom{
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					Value: "snmp_pdu1_power_watts",
+				},
+			},
 		},
 	}
 	bm1 := &chantico.DataCenterResource{
@@ -302,7 +366,11 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "1"},
+				{Name: "pdu1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "1",
+					},
+				}},
 			},
 		},
 	}
@@ -311,7 +379,11 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeVM,
 			Parents: []chantico.ParentRef{
-				{Name: "bm1", Coefficient: "0.4"},
+				{Name: "bm1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.4",
+					},
+				}},
 			},
 		},
 	}
@@ -320,7 +392,11 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeVM,
 			Parents: []chantico.ParentRef{
-				{Name: "bm1", Coefficient: "0.6"},
+				{Name: "bm1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.6",
+					},
+				}},
 			},
 		},
 	}
@@ -399,268 +475,5 @@ func writeDCRTestFile(t *testing.T, path string, data []byte) {
 
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
-	}
-}
-
-func TestResolveAndApplyTemplate_ConfigMapTemplateWithIncludedParameter(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vm-attribution-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
-		},
-		Parameters: []corev1.EnvVar{
-			{
-				Name:  "vmid",
-				Value: "3",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
-	}
-
-	expected := `vm_cpu_percentage{vmid="3"}`
-	if rendered != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered)
-	}
-}
-
-func TestResolveAndApplyTemplate_ConfigMapTemplateWithIncludedMultipleParameter(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vm-attribution-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `vm_cpu_percentage{variable1="{{ .var1 }}", variable2="{{ .var2 }}"}`,
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
-		},
-		Parameters: []corev1.EnvVar{
-			{
-				Name:  "var1",
-				Value: "3",
-			},
-			{
-				Name:  "var2",
-				Value: "4",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
-	}
-
-	expected := `vm_cpu_percentage{variable1="3", variable2="4"}`
-	if rendered != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered)
-	}
-}
-
-func TestResolveAndApplyTemplate_ConfigMapTemplateWithParameterFromSecret(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vm-attribution-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			},
-		},
-		&corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vmid-secret",
-				Namespace: "chantico",
-			},
-			Data: map[string][]byte{
-				"vmid": []byte("3"),
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
-		},
-		Parameters: []corev1.EnvVar{
-			{
-				Name: "vmid",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "vmid-secret",
-						},
-						Key: "vmid",
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
-	}
-
-	expected := `vm_cpu_percentage{vmid="3"}`
-	if rendered != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered)
-	}
-}
-
-func TestResolveAndApplyTemplate_ConfigMapTemplateWithParameterFromConfigMap(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vm-attribution-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			},
-		},
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vmid-configmap",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"vmid": "3",
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
-		},
-		Parameters: []corev1.EnvVar{
-			{
-				Name: "vmid",
-				ValueFrom: &corev1.EnvVarSource{
-					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "vmid-configmap",
-						},
-						Key: "vmid",
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
-	}
-
-	expected := `vm_cpu_percentage{vmid="3"}`
-	if rendered != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered)
-	}
-}
-
-func TestResolveCoefficientTemplates(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pdu-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `usage_coeff{identifier="{{ .identifier }}"}`,
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveCoefficientTemplates(t.Context(), &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1", Namespace: "chantico"},
-		Spec: chantico.DataCenterResourceSpec{
-			Type: dcr.DataCenterResourceTypeBaremetal,
-			Parents: []chantico.ParentRef{
-				{
-					Name: "pdu1",
-					CoefficientFrom: &chantico.TemplateFrom{
-						ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-							Name: "pdu-coefficient-template",
-							Key:  "template",
-						},
-						Parameters: []corev1.EnvVar{
-							{
-								Name:  "identifier",
-								Value: "pdu1",
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-
-	if err != nil {
-		t.Fatalf("resolveCoefficientTemplates returned error: %v", err)
-	}
-	expected := `usage_coeff{identifier="pdu1"}`
-	if len(rendered.Spec.Parents) == 0 || rendered.Spec.Parents[0].Coefficient != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered.Spec.Parents[0].Coefficient)
-	}
-}
-
-func TestResolveEnergyMetricTemplates(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pdu-energymetric-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `power_watts{identifier="{{ .identifier }}"}`,
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveEnergyMetricTemplate(t.Context(), &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1", Namespace: "chantico"},
-		Spec: chantico.DataCenterResourceSpec{
-			Type: dcr.DataCenterResourceTypeBaremetal,
-			EnergyMetricFrom: &chantico.TemplateFrom{
-				ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-					Name: "pdu-energymetric-template",
-					Key:  "template",
-				},
-				Parameters: []corev1.EnvVar{
-					{
-						Name:  "identifier",
-						Value: "pdu1",
-					},
-				},
-			},
-		},
-	})
-
-	if err != nil {
-		t.Fatalf("resolveEnergyMetricTemplates returned error: %v", err)
-	}
-	expected := `power_watts{identifier="pdu1"}`
-	if rendered.Spec.EnergyMetric != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered.Spec.EnergyMetric)
 	}
 }

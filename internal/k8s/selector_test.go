@@ -100,7 +100,7 @@ func TestSecretConfigMapSelectorResolve(t *testing.T) {
 			Selector: SecretConfigMapSelector{
 				ValueFrom: &ValueSource{},
 			},
-			ExpectedErr: &errs.MissingOptionError{Parent: "SecretConfigMapSelector", Options: []string{"Value", "ValueFrom.ConfigMapKeyRef", "ValueFrom.SecretKeyRef"}},
+			ExpectedErr: &errs.MissingOptionError{Parent: "ValueSource", Options: []string{"ConfigMapKeyRef", "SecretKeyRef"}},
 		},
 		{
 			Name: "configmap get error",
@@ -131,7 +131,6 @@ func TestSecretConfigMapSelectorResolve(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
 			builder := fake.NewClientBuilder().WithScheme(scheme)
 			if len(tc.Objects) > 0 {

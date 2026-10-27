@@ -26,10 +26,13 @@ spec:
   physicalMeasurements:
     - physicalMeasurement-pdu1-out
   energyMetricFrom:
-    configMapKeyRef:
-      name: pdu-energymetric-template
-      key: template
-    parameters:
+    valueFrom:
+      configMapKeyRef:
+        name: pdu-energymetric-template
+        key: template
+    templateParameters:
+    - name: jobName
+      value: tno
     - name: resourceName
       value: physicalmeasurement-pdu1-out
 ---
@@ -45,10 +48,13 @@ spec:
   physicalMeasurements:
     - physicalMeasurement-pdu2-out
   energyMetricFrom:
-    configMapKeyRef:
-      name: pdu-energymetric-template
-      key: template
-    parameters:
+    valueFrom:
+      configMapKeyRef:
+        name: pdu-energymetric-template
+        key: template
+    templateParameters:
+    - name: jobName
+      value: tno-2
     - name: resourceName
       value: physicalmeasurement-pdu2-out
 ---
@@ -80,10 +86,11 @@ spec:
   parents:
     - name: datacenterresource-misd-gbm-01
       coefficientFrom:
-        configMapKeyRef:
-          name: vm-attribution-coefficient-template
-          key: template
-        parameters:
+        valueFrom:
+          configMapKeyRef:
+            name: vm-attribution-coefficient-template
+            key: template
+        templateParameters:
         - name: vmid
           value: "120"
 ---
@@ -100,9 +107,10 @@ spec:
   parents:
     - name: datacenterresource-misd-gbm-01
       coefficientFrom:
-        configMapKeyRef:
-          name: vm-attribution-coefficient-template
-          key: template
-        parameters:
+        valueFrom:
+          configMapKeyRef:
+            name: vm-attribution-coefficient-template
+            key: template
+        templateParameters:
         - name: vmid
           value: "121"

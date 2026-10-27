@@ -123,6 +123,8 @@ spec:
                 x-kubernetes-validations:
                 - message: Value and ValueFrom cannot be set at the same time
                   rule: '!(has(self.value) && has(self.valueFrom))'
+                - message: Value or ValueFrom must be set
+                  rule: has(self.value)||has(self.valueFrom)
               walks:
                 items:
                   type: string

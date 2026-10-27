@@ -17,46 +17,35 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"chantico/internal/k8s"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type TemplateConfigMapKeyRef struct {
-	// Name is the name of the ConfigMap.
-	Name string `json:"name"`
-	// Key is the key within the ConfigMap that contains the template.
-	Key string `json:"key,omitempty"`
-}
-
-type TemplateFrom struct {
-	ConfigMapKeyRef TemplateConfigMapKeyRef `json:"configMapKeyRef"`
-	// +optional
-	Parameters []corev1.EnvVar `json:"parameters,omitempty"`
-}
-
-// ParentRef references a parent DataCenterResource and optionally carries
-// the energy coefficient for the edge from that parent to this node.
+// ParentRef references a parent DataCenterResource and carries the energy
+// coefficient for the edge from that parent to this node.
 // The coefficient represents what fraction of the parent's energy is
 // attributable to this child.
-// +kubebuilder:validation:XValidation:rule="has(self.coefficient)||has(self.coefficientFrom)",message="Parent must have coefficient"
-// +kubebuilder:validation:XValidation:rule="!(has(self.coefficient)&&has(self.coefficientFrom))",message="Parent cannot have both coefficient and coefficientFrom set"
+// +kubebuilder:validation:XValidation:rule="has(self.coefficient) != has(self.coefficientFrom)",message="Exactly one of coefficient or coefficientFrom must be set"
 type ParentRef struct {
 	// Name is the name of the parent DataCenterResource.
 	Name string `json:"name"`
 
-	// Coefficient is the energy coefficient for the edge from this parent
+	// Coefficient is shorthand for coefficientFrom.value.
+	// +optional
+	Coefficient string `json:"coefficient,omitempty"`
+
+	// CoefficientFrom is the energy coefficient for the edge from this parent
 	// to the current node. It is a PromQL expression (often a literal
 	// number) that will be written as a Prometheus recording rule.
 	// +optional
-	Coefficient string `json:"coefficient,omitempty"`
-	// +optional
-	CoefficientFrom *TemplateFrom `json:"coefficientFrom,omitempty"`
+	CoefficientFrom *k8s.TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
 // +kubebuilder:validation:XValidation:rule="(has(self.parents)&&size(self.parents)>0)||has(self.energyMetric)||has(self.energyMetricFrom)",message="Resource must have at least one parent, energyMetric or energyMetricFrom"
-// +kubebuilder:validation:XValidation:rule="!(has(self.energyMetric)&&has(self.energyMetricFrom))",message="Resource cannot have both energyMetric and energyMetricFrom set"
+// +kubebuilder:validation:XValidation:rule="!(has(self.energyMetric)&&has(self.energyMetricFrom))",message="EnergyMetric and EnergyMetricFrom cannot be set at the same time"
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -74,14 +63,15 @@ type DataCenterResourceSpec struct {
 	// +optional
 	Parents []ParentRef `json:"parents,omitempty"`
 
-	// EnergyMetric is the Prometheus metric name for the raw energy timeseries
-	// of this resource. Only set for root nodes (e.g. PDUs) whose energy
-	// timeseries is produced directly by hardware / an exporter.
+	// EnergyMetric is shorthand for energyMetricFrom.value.
 	// +optional
 	EnergyMetric string `json:"energyMetric,omitempty"`
 
+	// EnergyMetricFrom is the Prometheus metric name for the raw energy timeseries
+	// of this resource. Only set for root nodes (e.g. PDUs) whose energy
+	// timeseries is produced directly by hardware / an exporter.
 	// +optional
-	EnergyMetricFrom *TemplateFrom `json:"energyMetricFrom,omitempty"`
+	EnergyMetricFrom *k8s.TemplateFrom `json:"energyMetricFrom,omitempty"`
 
 	// ServiceId is the identifier of the service that this resource belongs to.
 	// Define on a resource to make it part of a service, or make a separate

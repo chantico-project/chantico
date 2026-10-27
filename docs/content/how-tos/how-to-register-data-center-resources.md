@@ -41,7 +41,8 @@ metadata:
 spec:
   type: pdu
   parents:
-    - datacenterresource-misd-gbm-01
+    - name: datacenterresource-misd-gbm-01
+      coefficient: "1"
   physicalMeasurements:
     - physicalMeasurement-pdu2-out
 ```
@@ -58,13 +59,41 @@ kubectl describe -n chantico datacenterresource datacenterresource-pdu2
 1. Revert your changes and apply the file again, to check that the validation 
    message disappears.
 
+## Set energy metrics and coefficients
+
+Root resources must define `energyMetric` or `energyMetricFrom`. Each parent
+listed by a child must define `coefficient` or `coefficientFrom`. For simple
+inline expressions, use the shorthand fields:
+
+```yaml
+energyMetric: 'tnoPduPowerValue{job="tno"}'
+```
+
+An inline coefficient on a parent reference is:
+
+```yaml
+parents:
+  - name: datacenterresource-pdu1
+    coefficient: "1"
+```
+
+During reconciliation, Chantico expands `energyMetric` into
+`energyMetricFrom.value` and `coefficient` into `coefficientFrom.value` without
+changing the stored spec. Coefficients are strings, so numeric values must be wrapped in quotes.
+Do not set a shorthand field together with its corresponding `From` field.
+
+Use `energyMetricFrom` and `coefficientFrom` for ConfigMap or Secret references
+with `valueFrom`, or for templates with `templateParameters`. Inline `value`
+expressions remain supported as well.
+
 ## Reuse PromQL with ConfigMap templates
 
 Use a ConfigMap template when the same PromQL expression is needed for more
 than one resource and only a few labels or values differ. Chantico reads the
 template from the ConfigMap in the same namespace as the `DataCenterResource`,
-renders it using Go template syntax (the same syntax as Helm), and uses the 
-result as the metric or coefficient expression.
+renders it using Go template syntax, and uses the result as the metric or
+coefficient expression. You can also put template text directly in `value`;
+provide `templateParameters` whenever placeholders need substituting.
 
 1. Create a ConfigMap with the PromQL expression under a named key. Template
    values use the parameter name, for example `{{ .job }}`:
@@ -79,8 +108,9 @@ data:
   template: |
     tnoPduPowerValue{job="{{ .job }}"}
 ```
-2. Reference the template from `spec.energyMetricFrom`. Each entry in `parameters` 
-supplies a template value by name:
+2. Reference the template from `spec.energyMetricFrom` or
+  `spec.parents[].coefficientFrom`. Each entry in `templateParameters`
+  supplies a named template value:
 
 ```yaml
 apiVersion: chantico-project.github.io/v1alpha1
@@ -91,15 +121,16 @@ metadata:
 spec:
   type: pdu
   energyMetricFrom:
-    configMapKeyRef:
-      name: tno-pdu-energy-metric-template
-      key: template
-    parameters:
+    valueFrom:
+      configMapKeyRef:
+        name: tno-pdu-energy-metric-template
+        key: template
+    templateParameters:
       - name: job
         value: tno
 ```
 
-Parameter values can be provided directly with `value`, or loaded with
+Template parameter values can be provided directly with `value`, or loaded with
 `valueFrom.configMapKeyRef` or `valueFrom.secretKeyRef`. All resources 
 referenced must be in the same namespace as the DataCenterResource. 
 IN case of a missing parameter or an invalid key reference, the resource 
