@@ -138,10 +138,6 @@ func (b *RuleBuilder) buildSharedLabels(base labels) labels {
 		"type":     b.resource.Spec.Type,
 	}
 
-	if b.resource.Spec.ServiceId != "" {
-		labels["serviceId"] = b.resource.Spec.ServiceId
-	}
-
 	if len(b.resource.Spec.Parents) > 0 {
 		labels["parents"] = b.constructParentNamesLabel()
 	}

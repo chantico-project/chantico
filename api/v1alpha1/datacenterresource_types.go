@@ -73,12 +73,6 @@ type DataCenterResourceSpec struct {
 	// +optional
 	EnergyMetricFrom *k8s.TemplateFrom `json:"energyMetricFrom,omitempty"`
 
-	// ServiceId is the identifier of the service that this resource belongs to.
-	// Define on a resource to make it part of a service, or make a separate
-	// data center resource with service type with parent resources.
-	// +optional
-	ServiceId string `json:"serviceId"`
-
 	// AdditionalLabels are applied directly to the prometheus time series for this resource to
 	// add additional identification information. If a label conflicts with existing labels, the additional label is skipped.
 	// +optional

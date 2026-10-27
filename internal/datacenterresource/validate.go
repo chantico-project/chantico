@@ -94,9 +94,6 @@ func validateGraph(
 		if resource.DeletionTimestamp == nil {
 			resourcesMap[resource.ObjectMeta.Name] = resource
 		}
-		if dataCenterResource.Spec.ServiceId != "" && slices.Contains(resource.Spec.ParentNames(), dataCenterResource.Name) {
-			return []chantico.DataCenterResource{}, dataCenterResource.Name, ErrorServiceDefinedOnParent{InvolvedResource: dataCenterResource.Name}
-		}
 	}
 	queue := make([]string, 0)
 	queue = append(queue, dataCenterResource.Spec.ParentNames()...)
@@ -109,9 +106,6 @@ func validateGraph(
 		current, ok := resourcesMap[queue[visited]]
 		if !ok {
 			return GetFromMap(resourcesMap, queue[0:visited]), queue[visited], ErrorResourceNotFound{InvolvedResource: queue[visited]}
-		}
-		if current.Spec.ServiceId != "" {
-			return GetFromMap(resourcesMap, queue[0:visited]), queue[visited], ErrorServiceDefinedOnParent{InvolvedResource: queue[visited]}
 		}
 		if slices.Contains(current.Spec.ParentNames(), dataCenterResource.ObjectMeta.Name) {
 			return GetFromMap(resourcesMap, queue[0:visited]), queue[visited], ErrorCycleDetected{InvolvedResource: queue[visited]}

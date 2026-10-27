@@ -30,7 +30,7 @@ consumption.
 | `spec.physicalMeasurements` | list of `string` | The list of physical measurements that are associated with this resource. A portion of these are the metrics that are relevant for energy usage calculation of this resource. |
 | `spec.energyMetricFrom` | `TemplateFrom` | Prometheus expression source for a root resource, supplied by `value` or `valueFrom` |
 | `spec.parents` | list of `ParentRef` | Parent resources; each entry requires a coefficient expression in `coefficientFrom` |
-| `spec.serviceId` | `string` | The service ID that this resource is associated with. This is used to group resources together for energy accounting purposes. |
+| `spec.additionalLabels` | map of `string` to `string` | Any additional fields to associate with the resource. This can be used to group resources together for energy accounting purposes. |
 
 Some of these fields are validated by the controller to ensure that the graph is 
 constructed correctly, has no ambiguous or unknown information, and that there 
@@ -48,14 +48,6 @@ are no cycles or invalid flags on the resources:
   (those without parents) must include `energyMetricFrom`. Both fields accept
   either an inline `value` or a `valueFrom` reference; Go-template placeholders
   can be supplied through `templateParameters`.
-- `spec.serviceId` must not be set for a resource that is itself a parent of 
-  another resource. This is because the service ID is used to group resources 
-  that are provided to a services subscription, and this is not applicable to 
-  resources that are themselves split up into other resources. If, later on, we 
-  encounter a use case where this is needed, such as a PDU that is provided as 
-  a service on some outlets (for rack-as-a-service) but provided as a normal 
-  resource device for higher-level (baremetal, VM, kubernetes) resources, we may 
-  relax or extend this field.
 
 ## Example graph
 
@@ -72,7 +64,8 @@ of a service subscription (bare metals, VMs, kubernetes clusters, pods, etc.).
 
 As such, the red nodes have no parents other than upstream power inputs, and the 
 green nodes have no children. The green nodes are marked with a `serviceId` in 
-their corresponding resources.
+their corresponding `additionalLabels` fields of their resources, to indicate 
+they form client-facing services with any resource with the same ID.
 
 The red nodes are currently not implemented with specific types and fields, and 
 the graph does not yet include any output power resources such as heat reuse. As 
