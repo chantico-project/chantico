@@ -17,7 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"chantico/internal/snmp"
+	ch "chantico/internal/k8s"
+	// "chantico/internal/snmp"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,8 +30,8 @@ type MeasurementDeviceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Walks []string           `yaml:"walks" json:"walks"`
-	Auth  snmp.GeneratorAuth `yaml:"auth" json:"auth"`
+	Walks    []string                    `yaml:"walks" json:"walks"`
+	AuthFrom *ch.SecretConfigMapSelector `yaml:"authFrom" json:"authFrom"`
 }
 
 // MeasurementDeviceStatus defines the observed state of MeasurementDevice

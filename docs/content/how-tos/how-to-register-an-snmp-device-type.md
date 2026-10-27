@@ -19,9 +19,22 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
     1. Login with (user: admin, password: admin)
     1. Upload your MIBS files in `snmp/mibs`
 1. Create the MeasurementDevice matching the required type of MeasurementDevice
-    1. Create a `measurement_device.yaml` file
+    1. Create a `measurement_device.yaml` file. The SNMP authentication is 
+       provided through `spec.authFrom`, which reads it from a `Secret` (see 
+       [Providing SNMP authentication](#providing-snmp-authentication) for 
+       other options):
 
         ```yaml
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: example-snmp-auth
+            namespace: chantico
+          stringData:
+            auth: |
+              community: public
+              version: 2
+          ---
           apiVersion: chantico-project.github.io/v1alpha1
           kind: MeasurementDevice
           metadata:
@@ -31,9 +44,11 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
             name: example-measurement-device
             namespace: chantico
           spec:
-            auth:
-              community: public
-              version: 2
+            authFrom:
+              valueFrom:
+                secretKeyRef:
+                  name: example-snmp-auth
+                  key: auth
             walks:
               - sdbDevInKWhTotal
           ```
@@ -52,6 +67,71 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
         kubectl port-forward -n chantico deployment/chantico-snmp 9116:9116
         ```
     1. Check that the config (http://localhost:9116/config) include the registered device as a module 
+
+## Providing SNMP authentication
+
+The SNMP Auth can either be provided directly in the `MeasurementDevice` resource using `spec.authFrom.value`, 
+or it can be sourced from a `Secret` or `ConfigMap` using `spec.authFrom.valueFrom`. Regardless of 
+the resolved value must be a valid YAML document containing the SNMP 
+authentication parameters, using the same format as an entry under `auths` in 
+the [SNMP exporter generator 
+configuration](https://github.com/prometheus/snmp_exporter/tree/main/generator#file-format). 
+
+The value can come from exactly one of three sources:
+
+1. A `Secret` (recommended for credentials such as SNMPv3 passwords):
+    ```yaml
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: example-snmp-v3-auth
+      namespace: chantico
+    stringData:
+      auth: |
+        version: 3
+        security_level: authPriv
+        username: monitor
+        password: my-auth-password
+        auth_protocol: SHA
+        priv_protocol: AES
+        priv_password: my-priv-password
+    ---
+    # in the MeasurementDevice
+    spec:
+      authFrom:
+        valueFrom:
+          secretKeyRef:
+            name: example-snmp-v3-auth
+            key: auth
+    ```
+1. A `ConfigMap`:
+    ```yaml
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: example-snmp-auth
+      namespace: chantico
+    data:
+      auth: |
+        community: public
+        version: 2
+    ---
+    # in the MeasurementDevice
+    spec:
+      authFrom:
+        valueFrom:
+          configMapKeyRef:
+            name: example-snmp-auth
+            key: auth
+    ```
+1. Inline (only suitable for non-sensitive settings):
+    ```yaml
+    spec:
+      authFrom:
+        value: |
+          community: public
+          version: 2
+    ```
 
 ## Metric name disambiguation
 

@@ -28,8 +28,8 @@ consumption.
 | `metadata.name` | `string` | The name of the resource. This is used to reference the resource in `spec.parents` of other resources. |
 | `spec.type` | `string` | The type of the resource (e.g. PDU, bare metal, VM, pod) |
 | `spec.physicalMeasurements` | list of `string` | The list of physical measurements that are associated with this resource. A portion of these are the metrics that are relevant for energy usage calculation of this resource. |
-| `spec.energyMetrics` | `string` | Prometheus metric expression to collect energy usage |
-| `spec.parents` | list of `ParentRef` | Parent resources with optional coefficients |
+| `spec.energyMetricFrom` | `TemplateFrom` | Prometheus expression source for a root resource, supplied by `value` or `valueFrom` |
+| `spec.parents` | list of `ParentRef` | Parent resources; each entry requires a coefficient expression in `coefficientFrom` |
 | `spec.serviceId` | `string` | The service ID that this resource is associated with. This is used to group resources together for energy accounting purposes. |
 
 Some of these fields are validated by the controller to ensure that the graph is 
@@ -44,6 +44,10 @@ are no cycles or invalid flags on the resources:
   those resources must not (indirectly) refer to this resource. If a parent 
   resource does not exist, the controller will not use the resource in energy 
   usage calculations.
+- Each entry in `spec.parents` must include `coefficientFrom`. Root resources
+  (those without parents) must include `energyMetricFrom`. Both fields accept
+  either an inline `value` or a `valueFrom` reference; Go-template placeholders
+  can be supplied through `templateParameters`.
 - `spec.serviceId` must not be set for a resource that is itself a parent of 
   another resource. This is because the service ID is used to group resources 
   that are provided to a services subscription, and this is not applicable to 

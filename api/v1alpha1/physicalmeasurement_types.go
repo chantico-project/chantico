@@ -34,10 +34,12 @@ const (
 )
 
 // PhysicalMeasurementSpec defines the desired state of PhysicalMeasurement
+// +kubebuilder:validation:XValidation:rule="self.type != \"snmp\" || (has(self.measurementDevice) && self.measurementDevice != \"\")",message="measurementDevice is required when type is snmp"
 type PhysicalMeasurementSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// +kubebuilder:default:=snmp
 	// +kubebuilder:validation:Enum=snmp;prometheus-exporter;
 	Type              PhysicalMeasurementType `json:"type"`
 	Ip                string                  `json:"ip"`

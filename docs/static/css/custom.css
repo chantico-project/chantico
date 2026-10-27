@@ -4,7 +4,25 @@
   --LOGO-IMAGE-width: 14rem;
   --INTERNAL-MENU-HOME-LINK-color: rgba(33, 181, 115, 1);
   --INTERNAL-MENU-HOME-LINK-HOVER-color: rgba(255, 255, 255, 1);
+  --CODE-font: 'Commit Mono', monospace;
+}
+@font-face {
+    font-family: 'Commit Mono';
+    src: url('../fonts/CommitMono-400-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
 }
 pre.chroma .pre-only {
   display: inline;
+}
+.theme-dark-only {
+    display: none;
+}
+
+html[data-r-theme-variant="relearn-dark"] .theme-light-only {
+    display: none;
+}
+
+html[data-r-theme-variant="relearn-dark"] .theme-dark-only {
+    display: block;
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
+	"chantico/internal/k8s"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,9 +29,13 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:         "pdu",
-					Parents:      []chantico.ParentRef{},
-					EnergyMetric: `tnoPduPowerValue{job="tno"}`,
+					Type:    "pdu",
+					Parents: []chantico.ParentRef{},
+					EnergyMetricFrom: &k8s.TemplateFrom{
+						SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+							Value: `tnoPduPowerValue{job="tno"}`,
+						},
+					},
 				},
 			},
 			Resources:                []chantico.DataCenterResource{},

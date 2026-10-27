@@ -180,7 +180,7 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 	if err != nil {
 		// If the generator file does not exist yet, create it with the desired content.
 		if errors.Is(err, fs.ErrNotExist) {
-			desired, derr := desiredGeneratorConfig(measurementDevice)
+			desired, derr := r.desiredGeneratorConfig(ctx, measurementDevice)
 			if derr != nil {
 				measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to marshal generator config: "+err.Error())
 				return steps.Error(derr)
@@ -197,7 +197,7 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 		return steps.Error(err)
 	}
 
-	desired, err := desiredGeneratorConfig(measurementDevice)
+	desired, err := r.desiredGeneratorConfig(ctx, measurementDevice)
 	if err != nil {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to marshal generator config: "+err.Error())
 		return steps.Error(err)
@@ -219,11 +219,26 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorFile(ctx context.Context
 	return steps.Continue()
 }
 
-func desiredGeneratorConfig(measurementDevice *chantico.MeasurementDevice) ([]byte, error) {
-	return yaml.Marshal(snmp.GeneratorConfig{
-		Auths:   map[string]*snmp.GeneratorAuth{measurementDevice.Name: &measurementDevice.Spec.Auth},
-		Modules: map[string]*snmp.GeneratorModule{measurementDevice.Name: {Walk: measurementDevice.Spec.Walks}},
-	})
+func (r *MeasurementDeviceReconciler) desiredGeneratorConfig(ctx context.Context, measurementDevice *chantico.MeasurementDevice) ([]byte, error) {
+	authString, err := measurementDevice.Spec.AuthFrom.Resolve(ctx, r.Client, measurementDevice.Namespace)
+
+	if err != nil {
+		return []byte{}, err
+	}
+
+	var ga snmp.GeneratorAuth
+
+	err = yaml.Unmarshal([]byte(authString), &ga)
+
+	if err != nil {
+		return []byte{}, err
+	}
+	return yaml.Marshal(
+		snmp.GeneratorConfig{
+			Auths:   map[string]*snmp.GeneratorAuth{measurementDevice.Name: &ga},
+			Modules: map[string]*snmp.GeneratorModule{measurementDevice.Name: {Walk: measurementDevice.Spec.Walks}},
+		},
+	)
 }
 
 func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {

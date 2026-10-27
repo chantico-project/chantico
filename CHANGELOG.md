@@ -1,3 +1,27 @@
+## 0.19.0 (2026-10-26)
+
+#### Feature
+
+* Physical measurement type prometheus exporter (#240) (68e08403)
+
+## 0.18.2 (2026-10-16)
+
+#### Bug Fixes
+
+* Deployment for dcr graph visualisation webapp (#254) (385a2354)
+
+## 0.18.1 (2026-10-15)
+
+#### Bug Fixes
+
+* Remove patch helper, use external patch package for referenced DCR (#262) (fd56a8cb)
+
+## 0.18.0 (2026-10-09)
+
+#### Feature
+
+* Move SNMP auth from measurementdevices into secrets and configmaps (#256) (0b91b13d)
+
 ## 0.17.2 (2026-10-05)
 
 #### Bug Fixes

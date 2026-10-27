@@ -314,7 +314,7 @@ func TestReconcileTargetFile_PrometheusExporter(t *testing.T) {
 		},
 	}
 
-	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action != steps.ActionContinue {
+	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action != steps.ActionContinue {
 		t.Fatalf("expected Continue, got %v (err: %v)", res.Action, res.Err)
 	}
 
@@ -340,15 +340,19 @@ func TestReconcileTargetFile_UnsupportedType(t *testing.T) {
 	physicalMeasurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
 		Spec: chantico.PhysicalMeasurementSpec{
-			Ip:   "192.168.1.10",
-			Type: "unknown",
+			Ip:                "192.168.1.10",
+			MeasurementDevice: "device-a",
 		},
 	}
 
-	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action != steps.ActionError {
-		t.Fatalf("expected Error, got %v", res.Action)
+	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action != steps.ActionContinue {
+		t.Fatalf("expected Continue, got %v (err: %v)", res.Action, res.Err)
 	}
-	assertPhysicalMeasurementCondition(t, physicalMeasurement, chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed)
+	path := filepath.Join(tmpDir, prometheusTargetsDir, "snmp", "physical-measurement.json")
+	targets := readFileSDTargets(t, path)
+	if len(targets) != 1 || targets[0].Labels["type"] != "snmp" {
+		t.Fatalf("expected unset type to produce an SNMP target, got %#v", targets)
+	}
 }
 
 func TestReconcilePhysicalMeasurementDeletion_RemovesTargetFile(t *testing.T) {
