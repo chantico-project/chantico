@@ -126,6 +126,8 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 	l = l.WithValues("generation", dataCenterResource.GetGeneration())
 	ctx = log.IntoContext(ctx, l)
 
+	normalizeDataCenterResource(dataCenterResource)
+
 	// Patches the changes to the DataCenterResource at the end of reconciliation. This updates the observedGeneration and conditions in the status.
 	patcher, err := patch.NewHelper(dataCenterResource, r.Client)
 	if err != nil {
@@ -145,6 +147,22 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 		r.reconcileWriteRuleFile,
 		r.reconcileReady,
 	)
+}
+
+func normalizeDataCenterResource(dataCenterResource *chantico.DataCenterResource) {
+	if dataCenterResource.Spec.EnergyMetric != "" {
+		dataCenterResource.Spec.EnergyMetricFrom = &k8s.TemplateFrom{
+			SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: dataCenterResource.Spec.EnergyMetric},
+		}
+	}
+	for index := range dataCenterResource.Spec.Parents {
+		parent := &dataCenterResource.Spec.Parents[index]
+		if parent.Coefficient != "" {
+			parent.CoefficientFrom = &k8s.TemplateFrom{
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: parent.Coefficient},
+			}
+		}
+	}
 }
 
 func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {

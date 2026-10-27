@@ -42,8 +42,7 @@ spec:
   type: pdu
   parents:
     - name: datacenterresource-misd-gbm-01
-      coefficientFrom:
-        value: "1"
+      coefficient: "1"
   physicalMeasurements:
     - physicalMeasurement-pdu2-out
 ```
@@ -62,14 +61,12 @@ kubectl describe -n chantico datacenterresource datacenterresource-pdu2
 
 ## Set energy metrics and coefficients
 
-Root resources must define `energyMetricFrom`. Each parent listed by a child
-must define `coefficientFrom`. Provide the PromQL expression inline with `value`, 
-or load it from a ConfigMap or Secret with `valueFrom`. For example, an 
-inline PDU metric is:
+Root resources must define `energyMetric` or `energyMetricFrom`. Each parent
+listed by a child must define `coefficient` or `coefficientFrom`. For simple
+inline expressions, use the shorthand fields:
 
 ```yaml
-energyMetricFrom:
-  value: 'tnoPduPowerValue{job="tno"}'
+energyMetric: 'tnoPduPowerValue{job="tno"}'
 ```
 
 An inline coefficient on a parent reference is:
@@ -77,9 +74,17 @@ An inline coefficient on a parent reference is:
 ```yaml
 parents:
   - name: datacenterresource-pdu1
-    coefficientFrom:
-      value: "1"
+    coefficient: "1"
 ```
+
+During reconciliation, Chantico expands `energyMetric` into
+`energyMetricFrom.value` and `coefficient` into `coefficientFrom.value` without
+changing the stored spec. Coefficients are strings, so numeric values must be wrapped in quotes.
+Do not set a shorthand field together with its corresponding `From` field.
+
+Use `energyMetricFrom` and `coefficientFrom` for ConfigMap or Secret references
+with `valueFrom`, or for templates with `templateParameters`. Inline `value`
+expressions remain supported as well.
 
 ## Reuse PromQL with ConfigMap templates
 

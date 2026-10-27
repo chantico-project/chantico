@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -38,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -134,6 +137,52 @@ func serverHostPort(t *testing.T, server *httptest.Server) (string, string) {
 		t.Fatalf("split server host %q: %v", serverURL.Host, err)
 	}
 	return host, port
+}
+
+func TestNormalizeDataCenterResource(t *testing.T) {
+	explicit := &k8s.TemplateFrom{
+		SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "existing_expression"},
+	}
+	tests := []struct {
+		name string
+		spec chantico.DataCenterResourceSpec
+	}{
+		{name: "energy metric", spec: chantico.DataCenterResourceSpec{EnergyMetric: "pdu_power_watts"}},
+		{name: "coefficients", spec: chantico.DataCenterResourceSpec{Parents: []chantico.ParentRef{
+			{Name: "pdu1", Coefficient: "0.5"},
+			{Name: "pdu2", Coefficient: "0"},
+			{Name: "pdu3", CoefficientFrom: explicit},
+		}}},
+		{name: "explicit template", spec: chantico.DataCenterResourceSpec{EnergyMetricFrom: explicit}},
+		{name: "empty", spec: chantico.DataCenterResourceSpec{}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resource := &chantico.DataCenterResource{Spec: test.spec}
+			normalizeDataCenterResource(resource)
+			if test.spec.EnergyMetric != "" {
+				if resource.Spec.EnergyMetricFrom == nil || resource.Spec.EnergyMetricFrom.Value != test.spec.EnergyMetric {
+					t.Fatalf("energy metric was not expanded: %#v", resource.Spec.EnergyMetricFrom)
+				}
+			} else if !reflect.DeepEqual(resource.Spec.EnergyMetricFrom, test.spec.EnergyMetricFrom) {
+				t.Fatal("explicit energy metric template changed")
+			}
+			for _, parent := range resource.Spec.Parents {
+				if parent.Coefficient != "" {
+					if parent.CoefficientFrom == nil || parent.CoefficientFrom.Value != parent.Coefficient {
+						t.Fatalf("coefficient for %s was not expanded: %#v", parent.Name, parent.CoefficientFrom)
+					}
+				} else if !reflect.DeepEqual(parent.CoefficientFrom, explicit) {
+					t.Fatal("explicit coefficient template changed")
+				}
+			}
+			first := resource.DeepCopy()
+			normalizeDataCenterResource(resource)
+			if !reflect.DeepEqual(resource, first) {
+				t.Fatal("normalization is not idempotent")
+			}
+		})
+	}
 }
 
 func TestReconcileWriteRuleFile_NonRootNode(t *testing.T) {

@@ -69,11 +69,9 @@ spec:
   type: baremetal
   parents:
     - name: datacenterresource-pdu1
-      coefficientFrom: 
-        value: "1"
+      coefficient: "1"
     - name: datacenterresource-pdu2
-      coefficientFrom:
-        value: "1"
+      coefficient: "1"
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource

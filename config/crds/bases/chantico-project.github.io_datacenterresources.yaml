@@ -60,9 +60,12 @@ spec:
                   AdditionalLabels are applied directly to the prometheus time series for this resource to
                   add additional identification information. If a label conflicts with existing labels, the additional label is skipped.
                 type: object
+              energyMetric:
+                description: EnergyMetric is shorthand for energyMetricFrom.value.
+                type: string
               energyMetricFrom:
                 description: |-
-                  EnergyMetric is the Prometheus metric name for the raw energy timeseries
+                  EnergyMetricFrom is the Prometheus metric name for the raw energy timeseries
                   of this resource. Only set for root nodes (e.g. PDUs) whose energy
                   timeseries is produced directly by hardware / an exporter.
                 properties:
@@ -226,9 +229,12 @@ spec:
                     The coefficient represents what fraction of the parent's energy is
                     attributable to this child.
                   properties:
+                    coefficient:
+                      description: Coefficient is shorthand for coefficientFrom.value.
+                      type: string
                     coefficientFrom:
                       description: |-
-                        Coefficient is the energy coefficient for the edge from this parent
+                        CoefficientFrom is the energy coefficient for the edge from this parent
                         to the current node. It is a PromQL expression (often a literal
                         number) that will be written as a Prometheus recording rule.
                       properties:
@@ -385,9 +391,12 @@ spec:
                       description: Name is the name of the parent DataCenterResource.
                       type: string
                   required:
-                  - coefficientFrom
                   - name
                   type: object
+                  x-kubernetes-validations:
+                  - message: Exactly one of coefficient or coefficientFrom must be
+                      set
+                    rule: has(self.coefficient) != has(self.coefficientFrom)
                 type: array
               physicalMeasurements:
                 items:
@@ -405,8 +414,11 @@ spec:
             - type
             type: object
             x-kubernetes-validations:
-            - message: Resource must have at least one parent or energyMetricFrom
-              rule: (has(self.parents)&&size(self.parents)>0)||has(self.energyMetricFrom)
+            - message: Resource must have at least one parent, energyMetric or energyMetricFrom
+              rule: (has(self.parents)&&size(self.parents)>0)||has(self.energyMetric)||has(self.energyMetricFrom)
+            - message: EnergyMetric and EnergyMetricFrom cannot be set at the same
+                time
+              rule: '!(has(self.energyMetric)&&has(self.energyMetricFrom))'
           status:
             description: status defines the observed state of DataCenterResource
             properties:
