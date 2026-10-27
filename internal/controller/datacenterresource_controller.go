@@ -4,7 +4,6 @@ import (
 	chantico "chantico/api/v1alpha1"
 	"chantico/internal/datacenterresource"
 	"chantico/internal/k8s"
-	ph "chantico/internal/patch"
 	"chantico/internal/steps"
 	"context"
 	"errors"
