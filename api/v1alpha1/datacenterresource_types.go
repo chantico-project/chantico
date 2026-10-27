@@ -27,7 +27,6 @@ import (
 // coefficient for the edge from that parent to this node.
 // The coefficient represents what fraction of the parent's energy is
 // attributable to this child.
-// +kubebuilder:validation:XValidation:rule="has(self.coefficientFrom)",message="Parent must have coefficientFrom"
 type ParentRef struct {
 	// Name is the name of the parent DataCenterResource.
 	Name string `json:"name"`
@@ -35,10 +34,12 @@ type ParentRef struct {
 	// Coefficient is the energy coefficient for the edge from this parent
 	// to the current node. It is a PromQL expression (often a literal
 	// number) that will be written as a Prometheus recording rule.
+	// +required
 	CoefficientFrom *k8s.TemplateFrom `json:"coefficientFrom,omitempty"`
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
+// +kubebuilder:validation:XValidation:rule="(has(self.parents)&&size(self.parents)>0)||has(self.energyMetricFrom)",message="Resource must have at least one parent or energyMetricFrom"
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file

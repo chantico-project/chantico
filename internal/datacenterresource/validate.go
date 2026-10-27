@@ -41,14 +41,6 @@ func (e ErrorUnknownType) Error() string {
 	return fmt.Sprintf("unknown type: %s", e.Type)
 }
 
-type ErrorMissingEnergyMetric struct {
-	InvolvedResource string
-}
-
-func (e ErrorMissingEnergyMetric) Error() string {
-	return fmt.Sprintf("root node (no parents) %s must have energyMetric set", e.InvolvedResource)
-}
-
 type ErrorServiceDefinedOnParent struct {
 	InvolvedResource string
 }
@@ -142,15 +134,6 @@ func validateResourceType(dataCenterResource *chantico.DataCenterResource) error
 	}
 }
 
-// Root nodes (no parents) must have energyMetric set so Prometheus can source their energy timeseries.
-func validateEnergyMetric(dataCenterResource *chantico.DataCenterResource) error {
-	// TODO: This might already be validated through KubeBuilder validation
-	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetricFrom == nil {
-		return ErrorMissingEnergyMetric{InvolvedResource: dataCenterResource.Name}
-	}
-	return nil
-}
-
 // ValidateAdditionalLabelNames rejects additional labels that are not valid Prometheus label names.
 func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResource) error {
 	for labelName := range dataCenterResource.Spec.AdditionalLabels {
@@ -163,7 +146,6 @@ func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResourc
 
 var validators = []func(*chantico.DataCenterResource) error{
 	validateResourceType,
-	validateEnergyMetric,
 	validateAdditionalLabelNames,
 }
 

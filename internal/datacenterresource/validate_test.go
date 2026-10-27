@@ -43,21 +43,6 @@ func TestValidate(t *testing.T) {
 			ExpectedError:            nil,
 			ExpectedInvolvedResource: "",
 		},
-		"gives error if root node has no energyMetric or energyMetricFrom": {
-			Resource: &chantico.DataCenterResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: chantico.DataCenterResourceSpec{
-					Type:    "pdu",
-					Parents: []chantico.ParentRef{},
-				},
-			},
-			Resources:                []chantico.DataCenterResource{},
-			ExpectedVisited:          []chantico.DataCenterResource{},
-			ExpectedError:            ErrorMissingEnergyMetric{InvolvedResource: "foo"},
-			ExpectedInvolvedResource: "",
-		},
 		"creates resource with acyclic dependency": {
 			Resource: &chantico.DataCenterResource{
 				ObjectMeta: metav1.ObjectMeta{

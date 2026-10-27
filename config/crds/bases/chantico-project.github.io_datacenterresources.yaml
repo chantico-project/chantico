@@ -385,11 +385,9 @@ spec:
                       description: Name is the name of the parent DataCenterResource.
                       type: string
                   required:
+                  - coefficientFrom
                   - name
                   type: object
-                  x-kubernetes-validations:
-                  - message: Parent must have coefficientFrom
-                    rule: has(self.coefficientFrom)
                 type: array
               physicalMeasurements:
                 items:
@@ -406,6 +404,9 @@ spec:
             required:
             - type
             type: object
+            x-kubernetes-validations:
+            - message: Resource must have at least one parent or energyMetricFrom
+              rule: (has(self.parents)&&size(self.parents)>0)||has(self.energyMetricFrom)
           status:
             description: status defines the observed state of DataCenterResource
             properties:
