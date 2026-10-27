@@ -42,6 +42,8 @@ spec:
           args:
             - --leader-elect
             - --health-probe-bind-address=:8081
+            - --use-prometheus-operator={{ .Values.prometheus.useOperator }}
+            - --snmp-exporter-address={{ .Values.snmpExporterAddress }}
           env:
             - name: CHANTICO_DATA_PATH
               value: "/data"

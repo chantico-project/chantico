@@ -1,3 +1,4 @@
+{{- if not .Values.prometheus.useOperator }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -116,6 +117,7 @@ spec:
         configMap:
           name: chantico-prometheus-config
       restartPolicy: Always
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -127,8 +129,12 @@ metadata:
 spec:
   type: {{ .Values.prometheus.service.type }}
   selector:
+    {{- if .Values.prometheus.useOperator }}
     app.kubernetes.io/name: prometheus
     operator.prometheus.io/name: prometheus
+    {{- else }}
+    app: chantico-prometheus
+    {{- end }}
   ports:
     - protocol: TCP
       port: 9090
@@ -136,12 +142,13 @@ spec:
       {{- if eq .Values.prometheus.service.type "NodePort" }}
       nodePort: 30001
       {{- end }}
+    {{- if .Values.prometheus.useOperator }}
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: prometheus
-  namespace: chantico
+  namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -184,26 +191,33 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: prometheus
-  namespace: chantico
+  namespace: {{ .Release.Namespace }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: Prometheus
 metadata:
   name: prometheus
-  namespace: chantico
+  namespace: {{ .Release.Namespace }}
 spec:
   serviceAccountName: prometheus
+  retention: {{ .Values.prometheusRetention }}
+  scrapeInterval: 10s
+  scrapeTimeout: 5s
+  evaluationInterval: 5s
   ruleSelector:
     matchLabels:
       app.kubernetes.io/managed-by: chantico
   ruleNamespaceSelector:
     matchLabels:
-      kubernetes.io/metadata.name: chantico
+      kubernetes.io/metadata.name: {{ .Release.Namespace }}
   scrapeConfigSelector:
     matchLabels:
       app.kubernetes.io/managed-by: chantico
   scrapeConfigNamespaceSelector:
     matchLabels:
-      kubernetes.io/metadata.name: chantico
+      kubernetes.io/metadata.name: {{ .Release.Namespace }}
+  {{- if .Values.victoriaMetrics.include }}
   remoteWrite:
     - url: http://chantico-victoriametrics:8428/api/v1/write
+  {{- end }}
+{{- end }}

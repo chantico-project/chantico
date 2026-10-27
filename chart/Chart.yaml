@@ -15,3 +15,4 @@ dependencies:
 - name: kube-prometheus-stack
   version: 92.3.0
   repository: https://prometheus-community.github.io/helm-charts
+  condition: prometheus.useOperator

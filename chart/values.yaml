@@ -51,6 +51,7 @@ filebrowser:
   service:
     type: "ClusterIP"
 prometheus:
+  useOperator: true
   service:
     type: "ClusterIP"
 victoriaMetrics:
