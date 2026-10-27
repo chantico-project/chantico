@@ -38,6 +38,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const prometheusTargetsDir = "prometheus/targets"
+
 func setupPhysicalMeasurementTest(t *testing.T, objs ...runtime.Object) (string, *PhysicalMeasurementReconciler) {
 	t.Helper()
 
@@ -59,7 +61,7 @@ func setupPhysicalMeasurementTest(t *testing.T, objs ...runtime.Object) (string,
 		WithRuntimeObjects(objs...).
 		Build()
 
-	return tmpDir, &PhysicalMeasurementReconciler{Client: client, Scheme: scheme}
+	return tmpDir, &PhysicalMeasurementReconciler{Client: client, Scheme: scheme, Targets: &pm.FileTargets{}}
 }
 
 func TestReconcileTargetFile_WritesTargetFile(t *testing.T) {
@@ -77,7 +79,7 @@ func TestReconcileTargetFile_WritesTargetFile(t *testing.T) {
 		},
 	}
 
-	res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement)
+	res := reconciler.reconcileTargets(t.Context(), physicalMeasurement)
 	if res.Action == steps.ActionError {
 		t.Fatalf("reconcileTargetFile errored: %v", res.Err)
 	}
@@ -113,7 +115,7 @@ func TestReconcileTargetFile_SkipsWriteWhenUnchanged(t *testing.T) {
 		},
 	}
 
-	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
+	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
 		t.Fatalf("first reconcileTargetFile errored: %v", res.Err)
 	}
 
@@ -123,7 +125,7 @@ func TestReconcileTargetFile_SkipsWriteWhenUnchanged(t *testing.T) {
 		t.Fatalf("stat target file %s: %v", targetPath, err)
 	}
 
-	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
+	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
 		t.Fatalf("second reconcileTargetFile errored: %v", res.Err)
 	}
 
@@ -154,7 +156,7 @@ func TestReconcileTargetFile_CreatesMissingTargetsDir(t *testing.T) {
 		},
 	}
 
-	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
+	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
 		t.Fatalf("reconcileTargetFile errored: %v", res.Err)
 	}
 
@@ -173,11 +175,11 @@ func TestReconcileTargetFile_OverwritesExisting(t *testing.T) {
 		},
 	}
 
-	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
+	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
 		t.Fatalf("first reconcileTargetFile errored: %v", res.Err)
 	}
 	physicalMeasurement.Spec.Ip = "192.168.1.11"
-	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
+	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
 		t.Fatalf("second reconcileTargetFile errored: %v", res.Err)
 	}
 
@@ -277,7 +279,7 @@ func TestReconcileTargetFile_MultipleMeasurements(t *testing.T) {
 			tmpDir, reconciler := setupPhysicalMeasurementTest(t)
 
 			for _, physicalMeasurement := range tc.physicalMeasurements {
-				if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
+				if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
 					t.Fatalf("reconcileTargetFile(%s) errored: %v", physicalMeasurement.Name, res.Err)
 				}
 			}
@@ -312,7 +314,7 @@ func TestReconcileTargetFile_PrometheusExporter(t *testing.T) {
 		},
 	}
 
-	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action != steps.ActionContinue {
+	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action != steps.ActionContinue {
 		t.Fatalf("expected Continue, got %v (err: %v)", res.Action, res.Err)
 	}
 
@@ -343,7 +345,7 @@ func TestReconcileTargetFile_UnsupportedType(t *testing.T) {
 		},
 	}
 
-	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action != steps.ActionError {
+	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action != steps.ActionError {
 		t.Fatalf("expected Error, got %v", res.Action)
 	}
 	assertPhysicalMeasurementCondition(t, physicalMeasurement, chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed)

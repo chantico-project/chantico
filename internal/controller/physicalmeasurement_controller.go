@@ -17,19 +17,11 @@ limitations under the License.
 package controller
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 
 	chantico "chantico/api/v1alpha1"
-	config "chantico/internal/configuration"
 	"chantico/internal/steps"
-
-	pm "chantico/internal/physicalmeasurement"
 
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,13 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const prometheusTargetsDir = "prometheus/targets"
-
-type typeToSubdirMap map[chantico.PhysicalMeasurementType]string
-
-var targetFileSubdirs = typeToSubdirMap{
-	chantico.PhysicalMeasurementTypeSNMP:               "snmp",
-	chantico.PhysicalMeasurementTypePrometheusExporter: "prometheus-exporter",
+type TargetConfigurer interface {
+	Reconcile(context.Context, *chantico.PhysicalMeasurement) error
+	Delete(context.Context, *chantico.PhysicalMeasurement) error
 }
 
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements,verbs=get;list;watch;create;update;patch;delete
@@ -61,15 +49,8 @@ var targetFileSubdirs = typeToSubdirMap{
 // PhysicalMeasurementReconciler reconciles a PhysicalMeasurement object
 type PhysicalMeasurementReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-}
-
-func getTargetFileSubdir(physicalMeasurement *chantico.PhysicalMeasurement) (string, error) {
-	subdir, ok := targetFileSubdirs[physicalMeasurement.Spec.Type]
-	if !ok {
-		return "", fmt.Errorf("unsupported physical measurement type: %s", physicalMeasurement.Spec.Type)
-	}
-	return subdir, nil
+	Scheme  *runtime.Scheme
+	Targets TargetConfigurer
 }
 
 func (r *PhysicalMeasurementReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -115,7 +96,7 @@ func (r *PhysicalMeasurementReconciler) Reconcile(ctx context.Context, req ctrl.
 		r.reconcileDeletion,
 		r.ensureFinalizerIsSet,
 		r.reconcileValidation,
-		r.reconcileTargetFile,
+		r.reconcileTargets,
 		r.reconcileReady,
 	)
 }
@@ -129,21 +110,7 @@ func (r *PhysicalMeasurementReconciler) reconcileDeletion(ctx context.Context, p
 		return steps.Stop()
 	}
 
-	l := log.FromContext(ctx)
-
-	volumePath := config.ValidatedEnv.VolumeLocation
-	subdir, err := getTargetFileSubdir(physicalMeasurement)
-	if err != nil {
-		log.FromContext(ctx).Error(err, "Error determining target file subdirectory")
-		return steps.Error(err)
-	}
-	targetPath := filepath.Join(volumePath, prometheusTargetsDir, subdir, physicalMeasurement.Name+".json")
-
-	l.Info("Deleting target file", "path", targetPath)
-
-	err = os.Remove(targetPath)
-	if err != nil && !os.IsNotExist(err) {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting target file: "+err.Error())
+	if err := r.Targets.Delete(ctx, physicalMeasurement); err != nil {
 		return steps.Error(err)
 	}
 
@@ -185,57 +152,22 @@ func (r *PhysicalMeasurementReconciler) reconcileValidation(ctx context.Context,
 	return steps.Continue()
 }
 
-func (r *PhysicalMeasurementReconciler) reconcileTargetFile(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
-	l := log.FromContext(ctx)
-
-	target, err := pm.CreateFileSDTarget(physicalMeasurement)
-	if err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error creating target: "+err.Error())
+func (r *PhysicalMeasurementReconciler) reconcileTargets(
+	ctx context.Context,
+	measurement *chantico.PhysicalMeasurement,
+) steps.StepResult {
+	if err := r.Targets.Reconcile(ctx, measurement); err != nil {
+		measurement.UpdateStatusCondition(
+			chantico.ConditionApplied, metav1.ConditionFalse,
+			chantico.ReasonApplyFailed, err.Error(),
+		)
 		return steps.Error(err)
 	}
 
-	desired, err := pm.MarshalFileSDTargets([]pm.FileSDTarget{target})
-	if err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error marshalling target file: "+err.Error())
-		return steps.Error(err)
-	}
-
-	volumePath := config.ValidatedEnv.VolumeLocation
-	subdir, err := getTargetFileSubdir(physicalMeasurement)
-	if err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error determining target file subdirectory: "+err.Error())
-		return steps.Error(err)
-	}
-	targetsDir := filepath.Join(volumePath, prometheusTargetsDir, subdir)
-	targetPath := filepath.Join(targetsDir, physicalMeasurement.Name+".json")
-
-	observed, err := os.ReadFile(targetPath)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error reading target file: "+err.Error())
-		return steps.Error(err)
-	}
-
-	if !bytes.Equal(observed, desired) {
-		return writeTargetFile(physicalMeasurement, targetsDir, targetPath, desired, l)
-	}
-
-	physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Target file is up to date")
-	return steps.Continue()
-}
-
-func writeTargetFile(physicalMeasurement *chantico.PhysicalMeasurement, targetsDir, targetPath string, desired []byte, l logr.Logger) steps.StepResult {
-	if err := os.MkdirAll(targetsDir, 0777); err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error creating targets directory: "+err.Error())
-		return steps.Error(err)
-	}
-
-	if err := pm.WriteFileSDTargets(targetPath, desired); err != nil {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Error writing target file: "+err.Error())
-		return steps.Error(err)
-	}
-
-	l.Info("Wrote file_sd target file", "path", targetPath, "device", physicalMeasurement.Spec.MeasurementDevice)
-	physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Target file has been generated successfully")
+	measurement.UpdateStatusCondition(
+		chantico.ConditionApplied, metav1.ConditionTrue,
+		chantico.ReasonReconciled, "Target configuration is up to date",
+	)
 	return steps.Continue()
 }
 

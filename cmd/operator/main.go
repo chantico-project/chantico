@@ -40,6 +40,7 @@ import (
 	config "chantico/internal/configuration"
 	"chantico/internal/controller"
 	"chantico/internal/filestore"
+	"chantico/internal/physicalmeasurement"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -154,9 +155,11 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)
 	}
+
 	if err = (&controller.PhysicalMeasurementReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:  mgr.GetClient(),
+		Scheme:  mgr.GetScheme(),
+		Targets: &physicalmeasurement.FileTargets{},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PhysicalMeasurement")
 		os.Exit(1)
