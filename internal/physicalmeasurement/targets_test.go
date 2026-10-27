@@ -69,9 +69,6 @@ func TestKubePrometheusTargetsReconcile_CreatesScrapeConfig(t *testing.T) {
 	if got := observed.Spec.StaticConfigs[0].Targets[0]; got != monitoringv1alpha1.Target(measurement.Spec.Ip) {
 		t.Fatalf("target = %q, want %q", got, measurement.Spec.Ip)
 	}
-	if observed.Labels["prometheus"] != "system-monitoring-prometheus" {
-		t.Fatalf("unexpected selector labels: %v", observed.Labels)
-	}
 	if observed.Labels["app.kubernetes.io/managed-by"] != "chantico" {
 		t.Fatalf("unexpected managed-by label: %v", observed.Labels)
 	}

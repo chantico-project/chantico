@@ -195,7 +195,7 @@ spec:
   serviceAccountName: prometheus
   scrapeConfigSelector:
     matchLabels:
-      prometheus: system-monitoring-prometheus
+      app.kubernetes.io/managed-by: chantico
   scrapeConfigNamespaceSelector:
     matchLabels:
       kubernetes.io/metadata.name: chantico
