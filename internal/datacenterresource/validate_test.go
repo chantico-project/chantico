@@ -11,11 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	TestServiceId  = "1dd362fd-758b-49cd-90b3-7d4d958b2c65"
-	ServiceIdLabel = "serviceId"
-)
-
 func TestValidate(t *testing.T) {
 	testCases := map[string]struct {
 		Resource                 *chantico.DataCenterResource
