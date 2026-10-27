@@ -50,7 +50,8 @@ const prometheusRulesDir = "prometheus/rules"
 // DataCenterResourceReconciler reconciles a DataCenterResource object
 type DataCenterResourceReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme                  *runtime.Scheme
+	DisablePrometheusReload bool
 }
 
 func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -158,7 +159,7 @@ func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, da
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
 		return steps.Error(err)
 	}
-	if err := reloadPrometheus(ctx); err != nil {
+	if err := r.reloadPrometheus(ctx); err != nil {
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Error reloading Prometheus: "+err.Error())
 		return steps.Error(err)
 	}
@@ -238,7 +239,7 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
 			return steps.Error(err)
 		}
-		if err := reloadPrometheus(ctx); err != nil {
+		if err := r.reloadPrometheus(ctx); err != nil {
 			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
 			return steps.Error(err)
 		}
@@ -266,7 +267,7 @@ func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Contex
 	}
 
 	l.Info("Wrote recording rule file", "file", rulePath, "resource", dataCenterResource.Name)
-	err = reloadPrometheus(ctx)
+	err = r.reloadPrometheus(ctx)
 	if err != nil {
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
 		return steps.Error(err)
@@ -443,7 +444,11 @@ func (r *DataCenterResourceReconciler) clearReferencedValidation(
 		_ = patch.PatchStatus()
 	}
 }
-func reloadPrometheus(ctx context.Context) error {
+func (r *DataCenterResourceReconciler) reloadPrometheus(ctx context.Context) error {
+	if r.DisablePrometheusReload {
+		return nil
+	}
+
 	l := log.FromContext(ctx)
 	host := config.ValidatedEnv.PrometheusServiceHost
 	port := config.ValidatedEnv.PrometheusServicePort

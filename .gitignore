@@ -61,3 +61,4 @@ dist/
 chart/crds
 
 .chantico-persistent-volume
+chart/charts

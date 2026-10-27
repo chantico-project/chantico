@@ -41,6 +41,9 @@ import (
 	"chantico/internal/controller"
 	"chantico/internal/filestore"
 	"chantico/internal/physicalmeasurement"
+
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -53,6 +56,10 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(chanticov1alpha1.AddToScheme(scheme))
+
+	// Kube Prometheus Operator Schemas
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
+	utilruntime.Must(monitoringv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -62,6 +69,8 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var disablePrometheusReload bool
+	var snmpExporterAddress string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -73,6 +82,10 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.BoolVar(&disablePrometheusReload, "disable-prometheus-reload", false,
+		"Skip manual Prometheus reload requests when using Prometheus Operator.")
+	flag.StringVar(&snmpExporterAddress, "snmp-exporter-address", "chantico-snmp:9116",
+		"SNMP exporter host:port reachable from Prometheus for SNMP scrape configurations.")
 
 	opts := zap.Options{
 		Development: true,
@@ -157,16 +170,21 @@ func main() {
 	}
 
 	if err = (&controller.PhysicalMeasurementReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Targets: &physicalmeasurement.FileTargets{},
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		// Targets: &physicalmeasurement.FileTargets{},
+		Targets: &physicalmeasurement.KubePrometheusTargets{
+			Client:              mgr.GetClient(),
+			SNMPExporterAddress: snmpExporterAddress,
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PhysicalMeasurement")
 		os.Exit(1)
 	}
 	if err := (&controller.DataCenterResourceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:                  mgr.GetClient(),
+		Scheme:                  mgr.GetScheme(),
+		DisablePrometheusReload: disablePrometheusReload,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DataCenterResource")
 		os.Exit(1)

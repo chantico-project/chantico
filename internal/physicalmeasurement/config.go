@@ -19,34 +19,39 @@ type FileSDTarget struct {
 	Labels  map[string]string `json:"labels"`
 }
 
+func CreateTargetLabels(physicalMeasurement *chantico.PhysicalMeasurement) map[string]string {
+	switch physicalMeasurement.Spec.Type {
+	case chantico.PhysicalMeasurementTypePrometheusExporter:
+		return map[string]string{
+			"name":     physicalMeasurement.Name,
+			"instance": physicalMeasurement.Spec.Ip,
+			"type":     "prometheus-exporter",
+		}
+	case chantico.PhysicalMeasurementTypeSNMP:
+		return map[string]string{
+			"__param_module": physicalMeasurement.Spec.MeasurementDevice,
+			"__param_auth":   physicalMeasurement.Spec.MeasurementDevice,
+			"job":            physicalMeasurement.Spec.MeasurementDevice,
+			"name":           physicalMeasurement.Name,
+			"instance":       physicalMeasurement.Spec.Ip,
+			"type":           "snmp",
+		}
+	default:
+		return map[string]string{}
+	}
+}
+
 // CreateFileSDTarget creates a file_sd_configs target entry for a PhysicalMeasurement.
 // The labels __param_module and __param_auth are used by the SNMP exporter relabel
 // configs in prometheus.yml to route scrapes through the correct SNMP module.
 func CreateFileSDTarget(physicalMeasurement *chantico.PhysicalMeasurement) (FileSDTarget, error) {
-	switch physicalMeasurement.Spec.Type {
-	case chantico.PhysicalMeasurementTypePrometheusExporter:
-		return FileSDTarget{
-			Targets: []string{physicalMeasurement.Spec.Ip},
-			Labels: map[string]string{
-				"name":     physicalMeasurement.Name,
-				"instance": physicalMeasurement.Spec.Ip,
-				"type":     "prometheus-exporter",
-			},
-		}, nil
-	case chantico.PhysicalMeasurementTypeSNMP:
-		return FileSDTarget{
-			Targets: []string{physicalMeasurement.Spec.Ip},
-			Labels: map[string]string{
-				"__param_module": physicalMeasurement.Spec.MeasurementDevice,
-				"__param_auth":   physicalMeasurement.Spec.MeasurementDevice,
-				"job":            physicalMeasurement.Spec.MeasurementDevice,
-				"name":           physicalMeasurement.Name,
-				"instance":       physicalMeasurement.Spec.Ip,
-				"type":           "snmp",
-			},
-		}, nil
+	if physicalMeasurement.Spec.Type != chantico.PhysicalMeasurementTypePrometheusExporter && physicalMeasurement.Spec.Type != chantico.PhysicalMeasurementTypeSNMP {
+		return FileSDTarget{}, fmt.Errorf("unsupported physical measurement type: %q", physicalMeasurement.Spec.Type)
 	}
-	return FileSDTarget{}, fmt.Errorf("unsupported physical measurement type: %q", physicalMeasurement.Spec.Type)
+	return FileSDTarget{
+		Targets: []string{physicalMeasurement.Spec.Ip},
+		Labels:  CreateTargetLabels(physicalMeasurement),
+	}, nil
 }
 
 // MarshalFileSDTargets renders the targets as the JSON content of a file_sd_configs file.

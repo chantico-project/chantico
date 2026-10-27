@@ -135,6 +135,28 @@ func serverHostPort(t *testing.T, server *httptest.Server) (string, string) {
 	return host, port
 }
 
+func TestReloadPrometheus(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		disabled bool
+		want     int32
+	}{
+		{name: "enabled by default", want: 1},
+		{name: "disabled for operator", disabled: true, want: 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, reconciler, reloads := setupDataCenterResourceRuleTest(t)
+			reconciler.DisablePrometheusReload = test.disabled
+			if err := reconciler.reloadPrometheus(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if got := reloads.Load(); got != test.want {
+				t.Fatalf("reload requests = %d, want %d", got, test.want)
+			}
+		})
+	}
+}
+
 func TestReconcileWriteRuleFile_NonRootNode(t *testing.T) {
 	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
 

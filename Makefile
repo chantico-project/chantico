@@ -124,6 +124,7 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 # 	idempotent function to create namespace
 	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 # 	idempotent helm installation
+	helm dependency build ./chart/
 	helm upgrade --install chantico ./chart/ \
 		--namespace $(CHANTICO_NAMESPACE) \
 		--set controller.include=false \
@@ -161,7 +162,7 @@ cluster-mocks: cluster-load-mock-images ## Apply the mock deployments and servic
 cluster-mock-resources: ## Apply the sample configurations for the mocks
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_measurementdevice_mock.yaml
 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
-	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_datacenterresource.yaml
+# 	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f config/samples/chantico_v1alpha1_datacenterresource.yaml
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
@@ -175,7 +176,7 @@ build: manifests generate ## Build manager binary.
 
 .PHONY: run
 run: manifests generate ## Run a controller from your host.
-	go run ./cmd/operator/main.go
+	go run ./cmd/operator/main.go --disable-prometheus-reload
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -210,6 +211,7 @@ GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
 
 .PHONY: helm-package
 helm-package: sync-deployment-crds ## Package Helm chart.
+	helm dependency build $(HELM_CHART_DIR)
 	helm package $(HELM_CHART_DIR)
 
 .PHONY: helm-push

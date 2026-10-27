@@ -1,6 +1,43 @@
 persistentVolumeClaimName: chantico-persistent-volume-claim
 prometheusRetention: 5h
 snmpExporterAddress: chantico-snmp:9116
+kube-prometheus-stack:
+  crds:
+    upgradeJob:
+      enabled: true
+  defaultRules:
+    create: false
+  alertmanager:
+    enabled: false
+  grafana:
+    enabled: false
+  kubeApiServer:
+    enabled: false
+  kubelet:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  coreDns:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeProxy:
+    enabled: false
+  kubeStateMetrics:
+    enabled: false
+  nodeExporter:
+    enabled: false
+  prometheus:
+    enabled: false
+  prometheusOperator:
+    tls:
+      enabled: false
+    admissionWebhooks:
+      enabled: false
+    serviceMonitor:
+      selfMonitor: false
 imagePullSecretName: "" # Set if pulled from private registry, otherwise leave empty
 controller:
   include: true
