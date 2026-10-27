@@ -39,6 +39,7 @@ import (
 	chanticov1alpha1 "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
 	"chantico/internal/controller"
+	"chantico/internal/datacenterresource"
 	"chantico/internal/filestore"
 	"chantico/internal/physicalmeasurement"
 
@@ -69,7 +70,6 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
-	var disablePrometheusReload bool
 	var snmpExporterAddress string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
@@ -82,8 +82,6 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.BoolVar(&disablePrometheusReload, "disable-prometheus-reload", false,
-		"Skip manual Prometheus reload requests when using Prometheus Operator.")
 	flag.StringVar(&snmpExporterAddress, "snmp-exporter-address", "chantico-snmp:9116",
 		"SNMP exporter host:port reachable from Prometheus for SNMP scrape configurations.")
 
@@ -182,9 +180,11 @@ func main() {
 		os.Exit(1)
 	}
 	if err := (&controller.DataCenterResourceReconciler{
-		Client:                  mgr.GetClient(),
-		Scheme:                  mgr.GetScheme(),
-		DisablePrometheusReload: disablePrometheusReload,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		RuleWriter: &datacenterresource.FileWriter{
+			Client: mgr.GetClient(),
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DataCenterResource")
 		os.Exit(1)
