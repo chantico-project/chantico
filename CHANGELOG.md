@@ -1,3 +1,9 @@
+## 0.20.0 (2026-10-27)
+
+#### Feature
+
+* Refactor template params use secret config map selector (#258) (4a2d04dc)
+
 ## 0.19.0 (2026-10-26)
 
 #### Feature
