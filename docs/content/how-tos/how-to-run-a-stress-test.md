@@ -33,13 +33,13 @@ All resources are created sequentially with a configurable delay between request
 To run the stress test, execute the following command:
 
 ```bash
-go run ./cmd/stresstest/main.go
+go run ./dev/stresstest/
 ```
 
 The different option flags can be viewed by running:
 
 ```bash
-go run ./cmd/stresstest/main.go -h
+go run ./dev/stresstest/ -h
 ```
 
 ## Observing the stress test
