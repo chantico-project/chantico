@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"log"
-	"os"
 	"time"
 
 	chapi "chantico/api/v1alpha1"
@@ -53,20 +52,17 @@ func createKubernetesClient() client.Client {
 	scheme := runtime.NewScheme()
 	if err := chapi.AddToScheme(scheme); err != nil {
 		log.Fatalf("failed to add API to scheme: %v\n", err)
-		os.Exit(1)
 	}
 
 	// Get kubeconfig (in-cluster or KUBECONFIG)
 	cfg, err := config.GetConfig()
 	if err != nil {
 		log.Fatalf("unable to get kubeconfig: %v\n", err)
-		os.Exit(1)
 	}
 
 	client, err := client.New(cfg, client.Options{Scheme: scheme})
 	if err != nil {
 		log.Fatalf("failed to create kubernetes client: %v\n", err)
-		os.Exit(1)
 	}
 	return client
 }

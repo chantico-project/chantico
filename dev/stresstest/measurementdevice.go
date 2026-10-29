@@ -82,7 +82,6 @@ func generateMeasurementDevices(path string, n int) []chapi.MeasurementDevice {
 	allWalks, err := parseMIB(path)
 	if err != nil || len(allWalks) == 0 {
 		log.Fatalf("failed to parse MIB %s: %v\n", path, err)
-		os.Exit(1)
 	}
 
 	for i := range n {
