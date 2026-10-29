@@ -28,6 +28,101 @@ DataCenterResources are generated in a two-layer hierarchy:
 
 All resources are created sequentially with a configurable delay between requests, controlled by the `--delay` flag (default: 100ms).
 
+The diagram below illustrates the hierarchical structure of the generated custom resources:
+
+```kroki {_type=d2 _output=embed}
+title: |md
+  # Stress Test Generation Architecture: from Measurement Devices to Physical Measurement
+| {near: top-center}
+
+vars: {
+  d2-config: {
+    layout-engine: elk
+  }
+}
+
+direction: right
+
+MD: {
+	label: "Measurement devices"
+
+	style: {
+		fill: "#E8F5E9"
+	}
+
+	MD1: "MD 1"
+	MDN: "MD N"
+}
+
+PM: {
+	label: "Physical Measurements"
+
+	style: {
+		fill: "#C8E6C9"
+	}
+
+	PM1_1: "PM 1-1"
+	PM1_M: "PM 1-M"
+
+	PMN_1: "PM N-1"
+	PMN_M: "PM N-M"
+}
+
+Root: {
+	label: "PDU Datacenter resources"
+
+	style: {
+		fill: "#A5D6A7"
+	}
+
+	DCR1_1_1: "DCR 1-1-1"
+	DCR1_M_1: "DCR 1-M-1"
+	DCRN_1_1: "DCR N-1-1"
+	DCRN_M_1: "DCR N-M-1"
+}
+
+Layer: {
+	label: "Baremetal Datacenter resources"
+
+	style: {
+		fill: "#81C784"
+	}
+
+	DCR1_1_2: "DCR 1-1-2"
+	DCR1_M_2: "DCR 1-M-2"
+	DCRN_1_2: "DCR N-1-2"
+	DCRN_M_2: "DCR N-M-2"
+	DCR1_1_K: "DCR 1-1-K"
+	DCR1_M_K: "DCR 1-M-K"
+	DCRN_1_K: "DCR N-1-K"
+	DCRN_M_K: "DCR N-M-K"
+}
+
+
+MD.MD1 -> PM.PM1_1
+MD.MD1 -> PM.PM1_M
+MD.MDN -> PM.PMN_1
+MD.MDN -> PM.PMN_M
+
+PM.PM1_1 -> Root.DCR1_1_1
+PM.PM1_M -> Root.DCR1_M_1
+PM.PMN_1 -> Root.DCRN_1_1
+PM.PMN_M -> Root.DCRN_M_1
+
+Root.DCR1_1_1 -> Layer.DCR1_1_2
+Root.DCR1_1_1 -> Layer.DCR1_M_2
+Root.DCR1_1_1 -> Layer.DCRN_1_2
+Root.DCR1_M_1 -> Layer.DCRN_M_2
+Root.DCR1_M_1 -> Layer.DCR1_1_K
+Root.DCR1_M_1 -> Layer.DCR1_M_K
+Root.DCRN_1_1 -> Layer.DCRN_1_K
+Root.DCRN_1_1 -> Layer.DCRN_M_K
+Root.DCRN_1_1 -> Layer.DCR1_1_2
+Root.DCRN_M_1 -> Layer.DCR1_M_2
+Root.DCRN_M_1 -> Layer.DCRN_1_2
+Root.DCRN_M_1 -> Layer.DCRN_M_2
+```
+
 ### Running the stress test
 
 To run the stress test, execute the following command:
@@ -45,6 +140,59 @@ go run ./dev/stresstest/ -h
 ## Observing the stress test
 
 The stress test includes an observability stack that monitors resource creation and reconciliation:
+
+```kroki {_type=d2 _output=embed}
+title: |md
+  # Stress Test Observability Stack Architecture
+| {near: top-center}
+
+
+direction: right
+
+StressTest: {
+  label: "Stress Test CLI"
+  style: {
+    fill: "#BBDEFB"
+  }
+}
+
+DockerCompose: {
+	label: "Observability stack: Docker Compose"
+	MetricsServer: {
+	  label: "Stress test application (localhost:2112)"
+	  style: {
+	    fill: "#C8E6C9"
+	  }
+	}
+
+	Prometheus: {
+	  label: "Prometheus (localhost:9090)"
+	  style: {
+	    fill: "#FFE0B2"
+	  }
+	}
+
+	Grafana: {
+	  label: "Grafana (localhost:3000)"
+	  style: {
+	    fill: "#F8BBD0"
+	  }
+	}
+}
+
+Kubernetes: {
+  label: "Kubernetes Cluster"
+  style: {
+    fill: "#E1BEE7"
+  }
+}
+
+DockerCompose.MetricsServer -> Kubernetes: "Polls clusters CRDs status"
+DockerCompose.Prometheus -> DockerCompose.Grafana: "Queries metrics"
+StressTest -> Kubernetes: "Creates CRD"
+DockerCompose.MetricsServer -> DockerCompose.Prometheus: "Scrape metrics"
+
+```
 
 ### Start the observability stack
 
