@@ -18,64 +18,64 @@ env:
   GO_VERSION: "1.26"
 
 jobs:
-  # # Linters
-  # lint:
-  #   runs-on: ubuntu-latest
-  #   continue-on-error: true
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #
-  #     - uses: actions/setup-go@v6
-  #       with:
-  #         go-version: ${{ env.GO_VERSION }}
-  #
-  #     - name: fmt
-  #       run: |
-  #         files=$(gofmt -l .)
-  #         if [ -n "$files" ]; then
-  #           echo "The following files are not formatted according to https://go.dev/blog/gofmt:"
-  #           echo "$files"
-  #           exit 1
-  #         fi
-  #
-  #     - name: go vet
-  #       run: go vet ./...
-  #
-  #     - name: golangci-lint
-  #       uses: golangci/golangci-lint-action@v9
-  #       continue-on-error: true
-  #       with:
-  #         version: v2.12
-  #
-  # # Tests
-  # test:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #
-  #     - uses: actions/setup-go@v6
-  #       with:
-  #         go-version: ${{ env.GO_VERSION }}
-  #
-  #     - name: Install tools
-  #       run: |
-  #         go install gotest.tools/gotestsum@latest
-  #         go install github.com/t-yuki/gocover-cobertura@latest
-  #
-  #     - name: Run tests
-  #       run: |
-  #         gotestsum --jsonfile report.json --format testname -- -v -coverprofile=coverage.out ./internal/...
-  #         go tool cover -func coverage.out
-  #         gocover-cobertura < coverage.out > coverage.xml
-  #
-  #     - name: Upload reports
-  #       uses: actions/upload-artifact@v7
-  #       with:
-  #         name: test-reports
-  #         path: |
-  #           report.json
-  #           coverage.xml
-  #
+  # Linters
+  lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: fmt
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then
+            echo "The following files are not formatted according to https://go.dev/blog/gofmt:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        continue-on-error: true
+        with:
+          version: v2.12
+
+  # Tests
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install tools
+        run: |
+          go install gotest.tools/gotestsum@latest
+          go install github.com/t-yuki/gocover-cobertura@latest
+
+      - name: Run tests
+        run: |
+          gotestsum --jsonfile report.json --format testname -- -v -coverprofile=coverage.out ./internal/...
+          go tool cover -func coverage.out
+          gocover-cobertura < coverage.out > coverage.xml
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            report.json
+            coverage.xml
+
   invoke-docker:
     if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
     needs: test
