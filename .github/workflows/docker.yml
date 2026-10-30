@@ -25,6 +25,7 @@ permissions:
 jobs:
   # Docker build and push
   docker:
+    name: docker (${{ matrix.scope }})
     if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     strategy:
