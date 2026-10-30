@@ -170,18 +170,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	var targets controller.TargetConfigurer = &physicalmeasurement.FileTargets{}
-	var rules controller.RecordingRuleConfigurer = &datacenterresource.FileRecordingRules{
-		Client: mgr.GetClient(),
+	targets := &physicalmeasurement.KubePrometheusTargets{
+		Client:              mgr.GetClient(),
+		SNMPExporterAddress: snmpExporterAddress,
 	}
-	if usePrometheusOperator {
-		targets = &physicalmeasurement.KubePrometheusTargets{
-			Client:              mgr.GetClient(),
-			SNMPExporterAddress: snmpExporterAddress,
-		}
-		rules = &datacenterresource.KubePrometheusRecordingRules{
-			Client: mgr.GetClient(),
-		}
+	rules := &datacenterresource.KubePrometheusRecordingRules{
+		Client: mgr.GetClient(),
 	}
 
 	if err = (&controller.PhysicalMeasurementReconciler{

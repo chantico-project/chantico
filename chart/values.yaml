@@ -10,7 +10,35 @@ kube-prometheus-stack:
   alertmanager:
     enabled: false
   grafana:
-    enabled: false
+    enabled: true
+    fullnameOverride: chantico-stack-grafana
+    adminPassword: admin
+    defaultDashboardsEnabled: false
+    grafana.ini:
+      auth.anonymous:
+        enabled: true
+        org_role: Viewer
+      security:
+        allow_embedding: true
+      users:
+        default_theme: light
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        labelValue: chantico
+        searchNamespace: "" # Search only the release namespace.
+        provider:
+          name: chantico
+          folder: Chantico
+          disableDelete: true
+          allowUiUpdates: false
+      datasources:
+        enabled: true
+        defaultDatasourceEnabled: false
+        label: grafana_datasource
+        labelValue: chantico
+        searchNamespace: ""
   kubeApiServer:
     enabled: false
   kubelet:
@@ -63,9 +91,7 @@ victoriaMetrics:
   service:
     type: "ClusterIP"
 grafana:
-  include: true
-  adminPassword: admin
-  anonymous: true
+  # Compatibility endpoint; the Grafana workload is configured in kube-prometheus-stack.
   service:
     type: "ClusterIP"
 visualisationWebapp:

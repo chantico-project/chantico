@@ -56,6 +56,11 @@ You should now have access to:
 - [VictoriaMetrics](http://localhost:18428)
 - [Grafana](http://localhost:13000) - username and password are both `admin`
 
+Grafana is provided by the `kube-prometheus-stack` dependency. Chantico's
+dashboards and Prometheus/VictoriaMetrics datasources are provisioned through
+its Grafana sidecars. The `chantico-grafana` Service is available on port
+3000 (NodePort 30004 in the local environment).
+
 
 #### Running a demo
 
