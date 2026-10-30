@@ -31,10 +31,8 @@ spec:
         name: pdu-energymetric-template
         key: template
     templateParameters:
-    - name: jobName
-      value: tno
-    - name: resourceName
-      value: physicalmeasurement-pdu1-out
+      - name: resourceName
+        value: physicalmeasurement-pdu1-out
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -53,10 +51,8 @@ spec:
         name: pdu-energymetric-template
         key: template
     templateParameters:
-    - name: jobName
-      value: tno-2
-    - name: resourceName
-      value: physicalmeasurement-pdu2-out
+      - name: resourceName
+        value: physicalmeasurement-pdu2-out
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -82,7 +78,6 @@ metadata:
   name: datacenterresource-misd-gbm-01-vm-120
 spec:
   type: vm
-  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55ba
   parents:
     - name: datacenterresource-misd-gbm-01
       coefficientFrom:
@@ -91,8 +86,10 @@ spec:
             name: vm-attribution-coefficient-template
             key: template
         templateParameters:
-        - name: vmid
-          value: "120"
+          - name: vmid
+            value: "120"
+  additionalLabels:
+    serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55ba
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -103,7 +100,6 @@ metadata:
   name: datacenterresource-misd-gbm-01-vm-121
 spec:
   type: vm
-  serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
   parents:
     - name: datacenterresource-misd-gbm-01
       coefficientFrom:
@@ -112,5 +108,7 @@ spec:
             name: vm-attribution-coefficient-template
             key: template
         templateParameters:
-        - name: vmid
-          value: "121"
+          - name: vmid
+            value: "121"
+  additionalLabels:
+    serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be

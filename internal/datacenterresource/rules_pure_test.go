@@ -32,6 +32,8 @@ const (
 	testBM1                = "bm1"
 	testVM1                = "vm1"
 	testSNMPPDU1PowerWatts = "snmp_pdu1_power_watts"
+	testServiceIdLabel     = "serviceId"
+	testServiceId          = "3d88f471-674f-4446-9de2-54e5faa2c951"
 )
 
 type ExpectedRule struct {
@@ -48,7 +50,7 @@ func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
 		t.Errorf("Expected rule expr = %q, got %q", expected.Expr, rule.Expr)
 	}
 	if expected.ServiceIdLabel != "" {
-		if val, ok := rule.Labels["serviceId"]; !ok || val != expected.ServiceIdLabel {
+		if val, ok := rule.Labels[testServiceIdLabel]; !ok || val != expected.ServiceIdLabel {
 			t.Errorf("Expected serviceId label = %q, got %q", expected.ServiceIdLabel, val)
 		}
 	}
@@ -57,7 +59,6 @@ func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
 type ruleFixture struct {
 	Name             string
 	Type             string
-	ServiceId        string
 	AdditionalLabels map[string]string
 	EnergyMetric     string
 	Parents          []ResolvedParent
@@ -68,7 +69,6 @@ func (f *ruleFixture) buildRuleBuilder() *RuleBuilder {
 		ObjectMeta: metav1.ObjectMeta{Name: f.Name},
 		Spec: chantico.DataCenterResourceSpec{
 			Type:             f.Type,
-			ServiceId:        f.ServiceId,
 			AdditionalLabels: f.AdditionalLabels,
 		},
 	}
@@ -118,13 +118,15 @@ func TestBuildSharedLabels(t *testing.T) {
 		"with serviceId": {
 			resource: &ruleFixture{
 				Name: testBM1, Type: DataCenterResourceTypeBaremetal,
-				ServiceId: "3d88f471-674f-4446-9de2-54e5faa2c951",
+				AdditionalLabels: map[string]string{
+					testServiceIdLabel: "3d88f471-674f-4446-9de2-54e5faa2c951",
+				},
 			},
 			extraLabels: nil,
 			expected: map[string]string{
-				"resource":  testBM1,
-				"serviceId": "3d88f471-674f-4446-9de2-54e5faa2c951",
-				"type":      DataCenterResourceTypeBaremetal,
+				"resource":         testBM1,
+				"type":             DataCenterResourceTypeBaremetal,
+				testServiceIdLabel: testServiceId,
 			},
 		},
 		"with additional labels": {
@@ -267,7 +269,9 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 	pdu := &ruleFixture{
 		Name: testPDU1, Type: DataCenterResourceTypePDU,
 		EnergyMetric: testSNMPPDU1PowerWatts,
-		ServiceId:    "3d88f471-674f-4446-9de2-54e5faa2c951",
+		AdditionalLabels: map[string]string{
+			testServiceIdLabel: "3d88f471-674f-4446-9de2-54e5faa2c951",
+		},
 	}
 
 	rules := pdu.buildRuleBuilder().BuildRecordingRules()
@@ -277,7 +281,7 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record:         "chantico_power_watts",
 		Expr:           testSNMPPDU1PowerWatts,
-		ServiceIdLabel: "3d88f471-674f-4446-9de2-54e5faa2c951",
+		ServiceIdLabel: testServiceId,
 	})
 }
 
@@ -346,8 +350,10 @@ func TestBuildRecordingRules_LeafNode(t *testing.T) {
 	// VM (leaf) with one parent and no children
 	vm := &ruleFixture{
 		Name: testVM1, Type: DataCenterResourceTypeVM,
-		ServiceId: "a479357a-2680-4577-8ffe-5105e634c836",
-		Parents:   []ResolvedParent{{Name: testBM1}},
+		Parents: []ResolvedParent{{Name: testBM1}},
+		AdditionalLabels: map[string]string{
+			testServiceIdLabel: "a479357a-2680-4577-8ffe-5105e634c836",
+		},
 	}
 
 	rules := vm.buildRuleBuilder().BuildRecordingRules()
@@ -455,9 +461,11 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	// VM2 with parent BM1 (coefficient "0.6")
 	vm2 := &ruleFixture{
 		Name: "vm2", Type: DataCenterResourceTypeVM,
-		ServiceId: "002793bc-e100-4953-ac07-a25d12b573d4",
 		Parents: []ResolvedParent{
 			{Name: testBM1, Coefficient: "0.6"},
+		},
+		AdditionalLabels: map[string]string{
+			testServiceIdLabel: "002793bc-e100-4953-ac07-a25d12b573d4",
 		},
 	}
 	vm2Rules := vm2.buildRuleBuilder().BuildRecordingRules()

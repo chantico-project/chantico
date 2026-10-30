@@ -11,10 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	TestServiceId = "1dd362fd-758b-49cd-90b3-7d4d958b2c65"
-)
-
 func TestValidate(t *testing.T) {
 	testCases := map[string]struct {
 		Resource                 *chantico.DataCenterResource
@@ -214,68 +210,6 @@ func TestValidate(t *testing.T) {
 			ExpectedVisited:          []chantico.DataCenterResource{},
 			ExpectedError:            ErrorCycleDetected{InvolvedResource: "bar"},
 			ExpectedInvolvedResource: "bar",
-		},
-		"gives error if service id is found on non-leaf node": {
-			Resource: &chantico.DataCenterResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: chantico.DataCenterResourceSpec{
-					Type:      "pdu",
-					ServiceId: TestServiceId,
-				},
-			},
-			Resources: []chantico.DataCenterResource{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: chantico.DataCenterResourceSpec{
-					Type:      "pdu",
-					ServiceId: TestServiceId,
-				},
-			}, {
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar",
-				},
-				Spec: chantico.DataCenterResourceSpec{
-					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "foo"}},
-				},
-			}},
-			ExpectedVisited:          []chantico.DataCenterResource{},
-			ExpectedError:            ErrorServiceDefinedOnParent{InvolvedResource: "foo"},
-			ExpectedInvolvedResource: "foo",
-		},
-		"gives error if service id is found on parent node": {
-			Resource: &chantico.DataCenterResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar",
-				},
-				Spec: chantico.DataCenterResourceSpec{
-					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "foo"}},
-				},
-			},
-			Resources: []chantico.DataCenterResource{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: chantico.DataCenterResourceSpec{
-					Type:      "pdu",
-					ServiceId: TestServiceId,
-				},
-			}, {
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar",
-				},
-				Spec: chantico.DataCenterResourceSpec{
-					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "foo"}},
-				},
-			}},
-			ExpectedVisited:          []chantico.DataCenterResource{},
-			ExpectedError:            ErrorServiceDefinedOnParent{InvolvedResource: "foo"},
-			ExpectedInvolvedResource: "foo",
 		},
 		"gives error if a self-reference is found": {
 			Resource: &chantico.DataCenterResource{

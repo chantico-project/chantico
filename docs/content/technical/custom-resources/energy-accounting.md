@@ -107,10 +107,9 @@ The default time series labels applied to every resource are:
 |---|---|
 | `resource` | The name of the resource (from `metadata.name`) |
 | `type` | The type of the resource (from `spec.type`) |
-| `serviceId` | The service ID of the resource (from `spec.serviceId`) |
 | `parents` | Comma-separated list of parent resource names (from `spec.parents`) |
 
-The `additionalLabels` field allows you to attach arbitary identification infromation to the resource's Prometheus timeseries. These labels are merged with the default labels when generating the recording rules. For example:
+The `additionalLabels` field allows you to attach arbitrary identification information to the resource's Prometheus timeseries. These labels are merged with the default labels when generating the recording rules. For example:
 
 ```yaml
 additionalLabels:
