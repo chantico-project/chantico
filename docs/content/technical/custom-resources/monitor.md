@@ -21,8 +21,13 @@ from a specific device, with a selected authentication setting and module.
 | Field | Type | Description |
 |---|---|---|
 | `metadata.name` | `string` | The name of the resource. This is used to reference the resource in instances of other custom resource definitions. |
+| `spec.type` | `string` | The measurement type: `snmp` (default) or `prometheus-exporter`. |
 | `spec.ip` | ` string` | The hostname or IP address of the physical device that is to be monitored. |
 | `spec.measurementDevice` | `string` | Reference to the name of the `MeasurementDevice` resource that describes the type of device and how it is to be monitored (authentication and walks). |
+
+The controller checks the measurement type during validation, before configuring
+scrape targets. Unsupported types set the `Validated` condition to `False` with
+reason `InvalidSpec` and stop reconciliation with an error.
 
 Note that the `ip` field may be anything that is resolvable by the SNMP exporter 
 instance, including hostnames, fully qualified domain names and IP addresses. 

@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	chantico "chantico/api/v1alpha1"
 	"chantico/internal/steps"
@@ -128,9 +129,34 @@ func (r *PhysicalMeasurementReconciler) ensureFinalizerIsSet(ctx context.Context
 }
 
 func (r *PhysicalMeasurementReconciler) reconcileValidation(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
+	validators := []steps.Func[*chantico.PhysicalMeasurement]{
+		r.validateType,
+		r.validateMeasurementDevice,
+	}
+	for _, validate := range validators {
+		if result := validate(ctx, physicalMeasurement); result.Action != steps.ActionContinue {
+			return result
+		}
+	}
+
+	physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
+	return steps.Continue()
+}
+
+func (r *PhysicalMeasurementReconciler) validateType(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
+	switch physicalMeasurement.Spec.Type {
+	case chantico.PhysicalMeasurementTypeSNMP, chantico.PhysicalMeasurementTypePrometheusExporter:
+		return steps.Continue()
+	default:
+		err := fmt.Errorf("unsupported physical measurement type: %q", physicalMeasurement.Spec.Type)
+		physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ReasonInvalidSpec, err.Error())
+		return steps.Error(err)
+	}
+}
+
+func (r *PhysicalMeasurementReconciler) validateMeasurementDevice(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
 	deviceName := physicalMeasurement.Spec.MeasurementDevice
 	if deviceName == "" {
-		physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
 		return steps.Continue()
 	}
 	key := types.NamespacedName{Namespace: physicalMeasurement.Namespace, Name: deviceName}
@@ -145,7 +171,6 @@ func (r *PhysicalMeasurementReconciler) reconcileValidation(ctx context.Context,
 		return steps.Error(err)
 	}
 
-	physicalMeasurement.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
 	return steps.Continue()
 }
 
