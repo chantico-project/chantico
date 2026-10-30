@@ -27,6 +27,7 @@ func (targets *KubePrometheusTargets) Reconcile(
 	measurement *chantico.PhysicalMeasurement,
 ) error {
 	var metricsPath string
+	// TODO: Add this to the PhysicalMeasurementSpec as a configurable field
 	if measurement.Spec.Type == chantico.PhysicalMeasurementTypePrometheusExporter {
 		metricsPath = "/metrics"
 	} else {

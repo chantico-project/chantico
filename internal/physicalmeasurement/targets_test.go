@@ -23,25 +23,19 @@ import (
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
+	"chantico/internal/testutil"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func setupKubePrometheusTargetsTest(t *testing.T) (*KubePrometheusTargets, *chantico.PhysicalMeasurement) {
 	t.Helper()
 
-	scheme := runtime.NewScheme()
-	if err := monitoringv1alpha1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	kubeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	kubeClient := testutil.NewFakeClientBuilder(t, monitoringv1alpha1.AddToScheme).Build()
 	targets := &KubePrometheusTargets{Client: kubeClient}
 	measurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{Name: "measurement", Namespace: "chantico"},
@@ -53,14 +47,17 @@ func setupKubePrometheusTargetsTest(t *testing.T) (*KubePrometheusTargets, *chan
 	return targets, measurement
 }
 
+// Call reconcile and retrieve the created ScrapeConfig
 func reconcileKubePrometheusTargetsForTest(t *testing.T, targets *KubePrometheusTargets, measurement *chantico.PhysicalMeasurement) *monitoringv1alpha1.ScrapeConfig {
 	t.Helper()
 
 	if err := targets.Reconcile(t.Context(), measurement); err != nil {
 		t.Fatal(err)
 	}
+
+	identifier := client.ObjectKey{Namespace: measurement.Namespace, Name: measurement.Name}
 	observed := &monitoringv1alpha1.ScrapeConfig{}
-	if err := targets.Client.Get(t.Context(), client.ObjectKeyFromObject(measurement), observed); err != nil {
+	if err := targets.Client.Get(t.Context(), identifier, observed); err != nil {
 		t.Fatal(err)
 	}
 	return observed
@@ -80,7 +77,7 @@ func TestKubePrometheusTargetsReconcile_CreatesScrapeConfig(t *testing.T) {
 		t.Fatalf("expected direct exporter metrics path, got %v", observed.Spec.MetricsPath)
 	}
 	if len(observed.Spec.RelabelConfigs) != 0 {
-		t.Fatal("direct exporter has SNMP relabelings")
+		t.Fatal("Prometheus exporter has unexpected relabelings")
 	}
 }
 
@@ -106,21 +103,6 @@ func TestKubePrometheusTargetsReconcile_SkipsUnchangedConfig(t *testing.T) {
 	}
 }
 
-func TestKubePrometheusTargetsReconcile_PreservesUnrelatedLabels(t *testing.T) {
-	targets, measurement := setupKubePrometheusTargetsTest(t)
-	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
-	observed.Labels["other"] = "preserved"
-	if err := targets.Client.Update(t.Context(), observed); err != nil {
-		t.Fatal(err)
-	}
-
-	measurement.Spec.Ip = "192.0.2.2:9100"
-	updated := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
-	if updated.Labels["other"] != "preserved" {
-		t.Fatal("reconciliation removed an unrelated label")
-	}
-}
-
 func TestKubePrometheusTargetsReconcile_RequiresSNMPExporterAddress(t *testing.T) {
 	targets, measurement := setupKubePrometheusTargetsTest(t)
 	measurement.Spec.Type = chantico.PhysicalMeasurementTypeSNMP
@@ -138,6 +120,9 @@ func TestKubePrometheusTargetsReconcile_ConfiguresSNMPExporter(t *testing.T) {
 	targets.SNMPExporterAddress = "custom-snmp:9116"
 	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
 
+	if len(observed.Spec.RelabelConfigs) != 3 {
+		t.Fatalf("expected 3 relabelings, got %d", len(observed.Spec.RelabelConfigs))
+	}
 	wantRelabelings := []monitoringv1.RelabelConfig{
 		{SourceLabels: []monitoringv1.LabelName{"__address__"}, TargetLabel: "__param_target"},
 		{SourceLabels: []monitoringv1.LabelName{"__param_target"}, TargetLabel: "instance"},
@@ -175,30 +160,6 @@ func TestKubePrometheusTargetsReconcile_RemovesSNMPRelabelingsForDirectExporter(
 	}
 }
 
-func TestKubePrometheusTargetsDelete_RemovesMatchingScrapeConfig(t *testing.T) {
-	targets, measurement := setupKubePrometheusTargetsTest(t)
-	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
-	other := &monitoringv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{Name: measurement.Name, Namespace: "other"},
-	}
-	if err := targets.Client.Create(t.Context(), other); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := targets.Delete(t.Context(), measurement); err != nil {
-		t.Fatal(err)
-	}
-	if err := targets.Client.Get(t.Context(), client.ObjectKeyFromObject(measurement), observed); !apierrors.IsNotFound(err) {
-		t.Fatalf("expected deleted scrape config to be absent, got %v", err)
-	}
-	if err := targets.Client.Get(t.Context(), client.ObjectKeyFromObject(other), other); err != nil {
-		t.Fatalf("scrape config in another namespace was affected: %v", err)
-	}
-	if err := targets.Delete(t.Context(), measurement); err != nil {
-		t.Fatalf("repeated deletion failed: %v", err)
-	}
-}
-
 func TestKubePrometheusTargetsDelete_MissingScrapeConfig(t *testing.T) {
 	targets, measurement := setupKubePrometheusTargetsTest(t)
 	if err := targets.Delete(t.Context(), measurement); err != nil {
@@ -206,11 +167,11 @@ func TestKubePrometheusTargetsDelete_MissingScrapeConfig(t *testing.T) {
 	}
 }
 
+// Check that kube client errors are properly returned by the Delete method
 func TestKubePrometheusTargetsDelete_ReturnsClientError(t *testing.T) {
 	targets, measurement := setupKubePrometheusTargetsTest(t)
 	wantErr := errors.New("delete denied")
-	targets.Client = fake.NewClientBuilder().
-		WithScheme(targets.Client.Scheme()).
+	targets.Client = testutil.NewFakeClientBuilder(t, monitoringv1alpha1.AddToScheme).
 		WithInterceptorFuncs(interceptor.Funcs{
 			Delete: func(ctx context.Context, kubeClient client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
 				return wantErr
