@@ -24,12 +24,12 @@ import (
 
 	chantico "chantico/api/v1alpha1"
 	"chantico/internal/steps"
+	"chantico/internal/testutil"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -80,18 +80,13 @@ func (m *TargetConfigurerMock) measurementState(pm *chantico.PhysicalMeasurement
 func setupPhysicalMeasurementTest(t *testing.T, objs ...runtime.Object) (*TargetConfigurerMock, *PhysicalMeasurementReconciler) {
 	t.Helper()
 
-	scheme := runtime.NewScheme()
-	if err := chantico.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	client := fake.NewClientBuilder().
-		WithScheme(scheme).
+	client := testutil.NewFakeClientBuilder(t, chantico.AddToScheme).
 		WithRuntimeObjects(objs...).
 		Build()
 
 	mockConfigurer := &TargetConfigurerMock{}
 
-	return mockConfigurer, &PhysicalMeasurementReconciler{Client: client, Scheme: scheme, Targets: mockConfigurer}
+	return mockConfigurer, &PhysicalMeasurementReconciler{Client: client, Scheme: client.Scheme(), Targets: mockConfigurer}
 }
 
 func TestReconcileTargets_DelegatesMeasurement(t *testing.T) {
