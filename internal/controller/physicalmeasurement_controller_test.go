@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -42,6 +43,8 @@ type reconciledPhysicalMeasurement struct {
 
 type TargetConfigurerMock struct {
 	reconciledPhysicalMeasurements map[types.NamespacedName]*reconciledPhysicalMeasurement
+	reconcileError                 error
+	deleteError                    error
 }
 
 func (m *TargetConfigurerMock) Reconcile(ctx context.Context, pm *chantico.PhysicalMeasurement) error {
@@ -49,14 +52,17 @@ func (m *TargetConfigurerMock) Reconcile(ctx context.Context, pm *chantico.Physi
 	state.reconcileCalls++
 	state.deleted = false
 	state.lastReconciled = pm.DeepCopy()
-	return nil
+	return m.reconcileError
 }
 
 func (m *TargetConfigurerMock) Delete(ctx context.Context, pm *chantico.PhysicalMeasurement) error {
 	state := m.measurementState(pm)
 	state.deleteCalls++
-	state.deleted = true
 	state.lastDeleted = pm.DeepCopy()
+	if m.deleteError != nil {
+		return m.deleteError
+	}
+	state.deleted = true
 	return nil
 }
 
@@ -88,13 +94,13 @@ func setupPhysicalMeasurementTest(t *testing.T, objs ...runtime.Object) (*Target
 	return mockConfigurer, &PhysicalMeasurementReconciler{Client: client, Scheme: scheme, Targets: mockConfigurer}
 }
 
-func TestReconcileTarget_WritesTarget(t *testing.T) {
+func TestReconcileTargets_DelegatesMeasurement(t *testing.T) {
 	mockConfigurer, reconciler := setupPhysicalMeasurementTest(t)
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "physical-measurement",
-			UID:  types.UID("18ac6360-39e7-4ee3-a9b8-58992958e29a"),
+			Name:      "physical-measurement",
+			Namespace: "chantico",
 		},
 		Spec: chantico.PhysicalMeasurementSpec{
 			MeasurementDevice: "device-a",
@@ -103,66 +109,60 @@ func TestReconcileTarget_WritesTarget(t *testing.T) {
 		},
 	}
 
+	for i, ip := range []string{"192.168.1.10", "192.168.1.11"} {
+		physicalMeasurement.Spec.Ip = ip
+		expectedMeasurement := physicalMeasurement.DeepCopy()
+
+		res := reconciler.reconcileTargets(t.Context(), physicalMeasurement)
+		if res.Action != steps.ActionContinue || res.Err != nil {
+			t.Fatalf("expected Continue without error, got %v (err: %v)", res.Action, res.Err)
+		}
+
+		key := types.NamespacedName{Namespace: physicalMeasurement.Namespace, Name: physicalMeasurement.Name}
+		state := mockConfigurer.reconciledPhysicalMeasurements[key]
+		if state == nil {
+			t.Fatal("expected physical measurement to be reconciled")
+		}
+		if state.reconcileCalls != i+1 {
+			t.Errorf("expected %d reconcile calls, got %d", i+1, state.reconcileCalls)
+		}
+		if !reflect.DeepEqual(state.lastReconciled, expectedMeasurement) {
+			t.Errorf("expected reconciled measurement %+v, got %+v", expectedMeasurement, state.lastReconciled)
+		}
+		if state.deleteCalls != 0 {
+			t.Fatal("expected no target deletion")
+		}
+		assertPhysicalMeasurementCondition(t, physicalMeasurement, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
+	}
+}
+
+// A configurer reconciliation failure must store the error on the physical measurement
+// and mark the target as not applied.
+func TestReconcileTargets_ConfigurerError(t *testing.T) {
+	mockConfigurer, reconciler := setupPhysicalMeasurementTest(t)
+	expectedError := errors.New("target reconciliation failed")
+	mockConfigurer.reconcileError = expectedError
+	physicalMeasurement := &chantico.PhysicalMeasurement{
+		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement", Namespace: "chantico"},
+		Spec:       chantico.PhysicalMeasurementSpec{Type: chantico.PhysicalMeasurementTypeSNMP},
+	}
 	expectedMeasurement := physicalMeasurement.DeepCopy()
 
 	res := reconciler.reconcileTargets(t.Context(), physicalMeasurement)
-	if res.Action == steps.ActionError {
-		t.Fatalf("reconcileTarget errored: %v", res.Err)
+	if res.Action != steps.ActionError || res.Err != expectedError {
+		t.Fatalf("expected Error with original error, got %v (err: %v)", res.Action, res.Err)
 	}
-	if res.Action != steps.ActionContinue {
-		t.Fatalf("expected Continue, got %v", res.Action)
-	}
-
-	state := mockConfigurer.reconciledPhysicalMeasurements[types.NamespacedName{Name: physicalMeasurement.Name}]
+	state := mockConfigurer.reconciledPhysicalMeasurements[types.NamespacedName{Namespace: physicalMeasurement.Namespace, Name: physicalMeasurement.Name}]
 	if state == nil {
-		t.Fatal("expected physical measurement to be reconciled")
+		t.Fatal("expected target reconciliation to be recorded")
 	}
-	if state.reconcileCalls != 1 {
-		t.Fatalf("expected 1 reconcile call, got %d", state.reconcileCalls)
+	if state.reconcileCalls != 1 || state.deleteCalls != 0 {
+		t.Fatalf("expected one reconcile and no delete calls, got %+v", state)
 	}
 	if !reflect.DeepEqual(state.lastReconciled, expectedMeasurement) {
 		t.Errorf("expected reconciled measurement %+v, got %+v", expectedMeasurement, state.lastReconciled)
 	}
-	if state.deleted || state.deleteCalls != 0 {
-		t.Fatal("expected no target deletion")
-	}
-
-	assertPhysicalMeasurementCondition(t, physicalMeasurement, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
-}
-
-func TestReconcileTarget_OverwritesExisting(t *testing.T) {
-	mockConfigurer, reconciler := setupPhysicalMeasurementTest(t)
-
-	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
-		Spec: chantico.PhysicalMeasurementSpec{
-			MeasurementDevice: "device-a",
-			Type:              chantico.PhysicalMeasurementTypeSNMP,
-			Ip:                "192.168.1.10",
-		},
-	}
-
-	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
-		t.Fatalf("first reconcileTarget errored: %v", res.Err)
-	}
-	physicalMeasurement.Spec.Ip = "192.168.1.11"
-	if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
-		t.Fatalf("second reconcileTarget errored: %v", res.Err)
-	}
-
-	if len(mockConfigurer.reconciledPhysicalMeasurements) != 1 {
-		t.Fatalf("expected 1 physical measurement, got %d", len(mockConfigurer.reconciledPhysicalMeasurements))
-	}
-	state := mockConfigurer.reconciledPhysicalMeasurements[types.NamespacedName{Name: physicalMeasurement.Name}]
-	if state == nil || state.lastReconciled == nil {
-		t.Fatal("expected physical measurement to be reconciled")
-	}
-	if state.reconcileCalls != 2 {
-		t.Errorf("expected 2 reconcile calls, got %d", state.reconcileCalls)
-	}
-	if got := state.lastReconciled.Spec.Ip; got != "192.168.1.11" {
-		t.Errorf("expected updated IP %q, got %q", "192.168.1.11", got)
-	}
+	assertPhysicalMeasurementCondition(t, physicalMeasurement, chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed)
 }
 
 func TestReconcileTargets_SameNameInDifferentNamespaces(t *testing.T) {
@@ -188,89 +188,6 @@ func TestReconcileTargets_SameNameInDifferentNamespaces(t *testing.T) {
 		if state.reconcileCalls != 1 || state.lastReconciled.Namespace != namespace {
 			t.Errorf("expected one reconcile in namespace %q, got %+v", namespace, state)
 		}
-	}
-}
-
-func TestReconcileTarget_MultipleMeasurements(t *testing.T) {
-	testCases := map[string]struct {
-		physicalMeasurements []*chantico.PhysicalMeasurement
-	}{
-		"two measurements for different devices": {
-			physicalMeasurements: []*chantico.PhysicalMeasurement{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-1", UID: types.UID("uid-1")},
-					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-a",
-						Ip:                "192.168.1.10",
-						Type:              chantico.PhysicalMeasurementTypeSNMP,
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-2", UID: types.UID("uid-2")},
-					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-b",
-						Ip:                "192.168.1.20",
-						Type:              chantico.PhysicalMeasurementTypeSNMP,
-					},
-				},
-			},
-		},
-		"two measurements for same device": {
-			physicalMeasurements: []*chantico.PhysicalMeasurement{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-1", UID: types.UID("uid-1")},
-					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "same-device",
-						Ip:                "192.168.1.10",
-						Type:              chantico.PhysicalMeasurementTypeSNMP,
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-2", UID: types.UID("uid-2")},
-					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "same-device",
-						Ip:                "192.168.1.20",
-						Type:              chantico.PhysicalMeasurementTypeSNMP,
-					},
-				},
-			},
-		},
-		"one snmp and one prometheus exporter measurement": {
-			physicalMeasurements: []*chantico.PhysicalMeasurement{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-1", UID: types.UID("uid-1")},
-					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-a",
-						Ip:                "192.168.1.10",
-						Type:              chantico.PhysicalMeasurementTypeSNMP,
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-2", UID: types.UID("uid-2")},
-					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-b",
-						Ip:                "192.168.1.20",
-						Type:              chantico.PhysicalMeasurementTypePrometheusExporter,
-					},
-				},
-			},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			mockConfigurer, reconciler := setupPhysicalMeasurementTest(t)
-
-			for _, physicalMeasurement := range tc.physicalMeasurements {
-				if res := reconciler.reconcileTargets(t.Context(), physicalMeasurement); res.Action == steps.ActionError {
-					t.Fatalf("reconcileTarget(%s) errored: %v", physicalMeasurement.Name, res.Err)
-				}
-			}
-
-			if len(mockConfigurer.reconciledPhysicalMeasurements) != len(tc.physicalMeasurements) {
-				t.Fatalf("expected %d physical measurement(s), got %d", len(tc.physicalMeasurements), len(mockConfigurer.reconciledPhysicalMeasurements))
-			}
-		})
 	}
 }
 
@@ -381,6 +298,42 @@ func TestReconcilePhysicalMeasurementDeletion_RemovesTarget(t *testing.T) {
 	}
 	if controllerutil.ContainsFinalizer(physicalMeasurement, chantico.PhysicalMeasurementFinalizer) {
 		t.Fatalf("expected finalizer %q to be removed", chantico.PhysicalMeasurementFinalizer)
+	}
+}
+
+// Failed cleanup must result in an error state for the physical measurement and the finalizer must remain so deletion can be retired.
+func TestReconcilePhysicalMeasurementDeletion_ConfigurerError(t *testing.T) {
+	mockConfigurer, reconciler := setupPhysicalMeasurementTest(t)
+	expectedError := errors.New("target deletion failed")
+	mockConfigurer.deleteError = expectedError
+	now := metav1.Now()
+	physicalMeasurement := &chantico.PhysicalMeasurement{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "physical-measurement",
+			Namespace:         "chantico",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{chantico.PhysicalMeasurementFinalizer},
+		},
+	}
+	expectedMeasurement := physicalMeasurement.DeepCopy()
+
+	res := reconciler.reconcileDeletion(t.Context(), physicalMeasurement)
+	if res.Action != steps.ActionError || res.Err != expectedError {
+		t.Fatalf("expected Error with original error, got %v (err: %v)", res.Action, res.Err)
+	}
+	state := mockConfigurer.reconciledPhysicalMeasurements[types.NamespacedName{Namespace: physicalMeasurement.Namespace, Name: physicalMeasurement.Name}]
+	if state == nil {
+		t.Fatal("expected target deletion attempt to be recorded")
+	}
+	if state.deleteCalls != 1 || state.reconcileCalls != 0 || state.deleted {
+		t.Fatalf("expected one failed delete and no reconcile calls, got %+v", state)
+	}
+	if !reflect.DeepEqual(state.lastDeleted, expectedMeasurement) {
+		t.Errorf("expected deleted measurement %+v, got %+v", expectedMeasurement, state.lastDeleted)
+	}
+	assertPhysicalMeasurementCondition(t, physicalMeasurement, chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed)
+	if !controllerutil.ContainsFinalizer(physicalMeasurement, chantico.PhysicalMeasurementFinalizer) {
+		t.Fatal("expected finalizer to be retained for cleanup retry")
 	}
 }
 
