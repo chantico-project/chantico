@@ -68,6 +68,8 @@ jobs:
           gotestsum --jsonfile report.json --format testname -- -v -coverprofile=coverage.out ./internal/...
           go tool cover -func coverage.out
           gocover-cobertura < coverage.out > coverage.xml
+          # Strip module prefix so paths are repo-relative and survive truncation better
+          sed -i 's#filename="chantico/#filename="#' coverage.xml
 
       - name: Upload coverage report
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
