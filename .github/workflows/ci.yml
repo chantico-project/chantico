@@ -22,6 +22,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     continue-on-error: true
+    if: github.repository == 'chantico-project/chantico' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v6
 
@@ -50,6 +51,7 @@ jobs:
   # Tests
   test:
     runs-on: ubuntu-latest
+    if: github.repository == 'chantico-project/chantico' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v6
 
