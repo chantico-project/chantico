@@ -1,3 +1,9 @@
+## 0.21.0 (2026-10-30)
+
+#### Feature
+
+* Drop serviceId from data center resource, favor additionalLabel instead (#265) (202c3631)
+
 ## 0.20.0 (2026-10-27)
 
 #### Feature
