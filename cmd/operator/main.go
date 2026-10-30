@@ -56,6 +56,25 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+func configureWatchNamespace() cache.Options {
+	cacheOpts := cache.Options{}
+	if config.ValidatedEnv.WatchNamespace != config.AllNamespaces {
+		setupLog.Info("restricting watches to a single namespace", "namespace", config.ValidatedEnv.WatchNamespace)
+		cacheOpts.DefaultNamespaces = map[string]cache.Config{
+			config.ValidatedEnv.WatchNamespace: {},
+		}
+		// The SNMP exporter Deployment always lives in the operator's own namespace,
+		// regardless of which namespace is being watched for custom resources, so
+		// include operator namespace when it differs from the watch namespace.
+		if config.ValidatedEnv.PodNamespace != config.ValidatedEnv.WatchNamespace {
+			cacheOpts.DefaultNamespaces[config.ValidatedEnv.PodNamespace] = cache.Config{}
+		}
+	} else {
+		setupLog.Info("watching resources in all namespaces")
+	}
+	return cacheOpts
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -134,22 +153,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	cacheOpts := cache.Options{}
-	if config.ValidatedEnv.WatchNamespace != config.AllNamespaces {
-		setupLog.Info("restricting watches to a single namespace", "namespace", config.ValidatedEnv.WatchNamespace)
-		cacheOpts.DefaultNamespaces = map[string]cache.Config{
-			config.ValidatedEnv.WatchNamespace: {},
-		}
-		// The SNMP exporter Deployment always lives in the operator's own namespace,
-		// regardless of which namespace is being watched for custom resources, so
-		// include operator namespace when it differs from the watch namespace.
-		if config.ValidatedEnv.PodNamespace != config.ValidatedEnv.WatchNamespace {
-			cacheOpts.DefaultNamespaces[config.ValidatedEnv.PodNamespace] = cache.Config{}
-		}
-	} else {
-		setupLog.Info("watching resources in all namespaces")
-	}
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -157,7 +160,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "c8b0fb2f.chantico-project.github.io",
-		Cache:                  cacheOpts,
+		Cache:                  configureWatchNamespace(),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

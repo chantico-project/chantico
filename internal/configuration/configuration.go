@@ -112,36 +112,30 @@ func ValidateEnv() (validatedEnv, []error) {
 		errs = append(errs, nsErrs...)
 	}
 
-	volumeClaim, err := validateVar(ChanticoVolumeClaimEnv, validateClaim)
-	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.VolumeClaim = volumeClaim
+	// List of environment variables to validate, the callback to validate them,
+	// and the field in the validatedEnv struct to store the validated value in.
+	varsToValidate := []struct {
+		VarName   string
+		Validator func(string, string) error
+		Field     *string
+	}{
+		{ChanticoVolumeClaimEnv, validateClaim, &ret.VolumeClaim},
+		{ChanticoVolumeLocationEnv, validateLocation, &ret.VolumeLocation},
+		{ChanticoPrometheusServiceHostEnv, validateHost, &ret.PrometheusServiceHost},
+		{ChanticoPrometheusServicePortEnv, validatePort, &ret.PrometheusServicePort},
 	}
 
-	volumeLocation, err := validateVar(ChanticoVolumeLocationEnv, validateLocation)
-	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.VolumeLocation = volumeLocation
-	}
-
-	prometheusServiceHost, err := validateVar(ChanticoPrometheusServiceHostEnv, validateHost)
-	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.PrometheusServiceHost = prometheusServiceHost
-	}
-
-	prometheusServicePort, err := validateVar(ChanticoPrometheusServicePortEnv, validatePort)
-	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.PrometheusServicePort = prometheusServicePort
+	for _, v := range varsToValidate {
+		value, err := validateVar(v.VarName, v.Validator)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			*v.Field = value
+		}
 	}
 
 	if ret.PrometheusServiceHost != "" && ret.PrometheusServicePort != "" {
-		err = validateHostPort([]string{ChanticoPrometheusServiceHostEnv, ChanticoPrometheusServicePortEnv}, prometheusServiceHost, prometheusServicePort)
+		err := validateHostPort([]string{ChanticoPrometheusServiceHostEnv, ChanticoPrometheusServicePortEnv}, ret.PrometheusServiceHost, ret.PrometheusServicePort)
 		if err != nil {
 			errs = append(errs, err)
 			ret.PrometheusServiceHost = ""
