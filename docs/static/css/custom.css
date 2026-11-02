@@ -26,3 +26,15 @@ html[data-r-theme-variant="relearn-dark"] .theme-light-only {
 html[data-r-theme-variant="relearn-dark"] .theme-dark-only {
     display: block;
 }
+
+svg.kroki {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+svg.kroki[preserveAspectRatio="none"] {
+    width: 100% !important;
+    height: auto !important;
+}

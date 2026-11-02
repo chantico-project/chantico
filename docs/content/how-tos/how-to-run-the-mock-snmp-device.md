@@ -76,7 +76,33 @@ snmpget -v2c -c public -M +./dev -m +TNO-PDU-MIB localhost:31161 tnoPduEnergyVal
 
 For an overview of the workflow that is run in the background in this demo please see the below image.
 
-![](../puml/PhysicalMeasurement-and-MeasurementDevice-sequence.png)
+```kroki {_type=plantuml}
+autonumber
+actor User
+participant "Kubernetes API" as K8s
+participant "MeasurementDevice Operator" as MDO
+participant "SNMP Generator Job" as SNMPJob
+participant "chantico-snmp Exporter" as SNMP
+participant "PhysicalMeasurement Operator" as PMO
+participant "Prometheus" as Prom
+
+User -> K8s: Apply MeasurementDevice CR
+K8s --> MDO: Reconcile MeasurementDevice
+MDO -> MDO: Write generator_<uid>.yml
+MDO -> SNMPJob: Create Job (mounts snmp/mibs + config paths)
+SNMPJob -> SNMPJob: Resolve OIDs from MIBs\nand generate config_<uid>.yml
+SNMPJob --> MDO: Job Succeeded
+MDO -> MDO: Merge config_*.yml -> snmp.yml
+MDO -> SNMP: Trigger rollout/reload
+SNMP --> MDO: New module/auth config active
+
+User -> K8s: Apply PhysicalMeasurement CR
+K8s --> PMO: Reconcile PhysicalMeasurement
+PMO -> PMO: Write targets/<name>.json\n(file_sd_configs target for device + ip)
+Prom -> Prom: Auto-detect target file changes\n(file_sd_configs refresh)
+Prom -> SNMP: Scrape /snmp with module+target
+SNMP --> Prom: Metrics
+```
 
 This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `PhysicalMeasurement` → Prometheus targets.
 
