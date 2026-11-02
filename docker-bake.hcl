@@ -25,8 +25,6 @@ target "controller" {
     ["${IMAGE_REGISTRY}/chantico${IMAGE_SUFFIX}:${IMAGE_TAG}"],
     IMAGE_SHA_TAG != "" ? ["${IMAGE_REGISTRY}/chantico${IMAGE_SUFFIX}:${IMAGE_SHA_TAG}"] : []
   )
-  cache-from = ["type=gha,scope=controller"]
-  cache-to   = ["type=gha,scope=controller,mode=max,ignore-error=true"]
 }
 
 target "visualisation-webapp" {
@@ -36,8 +34,6 @@ target "visualisation-webapp" {
     ["${IMAGE_REGISTRY}/chantico-visualisation-webapp${IMAGE_SUFFIX}:${IMAGE_TAG}"],
     IMAGE_SHA_TAG != "" ? ["${IMAGE_REGISTRY}/chantico-visualisation-webapp${IMAGE_SUFFIX}:${IMAGE_SHA_TAG}"] : []
   )
-  cache-from = ["type=gha,scope=visualisation-webapp"]
-  cache-to   = ["type=gha,scope=visualisation-webapp,mode=max,ignore-error=true"]
 }
 
 target "snmp-mock" {
@@ -47,8 +43,6 @@ target "snmp-mock" {
     ["${IMAGE_REGISTRY}/chantico-snmp-mock${IMAGE_SUFFIX}:${IMAGE_TAG}"],
     IMAGE_SHA_TAG != "" ? ["${IMAGE_REGISTRY}/chantico-snmp-mock${IMAGE_SUFFIX}:${IMAGE_SHA_TAG}"] : []
   )
-  cache-from = ["type=gha,scope=snmp-mock"]
-  cache-to   = ["type=gha,scope=snmp-mock,mode=max,ignore-error=true"]
 }
 
 target "vm-attribution-mock" {
@@ -58,6 +52,13 @@ target "vm-attribution-mock" {
     ["${IMAGE_REGISTRY}/chantico-vm-attribution-mock${IMAGE_SUFFIX}:${IMAGE_TAG}"],
     IMAGE_SHA_TAG != "" ? ["${IMAGE_REGISTRY}/chantico-vm-attribution-mock${IMAGE_SUFFIX}:${IMAGE_SHA_TAG}"] : []
   )
-  cache-from = ["type=gha,scope=vm-attribution-mock"]
-  cache-to   = ["type=gha,scope=vm-attribution-mock,mode=max,ignore-error=true"]
+}
+
+# CI-only targets that add GitHub Actions cache, e.g. ci-controller.
+target "ci" {
+  name     = "ci-${tgt}"
+  matrix   = { tgt = ["controller", "visualisation-webapp", "snmp-mock", "vm-attribution-mock"] }
+  inherits = [tgt]
+  cache-from = ["type=gha,scope=${tgt}"]
+  cache-to   = ["type=gha,scope=${tgt},mode=max,ignore-error=true"]
 }
