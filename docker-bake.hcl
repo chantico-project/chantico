@@ -18,6 +18,10 @@ group "default" {
   targets = ["controller", "visualisation-webapp", "snmp-mock", "vm-attribution-mock"]
 }
 
+group "mocks" {
+  targets = ["vm-attribution-mock", "snmp-mock"]
+}
+
 target "controller" {
   context    = "."
   dockerfile = "Dockerfile"

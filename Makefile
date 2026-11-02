@@ -193,18 +193,11 @@ run: manifests generate ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
-
-.PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	$(CONTAINER_TOOL) push ${IMG}
+	$(CONTAINER_TOOL) buildx bake controller --load --set controller.tags=${IMG}
 
 .PHONY: docker-build-visualisation-webapp
 docker-build-visualisation-webapp: ## Build docker image with the visualisation webapp.
-	$(CONTAINER_TOOL) build -t $(VISUALISATION_WEBAPP_IMG) -f Dockerfile.webapp .
-
-docker-push-visualisation-webapp: 
-	$(CONTAINER_TOOL) push $(VISUALISATION_WEBAPP_IMG)
+	$(CONTAINER_TOOL) buildx bake visualisation-webapp --load --set visualisation-webapp.tags=$(VISUALISATION_WEBAPP_IMG)
 
 .PHONY: docker-pull-mocks
 docker-pull-mocks:
@@ -215,13 +208,9 @@ docker-pull-mocks:
 
 .PHONY: docker-build-mocks
 docker-build-mocks:
-	$(CONTAINER_TOOL) build -t chantico-snmp-mock:latest -f Dockerfile.snmp-mock .
-	$(CONTAINER_TOOL) build -t chantico-vm-attribution-mock:latest -f Dockerfile.vm-attribution-mock .
-
-.PHONY: docker-push-mocks
-docker-push-mocks:
-	$(CONTAINER_TOOL) push chantico-snmp-mock:latest
-	$(CONTAINER_TOOL) push chantico-vm-attribution-mock:latest
+	$(CONTAINER_TOOL) buildx bake mocks --load \
+		--set snmp-mock.tags=chantico-snmp-mock:latest \
+		--set vm-attribution-mock.tags=chantico-vm-attribution-mock:latest
 
 HELM_CHART_DIR ?= chart
 GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
