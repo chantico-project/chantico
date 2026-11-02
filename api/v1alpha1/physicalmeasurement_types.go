@@ -44,7 +44,11 @@ type PhysicalMeasurementSpec struct {
 	Type              PhysicalMeasurementType `json:"type"`
 	Ip                string                  `json:"ip"`
 	MeasurementDevice string                  `json:"measurementDevice,omitempty"`
-	ResourceIds       []string                `json:"resourceIds,omitempty"`
+
+	// AdditionalLabels are applied directly to the prometheus time series for this resource to
+	// add additional identification information. If a label conflicts with existing labels, the additional label is skipped.
+	// +optional
+	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
 }
 
 // PhysicalMeasurementStatus defines the observed state of PhysicalMeasurement

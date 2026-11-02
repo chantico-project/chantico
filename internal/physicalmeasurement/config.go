@@ -18,31 +18,38 @@ type FileSDTarget struct {
 	Labels  map[string]string `json:"labels"`
 }
 
+func applyDefaultAndAdditionalLabels(physicalMeasurement *chantico.PhysicalMeasurement, labels map[string]string) map[string]string {
+	labels["name"] = physicalMeasurement.Name
+	labels["instance"] = physicalMeasurement.Spec.Ip
+	if physicalMeasurement.Spec.AdditionalLabels != nil {
+		for k, v := range physicalMeasurement.Spec.AdditionalLabels {
+			if _, exists := labels[k]; !exists {
+				labels[k] = v
+			}
+		}
+	}
+	return labels
+}
+
 // CreateFileSDTarget creates a file_sd_configs target entry for a PhysicalMeasurement.
 // The labels __param_module and __param_auth are used by the SNMP exporter relabel
 // configs in prometheus.yml to route scrapes through the correct SNMP module.
 func CreateFileSDTarget(physicalMeasurement *chantico.PhysicalMeasurement) FileSDTarget {
+	labels := make(map[string]string)
 	if physicalMeasurement.Spec.Type == chantico.PhysicalMeasurementTypePrometheusExporter {
-		return FileSDTarget{
-			Targets: []string{physicalMeasurement.Spec.Ip},
-			Labels: map[string]string{
-				"name":     physicalMeasurement.Name,
-				"instance": physicalMeasurement.Spec.Ip,
-				"type":     "prometheus-exporter",
-			},
-		}
-	}
-	// Default to SNMP configuration.
-	return FileSDTarget{
-		Targets: []string{physicalMeasurement.Spec.Ip},
-		Labels: map[string]string{
+		labels["type"] = "prometheus-exporter"
+	} else {
+		// Default to SNMP configuration.
+		labels = map[string]string{
 			"__param_module": physicalMeasurement.Spec.MeasurementDevice,
 			"__param_auth":   physicalMeasurement.Spec.MeasurementDevice,
 			"job":            physicalMeasurement.Spec.MeasurementDevice,
-			"name":           physicalMeasurement.Name,
-			"instance":       physicalMeasurement.Spec.Ip,
 			"type":           "snmp",
-		},
+		}
+	}
+	return FileSDTarget{
+		Targets: []string{physicalMeasurement.Spec.Ip},
+		Labels:  applyDefaultAndAdditionalLabels(physicalMeasurement, labels),
 	}
 }
 
