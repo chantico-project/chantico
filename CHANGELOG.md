@@ -1,3 +1,13 @@
+## 0.22.0 (2026-11-02)
+
+#### Feature
+
+* Delete measurementdevice from different namespace, configure watch namespace (#232) (36d2adb7)
+
+#### Chores
+
+* **ci:** Upload coverage report to GitHub code coverage action bot (#204) (5dee2a8e)
+
 ## 0.21.0 (2026-10-30)
 
 #### Feature
