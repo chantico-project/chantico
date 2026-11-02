@@ -26,9 +26,13 @@ jobs:
   # Docker build and push
   # TODO: REMOVE THIS LINE. This line is just a modification to trigger a rerunof the workflow.
   docker:
-    name: docker
+    name: docker (${{ matrix.target }})
     if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [controller, visualisation-webapp, snmp-mock, vm-attribution-mock]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -62,11 +66,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build and push images
+      - name: Build and push ${{ matrix.target }}
         uses: docker/bake-action@v6
         with:
           files: docker-bake.hcl
-          targets: default
+          targets: ${{ matrix.target }}
           push: true
         env:
           IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}/images
