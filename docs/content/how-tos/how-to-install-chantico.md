@@ -43,6 +43,15 @@ You can list the storage classes available on your cluster with kubectl.
 kubectl get storageclass
 ```
 
+## Watching resources in different namespaces
+
+By default, the Chantico controller manages resources in the namespace it is deployed in.
+If you want it to watch resources in a different namespace, you can override the `controller.watchNamespace` value when installing or upgrading Chantico. You can set this value to a single namespace or to an asterisk to give access to the managed resources in all namespaces.
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set controller.watchNamespace="*"
+```
+
 ## Getting started with the deployed Chantico
 
 After Chantico is successfully deployed on your cluster, you can start making use of it for measuring your datacenter hardware of interest. Currently this can only be done with manual configuration, until a more automated approach has been implemented. Chantico inherently configures SNMP walks for endpoints by means of `MIB` and `.yaml` files. The steps of configuring this typically follows the following how-to guides:

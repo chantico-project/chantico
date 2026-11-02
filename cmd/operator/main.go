@@ -30,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -53,6 +54,25 @@ func init() {
 
 	utilruntime.Must(chanticov1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
+}
+
+func configureWatchNamespace() cache.Options {
+	cacheOpts := cache.Options{}
+	if config.ValidatedEnv.WatchNamespace != config.AllNamespaces {
+		setupLog.Info("restricting watches to a single namespace", "namespace", config.ValidatedEnv.WatchNamespace)
+		cacheOpts.DefaultNamespaces = map[string]cache.Config{
+			config.ValidatedEnv.WatchNamespace: {},
+		}
+		// The SNMP exporter Deployment always lives in the operator's own namespace,
+		// regardless of which namespace is being watched for custom resources, so
+		// include operator namespace when it differs from the watch namespace.
+		if config.ValidatedEnv.PodNamespace != config.ValidatedEnv.WatchNamespace {
+			cacheOpts.DefaultNamespaces[config.ValidatedEnv.PodNamespace] = cache.Config{}
+		}
+	} else {
+		setupLog.Info("watching resources in all namespaces")
+	}
+	return cacheOpts
 }
 
 func main() {
@@ -124,6 +144,15 @@ func main() {
 		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
+	var errs []error
+	config.ValidatedEnv, errs = config.ValidateEnv()
+	if errs != nil {
+		for _, err := range errs {
+			setupLog.Error(err, "error reading environment variable")
+		}
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -131,18 +160,10 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "c8b0fb2f.chantico-project.github.io",
+		Cache:                  configureWatchNamespace(),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	var errs []error
-	config.ValidatedEnv, errs = config.ValidateEnv()
-	if errs != nil {
-		for _, err := range errs {
-			setupLog.Error(err, "error reading environment variable")
-		}
 		os.Exit(1)
 	}
 
