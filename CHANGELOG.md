@@ -1,3 +1,9 @@
+## 0.23.0 (2026-11-03)
+
+#### Feature
+
+* Replace resourceIds with additionalLabels on PhysicalMeasurement (#272) (51deb68b)
+
 ## 0.22.0 (2026-11-02)
 
 #### Feature
