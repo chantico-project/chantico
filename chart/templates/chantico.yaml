@@ -50,7 +50,7 @@ spec:
             - name: CHANTICO_NAMESPACE
               value: {{ .Release.Namespace | quote }}
             - name: CHANTICO_WATCH_NAMESPACE
-              value: {{ .Values.controller.watchNamespace | quote }}
+              value: {{ .Values.controller.watchNamespace | default .Release.Namespace | quote }}
           ports:
             - containerPort: 8443
               name: https
