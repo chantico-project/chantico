@@ -5,6 +5,7 @@ import (
 	"chantico/internal/filestore"
 	"context"
 	"encoding/json"
+	"maps"
 
 	chantico "chantico/api/v1alpha1"
 )
@@ -22,11 +23,10 @@ func applyDefaultAndAdditionalLabels(physicalMeasurement *chantico.PhysicalMeasu
 	labels["name"] = physicalMeasurement.Name
 	labels["instance"] = physicalMeasurement.Spec.Ip
 	if physicalMeasurement.Spec.AdditionalLabels != nil {
-		for k, v := range physicalMeasurement.Spec.AdditionalLabels {
-			if _, exists := labels[k]; !exists {
-				labels[k] = v
-			}
-		}
+		// Prefer the default and existing labels over the additional labels
+		merged := maps.Clone(physicalMeasurement.Spec.AdditionalLabels)
+		maps.Copy(merged, labels)
+		return merged
 	}
 	return labels
 }
