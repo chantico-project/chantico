@@ -7,6 +7,10 @@ copyright = 'Copyright 2025-2026 TNO. Chantico is licensed under the <a href="ht
 [security]
 allowContent = ['.*']
 
+  [security.http]
+    # Hugo blocks localhost by default; allow the kroki server (kroki.io or a local container)
+    urls = ['^https://kroki\.io/', '^http://localhost:8000/']
+
 [markup]
   [markup.highlight]
     noClasses = false   # generates <span class="keyword"> for styling
