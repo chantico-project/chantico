@@ -38,6 +38,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const (
+	testNamespace                    = "chantico"
+	testMeasurementA                 = "measurement-1"
+	testMeasurementB                 = "measurement-2"
+	testDeviceA                      = "device-type-a"
+	testDeviceB                      = "device-type-b"
+	testPM                           = "physical-measurement"
+	testIpA                          = "192.168.1.10"
+	testIpB                          = "192.168.1.20"
+	testResourceIdLabel              = "resourceId"
+	testResourceId                   = "74366c42-ac0c-4736-8301-db6d3c63297a"
+	testModuleTypeSNMP               = "snmp"
+	testModuleTypePrometheusExporter = "prometheus-exporter"
+	testTargetFile                   = "physical-measurement.json"
+)
+
 func setupPhysicalMeasurementTest(t *testing.T, objs ...runtime.Object) (string, *PhysicalMeasurementReconciler) {
 	t.Helper()
 
@@ -67,14 +83,26 @@ func TestReconcileTargetFile_WritesTargetFile(t *testing.T) {
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "physical-measurement",
+			Name: testPM,
 			UID:  types.UID("18ac6360-39e7-4ee3-a9b8-58992958e29a"),
 		},
 		Spec: chantico.PhysicalMeasurementSpec{
-			MeasurementDevice: "device-a",
-			Ip:                "192.168.1.10",
+			MeasurementDevice: testDeviceA,
+			Ip:                testIpA,
 			Type:              chantico.PhysicalMeasurementTypeSNMP,
+			AdditionalLabels: map[string]string{
+				testResourceIdLabel: testResourceId,
+			},
 		},
+	}
+	wantLabels := map[string]string{
+		"__param_module":    testDeviceA,
+		"__param_auth":      testDeviceA,
+		"job":               testDeviceA,
+		"type":              testModuleTypeSNMP,
+		"name":              physicalMeasurement.Name,
+		"instance":          physicalMeasurement.Spec.Ip,
+		testResourceIdLabel: testResourceId,
 	}
 
 	res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement)
@@ -86,18 +114,18 @@ func TestReconcileTargetFile_WritesTargetFile(t *testing.T) {
 	}
 
 	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir, "snmp")
-	targets := readFileSDTargets(t, filepath.Join(targetsDir, "physical-measurement.json"))
+	targets := readFileSDTargets(t, filepath.Join(targetsDir, testTargetFile))
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 target group, got %d", len(targets))
 	}
-	if got := targets[0].Labels["__param_module"]; got != physicalMeasurement.Spec.MeasurementDevice {
-		t.Errorf("expected module label %q, got %q", physicalMeasurement.Spec.MeasurementDevice, got)
+	if !maps.Equal(targets[0].Labels, wantLabels) {
+		t.Errorf("expected labels %v, got %v", wantLabels, targets[0].Labels)
 	}
 	if want := []string{physicalMeasurement.Spec.Ip}; !slices.Equal(targets[0].Targets, want) {
 		t.Errorf("expected targets %v, got %v", want, targets[0].Targets)
 	}
 
-	assertTargetFiles(t, targetsDir, []string{"physical-measurement.json"})
+	assertTargetFiles(t, targetsDir, []string{testTargetFile})
 	assertPhysicalMeasurementCondition(t, physicalMeasurement, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
 }
 
@@ -105,10 +133,10 @@ func TestReconcileTargetFile_SkipsWriteWhenUnchanged(t *testing.T) {
 	tmpDir, reconciler := setupPhysicalMeasurementTest(t)
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPM},
 		Spec: chantico.PhysicalMeasurementSpec{
-			MeasurementDevice: "device-a",
-			Ip:                "192.168.1.10",
+			MeasurementDevice: testDeviceA,
+			Ip:                testIpA,
 			Type:              chantico.PhysicalMeasurementTypeSNMP,
 		},
 	}
@@ -117,7 +145,7 @@ func TestReconcileTargetFile_SkipsWriteWhenUnchanged(t *testing.T) {
 		t.Fatalf("first reconcileTargetFile errored: %v", res.Err)
 	}
 
-	targetPath := filepath.Join(tmpDir, prometheusTargetsDir, "snmp", "physical-measurement.json")
+	targetPath := filepath.Join(tmpDir, prometheusTargetsDir, "snmp", testTargetFile)
 	before, err := os.Stat(targetPath)
 	if err != nil {
 		t.Fatalf("stat target file %s: %v", targetPath, err)
@@ -146,11 +174,11 @@ func TestReconcileTargetFile_CreatesMissingTargetsDir(t *testing.T) {
 	}
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPM},
 		Spec: chantico.PhysicalMeasurementSpec{
-			MeasurementDevice: "device-a",
+			MeasurementDevice: testDeviceA,
 			Type:              chantico.PhysicalMeasurementTypeSNMP,
-			Ip:                "192.168.1.10",
+			Ip:                testIpA,
 		},
 	}
 
@@ -158,18 +186,18 @@ func TestReconcileTargetFile_CreatesMissingTargetsDir(t *testing.T) {
 		t.Fatalf("reconcileTargetFile errored: %v", res.Err)
 	}
 
-	assertTargetFiles(t, targetsDir, []string{"physical-measurement.json"})
+	assertTargetFiles(t, targetsDir, []string{testTargetFile})
 }
 
 func TestReconcileTargetFile_OverwritesExisting(t *testing.T) {
 	tmpDir, reconciler := setupPhysicalMeasurementTest(t)
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPM},
 		Spec: chantico.PhysicalMeasurementSpec{
-			MeasurementDevice: "device-a",
+			MeasurementDevice: testDeviceA,
 			Type:              chantico.PhysicalMeasurementTypeSNMP,
-			Ip:                "192.168.1.10",
+			Ip:                testIpA,
 		},
 	}
 
@@ -182,7 +210,7 @@ func TestReconcileTargetFile_OverwritesExisting(t *testing.T) {
 	}
 
 	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir, "snmp")
-	targets := readFileSDTargets(t, filepath.Join(targetsDir, "physical-measurement.json"))
+	targets := readFileSDTargets(t, filepath.Join(targetsDir, testTargetFile))
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 target group, got %d", len(targets))
 	}
@@ -190,10 +218,15 @@ func TestReconcileTargetFile_OverwritesExisting(t *testing.T) {
 		t.Errorf("expected targets %v, got %v", want, targets[0].Targets)
 	}
 	// The atomic write must not leave its temporary file behind.
-	assertTargetFiles(t, targetsDir, []string{"physical-measurement.json"})
+	assertTargetFiles(t, targetsDir, []string{testTargetFile})
 }
 
 func TestReconcileTargetFile_MultipleMeasurements(t *testing.T) {
+	const (
+		testDeviceSame = "same-device"
+		testModuleA    = "snmp/measurement-1.json"
+		testModuleB    = "snmp/measurement-2.json"
+	)
 	testCases := map[string]struct {
 		physicalMeasurements []*chantico.PhysicalMeasurement
 		expectedModules      map[string]string // file name -> expected __param_module label
@@ -201,73 +234,73 @@ func TestReconcileTargetFile_MultipleMeasurements(t *testing.T) {
 		"two measurements for different devices": {
 			physicalMeasurements: []*chantico.PhysicalMeasurement{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-1", UID: types.UID("uid-1")},
+					ObjectMeta: metav1.ObjectMeta{Name: testMeasurementA, UID: types.UID("uid-1")},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-a",
-						Ip:                "192.168.1.10",
+						MeasurementDevice: testDeviceA,
+						Ip:                testIpA,
 						Type:              chantico.PhysicalMeasurementTypeSNMP,
 					},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-2", UID: types.UID("uid-2")},
+					ObjectMeta: metav1.ObjectMeta{Name: testMeasurementB, UID: types.UID("uid-2")},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-b",
-						Ip:                "192.168.1.20",
+						MeasurementDevice: testDeviceB,
+						Ip:                testIpB,
 						Type:              chantico.PhysicalMeasurementTypeSNMP,
 					},
 				},
 			},
 			expectedModules: map[string]string{
-				"snmp/measurement-1.json": "device-type-a",
-				"snmp/measurement-2.json": "device-type-b",
+				testModuleA: testDeviceA,
+				testModuleB: testDeviceB,
 			},
 		},
 		"two measurements for same device": {
 			physicalMeasurements: []*chantico.PhysicalMeasurement{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-1", UID: types.UID("uid-1")},
+					ObjectMeta: metav1.ObjectMeta{Name: testMeasurementA, UID: types.UID("uid-1")},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "same-device",
-						Ip:                "192.168.1.10",
+						MeasurementDevice: testDeviceSame,
+						Ip:                testIpA,
 						Type:              chantico.PhysicalMeasurementTypeSNMP,
 					},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-2", UID: types.UID("uid-2")},
+					ObjectMeta: metav1.ObjectMeta{Name: testMeasurementB, UID: types.UID("uid-2")},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "same-device",
-						Ip:                "192.168.1.20",
+						MeasurementDevice: testDeviceSame,
+						Ip:                testIpB,
 						Type:              chantico.PhysicalMeasurementTypeSNMP,
 					},
 				},
 			},
 			expectedModules: map[string]string{
-				"snmp/measurement-1.json": "same-device",
-				"snmp/measurement-2.json": "same-device",
+				testModuleA: testDeviceSame,
+				testModuleB: testDeviceSame,
 			},
 		},
 		"one snmp and one prometheus exporter measurement": {
 			physicalMeasurements: []*chantico.PhysicalMeasurement{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-1", UID: types.UID("uid-1")},
+					ObjectMeta: metav1.ObjectMeta{Name: testMeasurementA, UID: types.UID("uid-1")},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-a",
-						Ip:                "192.168.1.10",
+						MeasurementDevice: testDeviceA,
+						Ip:                testIpA,
 						Type:              chantico.PhysicalMeasurementTypeSNMP,
 					},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "measurement-2", UID: types.UID("uid-2")},
+					ObjectMeta: metav1.ObjectMeta{Name: testMeasurementB, UID: types.UID("uid-2")},
 					Spec: chantico.PhysicalMeasurementSpec{
-						MeasurementDevice: "device-type-b",
-						Ip:                "192.168.1.20",
+						MeasurementDevice: testDeviceB,
+						Ip:                testIpB,
 						Type:              chantico.PhysicalMeasurementTypePrometheusExporter,
 					},
 				},
 			},
 			expectedModules: map[string]string{
-				"snmp/measurement-1.json":                "device-type-a",
-				"prometheus-exporter/measurement-2.json": "device-type-b",
+				testModuleA:                              testDeviceA,
+				"prometheus-exporter/measurement-2.json": testDeviceB,
 			},
 		},
 	}
@@ -309,7 +342,16 @@ func TestReconcileTargetFile_PrometheusExporter(t *testing.T) {
 		Spec: chantico.PhysicalMeasurementSpec{
 			Ip:   "192.168.1.10:9100",
 			Type: chantico.PhysicalMeasurementTypePrometheusExporter,
+			AdditionalLabels: map[string]string{
+				testResourceIdLabel: testResourceId,
+			},
 		},
+	}
+	wantLabels := map[string]string{
+		"name":              "exporter",
+		"instance":          physicalMeasurement.Spec.Ip,
+		"type":              "prometheus-exporter",
+		testResourceIdLabel: testResourceId,
 	}
 
 	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action != steps.ActionContinue {
@@ -326,7 +368,6 @@ func TestReconcileTargetFile_PrometheusExporter(t *testing.T) {
 	if want := []string{physicalMeasurement.Spec.Ip}; !slices.Equal(targets[0].Targets, want) {
 		t.Errorf("expected targets %v, got %v", want, targets[0].Targets)
 	}
-	wantLabels := map[string]string{"name": "exporter", "instance": physicalMeasurement.Spec.Ip, "type": "prometheus-exporter"}
 	if !maps.Equal(targets[0].Labels, wantLabels) {
 		t.Errorf("expected labels %v, got %v", wantLabels, targets[0].Labels)
 	}
@@ -336,17 +377,17 @@ func TestReconcileTargetFile_UnsetTypeDefaultsToSNMP(t *testing.T) {
 	tmpDir, reconciler := setupPhysicalMeasurementTest(t)
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPM},
 		Spec: chantico.PhysicalMeasurementSpec{
-			Ip:                "192.168.1.10",
-			MeasurementDevice: "device-a",
+			Ip:                testIpA,
+			MeasurementDevice: testDeviceA,
 		},
 	}
 
 	if res := reconciler.reconcileTargetFile(t.Context(), physicalMeasurement); res.Action != steps.ActionContinue {
 		t.Fatalf("expected Continue, got %v (err: %v)", res.Action, res.Err)
 	}
-	path := filepath.Join(tmpDir, prometheusTargetsDir, "snmp", "physical-measurement.json")
+	path := filepath.Join(tmpDir, prometheusTargetsDir, "snmp", testTargetFile)
 	targets := readFileSDTargets(t, path)
 	if len(targets) != 1 || targets[0].Labels["type"] != "snmp" {
 		t.Fatalf("expected unset type to produce an SNMP target, got %#v", targets)
@@ -357,7 +398,7 @@ func TestReconcilePhysicalMeasurementDeletion_RemovesTargetFile(t *testing.T) {
 	tmpDir, reconciler := setupPhysicalMeasurementTest(t)
 
 	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir)
-	targetPath := filepath.Join(targetsDir, "snmp", "physical-measurement.json")
+	targetPath := filepath.Join(targetsDir, "snmp", testTargetFile)
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		t.Fatalf("create directory for %s: %v", targetPath, err)
 	}
@@ -368,7 +409,7 @@ func TestReconcilePhysicalMeasurementDeletion_RemovesTargetFile(t *testing.T) {
 	now := metav1.Now()
 	physicalMeasurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              "physical-measurement",
+			Name:              testPM,
 			UID:               types.UID("18ac6360-39e7-4ee3-a9b8-58992958e29a"),
 			DeletionTimestamp: &now,
 			Finalizers:        []string{chantico.PhysicalMeasurementFinalizer},
@@ -421,14 +462,14 @@ func TestReconcilePhysicalMeasurementDeletion_NotBeingDeleted(t *testing.T) {
 	tmpDir, reconciler := setupPhysicalMeasurementTest(t)
 
 	targetsDir := filepath.Join(tmpDir, prometheusTargetsDir)
-	targetPath := filepath.Join(targetsDir, "physical-measurement.json")
+	targetPath := filepath.Join(targetsDir, testTargetFile)
 	if err := os.WriteFile(targetPath, []byte("[]"), 0644); err != nil {
 		t.Fatalf("write %s: %v", targetPath, err)
 	}
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       "physical-measurement",
+			Name:       testPM,
 			Finalizers: []string{chantico.PhysicalMeasurementFinalizer},
 		},
 	}
@@ -437,14 +478,14 @@ func TestReconcilePhysicalMeasurementDeletion_NotBeingDeleted(t *testing.T) {
 	if res.Action != steps.ActionContinue {
 		t.Fatalf("expected Continue, got %v", res.Action)
 	}
-	assertTargetFiles(t, targetsDir, []string{"physical-measurement.json"})
+	assertTargetFiles(t, targetsDir, []string{testTargetFile})
 }
 
 func TestEnsurePhysicalMeasurementFinalizerIsSet(t *testing.T) {
 	_, reconciler := setupPhysicalMeasurementTest(t)
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPM},
 	}
 
 	// First run adds the finalizer and stops so the patcher can persist it.
@@ -467,7 +508,7 @@ func TestReconcilePhysicalMeasurementReady(t *testing.T) {
 	_, reconciler := setupPhysicalMeasurementTest(t)
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPM},
 	}
 
 	res := reconciler.reconcileReady(t.Context(), physicalMeasurement)
@@ -479,15 +520,15 @@ func TestReconcilePhysicalMeasurementReady(t *testing.T) {
 
 func TestReconcilePhysicalMeasurementValidation_ExistingDevice(t *testing.T) {
 	measurementDevice := &chantico.MeasurementDevice{
-		ObjectMeta: metav1.ObjectMeta{Name: "device-a", Namespace: "chantico"},
+		ObjectMeta: metav1.ObjectMeta{Name: testDeviceA, Namespace: testNamespace},
 	}
 	_, reconciler := setupPhysicalMeasurementTest(t, measurementDevice)
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement", Namespace: "chantico"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPM, Namespace: testNamespace},
 		Spec: chantico.PhysicalMeasurementSpec{
-			MeasurementDevice: "device-a",
-			Ip:                "192.168.1.10",
+			MeasurementDevice: testDeviceA,
+			Ip:                testIpA,
 		},
 	}
 
@@ -502,10 +543,10 @@ func TestReconcilePhysicalMeasurementValidation_MissingDevice(t *testing.T) {
 	_, reconciler := setupPhysicalMeasurementTest(t)
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement", Namespace: "chantico"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPM, Namespace: testNamespace},
 		Spec: chantico.PhysicalMeasurementSpec{
 			MeasurementDevice: "does-not-exist",
-			Ip:                "192.168.1.10",
+			Ip:                testIpA,
 		},
 	}
 
@@ -521,15 +562,15 @@ func TestReconcilePhysicalMeasurementValidation_MissingDevice(t *testing.T) {
 
 func TestReconcilePhysicalMeasurementValidation_DeviceInOtherNamespace(t *testing.T) {
 	measurementDevice := &chantico.MeasurementDevice{
-		ObjectMeta: metav1.ObjectMeta{Name: "device-a", Namespace: "other"},
+		ObjectMeta: metav1.ObjectMeta{Name: testDeviceA, Namespace: "other"},
 	}
 	_, reconciler := setupPhysicalMeasurementTest(t, measurementDevice)
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
-		ObjectMeta: metav1.ObjectMeta{Name: "physical-measurement", Namespace: "chantico"},
+		ObjectMeta: metav1.ObjectMeta{Name: testPM, Namespace: testNamespace},
 		Spec: chantico.PhysicalMeasurementSpec{
-			MeasurementDevice: "device-a",
-			Ip:                "192.168.1.10",
+			MeasurementDevice: testDeviceA,
+			Ip:                testIpA,
 		},
 	}
 

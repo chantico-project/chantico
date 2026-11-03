@@ -114,12 +114,10 @@ func (b *RuleBuilder) BuildRecordingRules() []RecordingRule {
 }
 
 func applyAdditionalLabels(base map[string]string, labels map[string]string) map[string]string {
-	for k, v := range labels {
-		if _, exists := base[k]; !exists {
-			base[k] = v
-		}
-	}
-	return base
+	// Prefer the base labels over the additional labels
+	merged := maps.Clone(labels)
+	maps.Copy(merged, base)
+	return merged
 }
 
 func (b *RuleBuilder) constructParentNamesLabel() string {
