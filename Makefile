@@ -188,16 +188,19 @@ build: manifests generate ## Build manager binary.
 run: manifests generate ## Run a controller from your host.
 	go run ./cmd/operator/main.go
 
-# If you wish to build the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
-# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
+# The docker-build* targets build images with docker buildx bake using the targets in docker-bake.hcl.
+# ARCH optionally sets comma-separated target architectures (i.e. make docker-build ARCH=arm64).
+# When ARCH is empty, images are built for the host architecture
+ARCH ?=
+BAKE = $(if $(ARCH),IMAGE_ARCH=$(ARCH) )$(CONTAINER_TOOL) buildx bake
+
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) buildx bake controller --load --set controller.tags=${IMG}
+	$(BAKE) controller --load --set controller.tags=${IMG}
 
 .PHONY: docker-build-visualisation-webapp
 docker-build-visualisation-webapp: ## Build docker image with the visualisation webapp.
-	$(CONTAINER_TOOL) buildx bake visualisation-webapp --load --set visualisation-webapp.tags=$(VISUALISATION_WEBAPP_IMG)
+	$(BAKE) visualisation-webapp --load --set visualisation-webapp.tags=$(VISUALISATION_WEBAPP_IMG)
 
 .PHONY: docker-pull-mocks
 docker-pull-mocks:
@@ -208,7 +211,7 @@ docker-pull-mocks:
 
 .PHONY: docker-build-mocks
 docker-build-mocks:
-	$(CONTAINER_TOOL) buildx bake mocks --load \
+	$(BAKE) mocks --load \
 		--set snmp-mock.tags=chantico-snmp-mock:latest \
 		--set vm-attribution-mock.tags=chantico-vm-attribution-mock:latest
 
@@ -222,26 +225,6 @@ helm-package: sync-deployment-crds ## Package Helm chart.
 .PHONY: helm-push
 helm-push: helm-package ## Package and push Helm chart to GHCR.
 	helm push chantico-$(VERSION).tgz $(GHCR_HELM_REPO)
-
-
-
-
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-.PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name chantico-builder
-	$(CONTAINER_TOOL) buildx use chantico-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm chantico-builder
-	rm Dockerfile.cross
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.

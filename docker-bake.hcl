@@ -14,6 +14,11 @@ variable "IMAGE_SHA_TAG" {
   default = ""
 }
 
+# Comma-separated target architectures, e.g. "amd64,arm64". Empty builds for the host architecture.
+variable "IMAGE_ARCH" {
+  default = ""
+}
+
 group "default" {
   targets = ["controller", "visualisation-webapp", "snmp-mock", "vm-attribution-mock"]
 }
@@ -22,8 +27,13 @@ group "mocks" {
   targets = ["vm-attribution-mock", "snmp-mock"]
 }
 
+target "_common" {
+  context   = "."
+  platforms = [for arch in compact(split(",", IMAGE_ARCH)) : "linux/${trimspace(arch)}"]
+}
+
 target "controller" {
-  context    = "."
+  inherits   = ["_common"]
   dockerfile = "Dockerfile"
   tags = concat(
     ["${IMAGE_REGISTRY}/chantico${IMAGE_SUFFIX}:${IMAGE_TAG}"],
@@ -32,7 +42,7 @@ target "controller" {
 }
 
 target "visualisation-webapp" {
-  context    = "."
+  inherits   = ["_common"]
   dockerfile = "Dockerfile.webapp"
   tags = concat(
     ["${IMAGE_REGISTRY}/chantico-visualisation-webapp${IMAGE_SUFFIX}:${IMAGE_TAG}"],
@@ -41,7 +51,7 @@ target "visualisation-webapp" {
 }
 
 target "snmp-mock" {
-  context    = "."
+  inherits   = ["_common"]
   dockerfile = "Dockerfile.snmp-mock"
   tags = concat(
     ["${IMAGE_REGISTRY}/chantico-snmp-mock${IMAGE_SUFFIX}:${IMAGE_TAG}"],
@@ -50,7 +60,7 @@ target "snmp-mock" {
 }
 
 target "vm-attribution-mock" {
-  context    = "."
+  inherits   = ["_common"]
   dockerfile = "Dockerfile.vm-attribution-mock"
   tags = concat(
     ["${IMAGE_REGISTRY}/chantico-vm-attribution-mock${IMAGE_SUFFIX}:${IMAGE_TAG}"],
