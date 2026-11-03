@@ -39,7 +39,7 @@ jobs:
             docs/go.sum
 
       - name: Cache Hugo modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/hugo_cache/modules
           key: ${{ runner.os }}-hugo-modules-${{ hashFiles('docs/go.sum') }}
