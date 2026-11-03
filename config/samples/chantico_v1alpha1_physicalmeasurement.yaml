@@ -21,3 +21,5 @@ metadata:
 spec:
   ip: 10.5.1.2
   measurementDevice: schleifenbauer-pdu
+  additionalLabels:
+    resourceId: "0e3cad39-70ae-4af0-8eb2-a1389ad7b73a"

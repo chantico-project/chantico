@@ -23,6 +23,8 @@ spec:
   type: snmp
   ip: chantico-snmp-mock-2:1161
   measurementDevice: tno
+  additionalLabels:
+    resourceId: "0e3cad39-70ae-4af0-8eb2-a1389ad7b73a"
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: PhysicalMeasurement
