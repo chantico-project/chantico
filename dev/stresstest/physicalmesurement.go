@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
-	"os"
 	"time"
 
 	chapi "chantico/api/v1alpha1"
@@ -13,10 +13,9 @@ import (
 
 var ips = []string{"chantico-snmp-mock:1161", "chantico-snmp-mock-2:1161"}
 
-func generatePhysicalMeasurement(measurementDevice chapi.MeasurementDevice, idx int, ips []string) chapi.PhysicalMeasurement {
+func generatePhysicalMeasurement(namespace string, measurementDevice chapi.MeasurementDevice, idx int, ips []string) chapi.PhysicalMeasurement {
 	if len(ips) == 0 {
-		fmt.Fprintf(os.Stderr, "no ip provided")
-		os.Exit(1)
+		log.Fatalf("no ip provided")
 	}
 
 	name := fmt.Sprintf("stresstest-pm-%d-%d", time.Now().Unix(), idx)
@@ -29,17 +28,18 @@ func generatePhysicalMeasurement(measurementDevice chapi.MeasurementDevice, idx 
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "chantico",
+			Namespace: namespace,
 		},
 		Spec: chapi.PhysicalMeasurementSpec{
 			Ip:                ip,
 			MeasurementDevice: measurementDevice.Name,
+			Type:              "snmp",
 		},
 	}
 	return pm
 }
 
-func generatePhysicalMeasurements(measurementDevices []chapi.MeasurementDevice, nbMeasurementPerPhysicalMeasurement int) ([]chapi.PhysicalMeasurement, []MeasurementDevicePhysicalMeasurementCombination) {
+func generatePhysicalMeasurements(namespace string, measurementDevices []chapi.MeasurementDevice, nbMeasurementPerPhysicalMeasurement int) ([]chapi.PhysicalMeasurement, []MeasurementDevicePhysicalMeasurementCombination) {
 	if nbMeasurementPerPhysicalMeasurement <= 0 || len(measurementDevices) == 0 {
 		return nil, nil
 	}
@@ -51,7 +51,7 @@ func generatePhysicalMeasurements(measurementDevices []chapi.MeasurementDevice, 
 	idx := 0
 	for _, md := range measurementDevices {
 		for range nbMeasurementPerPhysicalMeasurement {
-			pm := generatePhysicalMeasurement(md, idx, ips)
+			pm := generatePhysicalMeasurement(namespace, md, idx, ips)
 			out = append(out, pm)
 			outCombinations = append(outCombinations, MeasurementDevicePhysicalMeasurementCombination{
 				MeasurementDevice:    &md,

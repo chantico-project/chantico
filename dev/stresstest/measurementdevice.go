@@ -41,7 +41,7 @@ func parseMIB(path string) ([]string, error) {
 
 // generateMeasurementDevice creates a MeasurementDevice with a random subset of walks.
 // It sets TypeMeta and ObjectMeta so the resource can be created via the Kubernetes API.
-func generateMeasurementDevice(allWalks []string, idx int) chapi.MeasurementDevice {
+func generateMeasurementDevice(namespace string, allWalks []string, idx int) chapi.MeasurementDevice {
 	n := len(allWalks)
 	subCount := 1
 	if n > 1 {
@@ -63,7 +63,7 @@ func generateMeasurementDevice(allWalks []string, idx int) chapi.MeasurementDevi
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "chantico",
+			Namespace: namespace,
 		},
 		Spec: chapi.MeasurementDeviceSpec{
 			Walks: walks,
@@ -76,7 +76,7 @@ version: 2`,
 	return md
 }
 
-func generateMeasurementDevices(path string, n int) []chapi.MeasurementDevice {
+func generateMeasurementDevices(namespace, path string, n int) []chapi.MeasurementDevice {
 	mds := make([]chapi.MeasurementDevice, 0, n)
 
 	allWalks, err := parseMIB(path)
@@ -85,7 +85,7 @@ func generateMeasurementDevices(path string, n int) []chapi.MeasurementDevice {
 	}
 
 	for i := range n {
-		mds = append(mds, generateMeasurementDevice(allWalks, i))
+		mds = append(mds, generateMeasurementDevice(namespace, allWalks, i))
 	}
 	return mds
 }
