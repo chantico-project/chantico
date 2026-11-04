@@ -26,6 +26,14 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
 {{- if $deploymentsCoveredByManagerRole }}
 - apiGroups:
   - apps

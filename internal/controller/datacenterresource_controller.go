@@ -44,7 +44,7 @@ const prometheusRulesDir = "prometheus/rules"
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 // DataCenterResourceReconciler reconciles a DataCenterResource object
 type DataCenterResourceReconciler struct {
