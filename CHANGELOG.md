@@ -1,3 +1,10 @@
+## 0.23.1 (2026-11-04)
+
+#### Bug Fixes
+
+* **deploy:** Merge resource rules (#277) (ba6fe416)
+* **deploy:** Watch release namespace as default and add missing permission (#277) (1a7010ec)
+
 ## 0.23.0 (2026-11-03)
 
 #### Feature
