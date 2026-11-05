@@ -76,3 +76,4 @@ jobs:
           IMAGE_SUFFIX: ${{ steps.meta.outputs.suffix }}
           IMAGE_TAG: ${{ steps.meta.outputs.tag }}
           IMAGE_SHA_TAG: ${{ steps.meta.outputs.sha_tag }}
+          IMAGE_ARCH: amd64,arm64
