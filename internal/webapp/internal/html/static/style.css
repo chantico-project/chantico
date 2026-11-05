@@ -1,0 +1,111 @@
+:root {
+  --color-background: #272822;
+  --color-surface: #3e3d32;
+  --color-border: #75715e;
+  --color-foreground: #f8f8f2;
+  --color-heading: #a6e22e;
+  --color-label: #66d9ef;
+  --color-accent: #f92672;
+  --color-highlight: #e6db74;
+
+  --font-family-base: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-size-base: 1rem;
+  --font-size-title: 1.5rem;
+  --font-weight-normal: 400;
+  --font-weight-bold: 700;
+  --line-height-base: 1.5;
+
+  --space-xs: 0.25rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --border-width: 1px;
+  --border-width-accent: 3px;
+  --radius-md: 0.375rem;
+  --content-max-width: 60rem;
+  --label-column-width: 10rem;
+  --grid-fill: 1fr;
+  --auto-margin: auto;
+  --zero: 0;
+  --min-height-full: 100vh;
+  --diagram-min-height: 20rem;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: var(--zero);
+  min-height: var(--min-height-full);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-base);
+}
+
+header,
+main {
+  max-width: var(--content-max-width);
+  margin-left: var(--auto-margin);
+  margin-right: var(--auto-margin);
+  padding-left: var(--space-md);
+  padding-right: var(--space-md);
+}
+
+header {
+  padding-top: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+h1 {
+  margin-top: var(--zero);
+  margin-bottom: var(--space-md);
+  color: var(--color-heading);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+}
+
+dl {
+  display: grid;
+  grid-template-columns: var(--label-column-width) var(--grid-fill);
+  gap: var(--space-xs) var(--space-md);
+  margin: var(--zero);
+}
+
+dt {
+  color: var(--color-label);
+  font-weight: var(--font-weight-bold);
+}
+
+dd {
+  margin: var(--zero);
+  font-family: var(--font-family-mono);
+  word-break: break-all;
+}
+
+main {
+  padding-top: var(--space-lg);
+  padding-bottom: var(--space-lg);
+}
+
+pre.mermaid {
+  min-height: var(--diagram-min-height);
+  margin: var(--zero);
+  padding: var(--space-md);
+  overflow-x: auto;
+  background-color: var(--color-surface);
+  border-left: var(--border-width-accent) solid var(--color-accent);
+  border-radius: var(--radius-md);
+}
+
+main > p {
+  padding: var(--space-md);
+  background-color: var(--color-surface);
+  border-left: var(--border-width-accent) solid var(--color-highlight);
+  border-radius: var(--radius-md);
+  color: var(--color-highlight);
+}

@@ -30,6 +30,7 @@ type HTTPServerConfig struct {
 func New(h *HTTPServerHandler, config *HTTPServerConfig) *HTTPServer {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", h.HomePage)
+	mux.HandleFunc("GET /static/style.css", serveStyle)
 
 	server := &http.Server{
 		Addr:              ":" + strconv.Itoa(config.Port),
@@ -53,6 +54,11 @@ func (s HTTPServer) Run(errChannel chan<- error) {
 
 func (s HTTPServer) Stop(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
+}
+
+func serveStyle(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	_, _ = w.Write(html.StyleCSS())
 }
 
 func (h *HTTPServerHandler) HomePage(w http.ResponseWriter, r *http.Request) {

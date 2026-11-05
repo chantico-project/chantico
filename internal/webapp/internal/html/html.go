@@ -9,6 +9,13 @@ import (
 //go:embed templates/*.html
 var fs embed.FS
 
+//go:embed static/style.css
+var styleCSS []byte
+
+func StyleCSS() []byte {
+	return styleCSS
+}
+
 type TemplateRenderer struct {
 	tmpl *template.Template
 }

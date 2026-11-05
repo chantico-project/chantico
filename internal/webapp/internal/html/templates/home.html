@@ -1,41 +1,39 @@
+<!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chantico</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <header>
+      <h1>Kubernetes cluster information</h1>
+      <dl>
+        <dt>Host</dt>
+        <dd>{{ .Host }}</dd>
+        <dt>CurrentContext</dt>
+        <dd>{{ .CurrentContext }}</dd>
+      </dl>
+    </header>
 
-<head>
-    <meta charset="utf-8"/>
-</head>
-
-<body>
-    <div>
-      <div>
-        Kubernetes cluster information:
-      </div>
-      <div>
-        Host: {{ .Host }}
-      </div>
-      <div>
-        CurrentContext: {{ .CurrentContext }}
-      </div>
-    </div>
-    {{ if .Diagram }}
-
-    <pre class="mermaid" style="visibility: hidden;">
-        {{ .Diagram }}
-    </pre>
-
-    {{ else }}
-
-    <div>There is no input to generate the graph.</div>
-
-    {{ end }}
+    <main>
+      {{ if .Diagram }}
+      <pre class="mermaid" style="visibility: hidden;">
+{{ .Diagram }}
+      </pre>
+      {{ else }}
+      <p>There is no input to generate the graph.</p>
+      {{ end }}
+    </main>
 
     <script type="module">
-        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-        mermaid.initialize({ startOnLoad: true });
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true });
 
-        document.addEventListener("DOMContentLoaded", () => {
-            const diagrams = document.querySelectorAll("pre.mermaid");
-            diagrams.forEach(pre => pre.style.visibility = "visible");
-        })
+      document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll("pre.mermaid").forEach(pre => pre.style.visibility = "visible");
+      });
     </script>
-</body>
+  </body>
 </html>
