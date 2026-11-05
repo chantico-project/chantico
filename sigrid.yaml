@@ -14,3 +14,5 @@ thirdpartyfindings:
     - ".*/.*_test[.].go"
     - ".*/.*mock.*.yaml"
     - ".*/testdata/.*[.]json"
+    # Exclude the docker-compose files used for stress testing observability because it is a development setup restricted to the development team and not relevant for production deployments.
+    - "./dev/stresstest-observability/docker-compose.yml"

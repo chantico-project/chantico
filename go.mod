@@ -6,6 +6,7 @@ require (
 	github.com/go-logr/logr v1.4.4
 	github.com/google/renameio v1.0.1
 	github.com/gosnmp/gosnmp v1.43.2
+	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.67.5
 	go.uber.org/zap v1.27.1
 	go.yaml.in/yaml/v2 v2.4.4
@@ -61,7 +62,6 @@ require (
 	github.com/onsi/gomega v1.39.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect

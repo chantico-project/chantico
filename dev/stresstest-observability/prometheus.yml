@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 2s
+
+scrape_configs:
+  - job_name: stresstest
+    static_configs:
+      - targets: ["localhost:2112"]
