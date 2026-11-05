@@ -173,13 +173,13 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 		--set visualisationWebapp.service.type="NodePort"
 
 .PHONY: cluster-load-visualisation-webapp
-cluster-load-visualisation-webapp: kind ## Load the locally built visualisation webapp image into the Kind cluster
+cluster-load-visualisation-webapp: kind ## Load the visualisation webapp image into the Kind cluster.
 	$(call kind_load,$(VISUALISATION_WEBAPP_IMG),$(KIND_CLUSTER_NAME))
 
 .PHONY: cluster-load-mock-images
-cluster-load-mock-images:
-	$(call kind_load,$(SNMP_MOCK_IMAGE),kind)
-	$(call kind_load,$(VM_ATTRIBUTION_MOCK_IMAGE),kind)
+cluster-load-mock-images: ## Load the SNMP and VM attribution mock images into the Kind cluster.
+	$(call kind_load,$(SNMP_MOCK_IMAGE),$(KIND_CLUSTER_NAME))
+	$(call kind_load,$(VM_ATTRIBUTION_MOCK_IMAGE),$(KIND_CLUSTER_NAME))
 
 .PHONY: cluster-mocks
 cluster-mocks: cluster-load-mock-images ## Apply the mock deployments and services.
@@ -216,21 +216,29 @@ run: manifests generate ## Run a controller from your host.
 ARCH ?=
 BAKE = $(if $(ARCH),IMAGE_ARCH=$(ARCH) )$(CONTAINER_TOOL) buildx bake
 
+.PHONY: docker-pull
+docker-pull: ## Pull docker image with the manager.
+	$(CONTAINER_TOOL) pull ${IMG}
+
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
 	$(BAKE) controller --load --set controller.tags=${IMG}
+
+.PHONY: docker-pull-visualisation-webapp
+docker-pull-visualisation-webapp: ## Pull docker image with the visualisation webapp.
+	$(CONTAINER_TOOL) pull $(VISUALISATION_WEBAPP_IMG)
 
 .PHONY: docker-build-visualisation-webapp
 docker-build-visualisation-webapp: ## Build docker image with the visualisation webapp.
 	$(BAKE) visualisation-webapp --load --set visualisation-webapp.tags=$(VISUALISATION_WEBAPP_IMG)
 
 .PHONY: docker-pull-mocks
-docker-pull-mocks:
+docker-pull-mocks: ## Pull docker images with the SNMP and VM attribution mocks.
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
 	$(CONTAINER_TOOL) pull $(VM_ATTRIBUTION_MOCK_IMAGE)
 
 .PHONY: docker-build-mocks
-docker-build-mocks:
+docker-build-mocks: ## Build docker images with the SNMP and VM attribution mocks.
 	$(BAKE) mocks --load \
 		--set snmp-mock.tags=$(SNMP_MOCK_IMAGE) \
 		--set vm-attribution-mock.tags=$(VM_ATTRIBUTION_MOCK_IMAGE)
