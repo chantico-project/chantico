@@ -21,8 +21,7 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
 1. Create the MeasurementDevice matching the required type of MeasurementDevice
     1. Create a `measurement_device.yaml` file. The SNMP authentication is 
        provided through `spec.authFrom`, which reads it from a `Secret` (see 
-       [Providing SNMP authentication](#providing-snmp-authentication) for 
-       other options):
+       Providing SNMP authentication section for other options):
 
         ```yaml
           apiVersion: v1

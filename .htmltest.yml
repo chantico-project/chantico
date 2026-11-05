@@ -1,0 +1,3 @@
+IgnoreDirs:
+  - docs/public/chantico
+IgnoreAltMissing: true
