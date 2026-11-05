@@ -5,23 +5,37 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.21.0
 
+# PR_NUMBER selects the images built by CI for a pull request (repository suffix -pr, tag pr-<number>).
+# Set it to a number, or to "auto" to look up the PR of the current branch with the gh CLI.
+# When unset (or no PR is found), the regular images with the latest tag are used.
+PR_NUMBER ?=
+ifeq ($(PR_NUMBER),auto)
+override PR_NUMBER := $(shell command -v gh >/dev/null 2>&1 && gh pr view --json number -q .number 2>/dev/null)
+endif
+IMAGE_SUFFIX ?= $(if $(PR_NUMBER),-pr)
+IMAGE_TAG ?= $(if $(PR_NUMBER),pr-$(PR_NUMBER),latest)
+
 # Image REPOSITORY_URL to use all building/pushing image targets
-IMG ?= ghcr.io/chantico-project/images/chantico:latest
+REPO ?= ghcr.io/chantico-project/images/chantico$(IMAGE_SUFFIX)
+TAG ?= $(IMAGE_TAG)
+IMG ?= $(REPO):$(TAG)
 CHANTICO_DATA_PATH ?= .chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
 CHANTICO_NAMESPACE ?= chantico
-VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visualisation-webapp
-VISUALISATION_WEBAPP_TAG ?= latest
+VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visualisation-webapp$(IMAGE_SUFFIX)
+VISUALISATION_WEBAPP_TAG ?= $(IMAGE_TAG)
 VISUALISATION_WEBAPP_IMG ?= $(VISUALISATION_WEBAPP_REPOSITORY):$(VISUALISATION_WEBAPP_TAG)
 
 LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
 LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 
-SNMP_MOCK_TAG ?= latest
-SNMP_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
-VM_ATTRIBUTION_MOCK_TAG ?= latest
-VM_ATTRIBUTION_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-vm-attribution-mock:$(VM_ATTRIBUTION_MOCK_TAG)
+SNMP_MOCK_TAG ?= $(IMAGE_TAG)
+SNMP_MOCK_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-snmp-mock$(IMAGE_SUFFIX)
+SNMP_MOCK_IMAGE ?= $(SNMP_MOCK_REPOSITORY):$(SNMP_MOCK_TAG)
+VM_ATTRIBUTION_MOCK_TAG ?= $(IMAGE_TAG)
+VM_ATTRIBUTION_MOCK_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-vm-attribution-mock$(IMAGE_SUFFIX)
+VM_ATTRIBUTION_MOCK_IMAGE ?= $(VM_ATTRIBUTION_MOCK_REPOSITORY):$(VM_ATTRIBUTION_MOCK_TAG)
 
 # Name of the kind cluster created by cluster-up, and the kube context it produces.
 KIND_CLUSTER_NAME ?= kind
@@ -39,6 +53,14 @@ endif
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= docker
+
+# kind_load loads an image into a kind cluster.
+# This works for multi-arch images, avoiding exporting platforms whose blobs are
+# not present locally. Instead, only the host platform is saved and loaded.
+HOST_ARCH ?= $(shell go env GOARCH)
+define kind_load
+$(CONTAINER_TOOL) save --platform linux/$(HOST_ARCH) $(1) | $(KIND) load image-archive /dev/stdin --name $(2)
+endef
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -152,12 +174,12 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 
 .PHONY: cluster-load-visualisation-webapp
 cluster-load-visualisation-webapp: kind ## Load the locally built visualisation webapp image into the Kind cluster
-	$(KIND) load docker-image $(VISUALISATION_WEBAPP_IMG) --name $(KIND_CLUSTER_NAME)
+	$(call kind_load,$(VISUALISATION_WEBAPP_IMG),$(KIND_CLUSTER_NAME))
 
 .PHONY: cluster-load-mock-images
 cluster-load-mock-images:
-	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
-	$(KIND) load docker-image chantico-vm-attribution-mock:latest --name kind
+	$(call kind_load,$(SNMP_MOCK_IMAGE),kind)
+	$(call kind_load,$(VM_ATTRIBUTION_MOCK_IMAGE),kind)
 
 .PHONY: cluster-mocks
 cluster-mocks: cluster-load-mock-images ## Apply the mock deployments and services.
@@ -205,15 +227,13 @@ docker-build-visualisation-webapp: ## Build docker image with the visualisation 
 .PHONY: docker-pull-mocks
 docker-pull-mocks:
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
-	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
 	$(CONTAINER_TOOL) pull $(VM_ATTRIBUTION_MOCK_IMAGE)
-	$(CONTAINER_TOOL) tag $(VM_ATTRIBUTION_MOCK_IMAGE) chantico-vm-attribution-mock:latest
 
 .PHONY: docker-build-mocks
 docker-build-mocks:
 	$(BAKE) mocks --load \
-		--set snmp-mock.tags=chantico-snmp-mock:latest \
-		--set vm-attribution-mock.tags=chantico-vm-attribution-mock:latest
+		--set snmp-mock.tags=$(SNMP_MOCK_IMAGE) \
+		--set vm-attribution-mock.tags=$(VM_ATTRIBUTION_MOCK_IMAGE)
 
 HELM_CHART_DIR ?= chart
 GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
