@@ -6,7 +6,11 @@ menus:
     weight: 30
 ---
 
+<<<<<<< HEAD
 ## Stress test overview
+=======
+## Custom resources generation for the stress test
+>>>>>>> f1ff608 (tmp)
 
 ### Generated custom resources
 
@@ -28,9 +32,48 @@ DataCenterResources are generated in a two-layer hierarchy:
 
 All resources are created sequentially with a configurable delay between requests, controlled by the `--delay` flag (default: 100ms).
 
+<<<<<<< HEAD
 ## Stress test observability stack
 
 The stress test includes an observability stack that monitors resource creation and reconciliation.
+=======
+### Running the stress test
+
+To run the stress test, execute the following command:
+
+```bash
+go run ./dev/stresstest/
+```
+
+The different option flags can be viewed by running:
+
+```bash
+go run ./dev/stresstest/ -h
+```
+
+## Observing the stress test
+
+The stress test includes an observability stack that monitors resource creation and reconciliation:
+
+### Start the observability stack
+
+```bash
+KUBECONFIG_FILE=${HOME}/.kube/config docker compose -f ./dev/stresstest-observability/docker-compose.yml up
+```
+The`KUBECONFIG_FILE` environment variable specifies the Kubernetes configuration file that will be mounted into the Prometheus and Grafana containers. This file contains the cluster connection details and authentication credentials required for the observability stack to access your Kubernetes cluster and collect metrics. In most environments, the kubeconfig is located at `${HOME}/.kube/config`
+
+This command:
+- Starts Prometheus on `http://localhost:9090` to scrape metrics from the stress test application
+- Starts Grafana on `http://localhost:3000` with pre-configured dashboards and datasources
+- Configures both services to run on host network mode for direct access to your Kubernetes cluster metrics
+- Enables metric collection at 200ms intervals for real-time monitoring
+
+To stop the observability stack:
+
+```bash
+docker compose -f ./dev/stresstest-observability/docker-compose.yml down
+```
+>>>>>>> f1ff608 (tmp)
 
 ### Prometheus
 
@@ -54,6 +97,7 @@ Grafana provides visualization dashboards for the collected metrics. Key feature
 - **Access**: Available at `http://localhost:3000`
 
 The observability stack runs alongside the stress test via Docker Compose with all services on host network mode for direct access to the Kubernetes cluster metrics.
+<<<<<<< HEAD
 
 ## Running the observability stack
 
@@ -96,3 +140,5 @@ To clean the generated resources after the stress test, execute the following co
 ```bash
 go run ./dev/stresstest/ -cleanup
 ```
+=======
+>>>>>>> f1ff608 (tmp)
