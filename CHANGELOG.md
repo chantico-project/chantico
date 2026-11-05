@@ -1,3 +1,9 @@
+## 0.24.0 (2026-11-05)
+
+#### Feature
+
+* Create a stress test to find the limit of custom resources deployed (#268) (6b64b838)
+
 ## 0.23.1 (2026-11-04)
 
 #### Bug Fixes
