@@ -4,16 +4,21 @@ import (
 	"embed"
 	"html/template"
 	"io"
+	"io/fs"
 )
 
 //go:embed templates/*.html
-var fs embed.FS
+var templateFS embed.FS
 
-//go:embed static/style.css
-var styleCSS []byte
+//go:embed static
+var staticFS embed.FS
 
-func StyleCSS() []byte {
-	return styleCSS
+func StaticFS() fs.FS {
+	sub, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		panic(err)
+	}
+	return sub
 }
 
 type TemplateRenderer struct {
@@ -21,7 +26,7 @@ type TemplateRenderer struct {
 }
 
 func New() (*TemplateRenderer, error) {
-	tmpl, err := template.ParseFS(fs, "templates/*.html")
+	tmpl, err := template.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +36,6 @@ func New() (*TemplateRenderer, error) {
 }
 
 type HomePageData struct {
-	Diagram        string
 	Host           string
 	CurrentContext string
 }

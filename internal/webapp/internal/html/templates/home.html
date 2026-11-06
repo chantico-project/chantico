@@ -8,7 +8,8 @@
   </head>
   <body>
     <header>
-      <h1>Kubernetes cluster information</h1>
+      <img class="logo" src="/static/chantico-dark.png" alt="Chantico">
+      <h1>Kubernetes cluster information <span class="badge">Experimental</span></h1>
       <dl>
         <dt>Host</dt>
         <dd>{{ .Host }}</dd>
@@ -18,22 +19,17 @@
     </header>
 
     <main>
-      {{ if .Diagram }}
-      <pre class="mermaid" style="visibility: hidden;">
-{{ .Diagram }}
-      </pre>
-      {{ else }}
-      <p>There is no input to generate the graph.</p>
-      {{ end }}
+      <div class="layout">
+        <div id="graph" class="graph"></div>
+        <div id="divider" class="divider" role="separator" aria-orientation="vertical"></div>
+        <aside class="panel">
+          <h2>Selected node</h2>
+          <p id="selected-node">None</p>
+        </aside>
+      </div>
     </main>
 
-    <script type="module">
-      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-      mermaid.initialize({ startOnLoad: true });
-
-      document.addEventListener("DOMContentLoaded", () => {
-        document.querySelectorAll("pre.mermaid").forEach(pre => pre.style.visibility = "visible");
-      });
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+    <script src="/static/graph.js"></script>
   </body>
 </html>

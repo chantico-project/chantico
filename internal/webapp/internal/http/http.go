@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -30,7 +31,8 @@ type HTTPServerConfig struct {
 func New(h *HTTPServerHandler, config *HTTPServerConfig) *HTTPServer {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", h.HomePage)
-	mux.HandleFunc("GET /static/style.css", serveStyle)
+	mux.HandleFunc("GET /api/graph", h.GraphAPI)
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(html.StaticFS()))))
 
 	server := &http.Server{
 		Addr:              ":" + strconv.Itoa(config.Port),
@@ -56,16 +58,21 @@ func (s HTTPServer) Stop(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-func serveStyle(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	_, _ = w.Write(html.StyleCSS())
+func (h *HTTPServerHandler) GraphAPI(w http.ResponseWriter, r *http.Request) {
+	nodes, err := h.Kubernetes.GetDataCenterResources()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(graph.BuildElements(nodes))
 }
 
 func (h *HTTPServerHandler) HomePage(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Handling home page request:", r.URL.Path)
 
-	nodes, err := h.Kubernetes.GetDataCenterResources()
-	if err != nil {
+	if _, err := h.Kubernetes.GetDataCenterResources(); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		h.Renderer.RenderErrorPage(w, html.ErrorPageData{
 			Host:           h.Kubernetes.Host,
@@ -75,10 +82,8 @@ func (h *HTTPServerHandler) HomePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m := graph.GenerateMermaidString(nodes)
 	h.Renderer.RenderHomePage(w, html.HomePageData{
 		Host:           h.Kubernetes.Host,
 		CurrentContext: h.Kubernetes.CurrentContext,
-		Diagram:        m,
 	})
 }
