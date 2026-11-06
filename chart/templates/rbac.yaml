@@ -98,6 +98,20 @@ rules:
   - create
   - patch
   - update
+  # Allow access to Prometheus Operator Resources monitoring resources
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - prometheusrules
+  - scrapeconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: {{ if $allNamespaces }}ClusterRoleBinding{{ else }}RoleBinding{{ end }}

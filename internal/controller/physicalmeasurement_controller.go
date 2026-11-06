@@ -25,6 +25,7 @@ import (
 	"chantico/internal/steps"
 
 	"github.com/go-logr/logr"
+	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,6 +46,7 @@ type TargetConfigurer interface {
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/finalizers,verbs=create;update;patch
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=measurementdevices,verbs=get;list;watch
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=scrapeconfigs,verbs=get;list;watch;create;update;patch;delete
 
 // PhysicalMeasurementReconciler reconciles a PhysicalMeasurement object
 type PhysicalMeasurementReconciler struct {
@@ -55,6 +57,7 @@ type PhysicalMeasurementReconciler struct {
 func (r *PhysicalMeasurementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chantico.PhysicalMeasurement{}).
+		Owns(&monitoringv1alpha1.ScrapeConfig{}).
 		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
 			log := mgr.GetLogger().WithName("PhysicalMeasurementController")
 			if req != nil {
