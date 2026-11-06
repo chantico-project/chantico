@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,8 +27,9 @@ func BuildRuleFile(ctx context.Context, client client.Client, resource *chantico
 	return NewRuleBuilder(resource, resolvedExpressions).BuildRuleFile(), nil
 }
 
-type KubePrometheusRecordingRules struct {
+type PrometheusRecordingRuleConfigurer struct {
 	Client client.Client
+	Scheme *runtime.Scheme
 }
 
 func buildRuleGroup(group *RuleGroup) monitoringv1.RuleGroup {
@@ -46,7 +48,7 @@ func buildRuleGroup(group *RuleGroup) monitoringv1.RuleGroup {
 	}
 }
 
-func (f *KubePrometheusRecordingRules) Reconcile(ctx context.Context, resource *chantico.DataCenterResource) error {
+func (f *PrometheusRecordingRuleConfigurer) Reconcile(ctx context.Context, resource *chantico.DataCenterResource) error {
 	ruleFile, err := BuildRuleFile(ctx, f.Client, resource)
 	if err != nil {
 		return err
@@ -73,6 +75,10 @@ func (f *KubePrometheusRecordingRules) Reconcile(ctx context.Context, resource *
 
 	desired := rule.DeepCopy()
 
+	if err := controllerutil.SetControllerReference(resource, rule, f.Scheme); err != nil {
+		return fmt.Errorf("set controller reference: %w", err)
+	}
+
 	_, err = controllerutil.CreateOrUpdate(ctx, f.Client, rule, func() error {
 		if rule.Labels == nil {
 			rule.Labels = make(map[string]string)
@@ -89,7 +95,7 @@ func (f *KubePrometheusRecordingRules) Reconcile(ctx context.Context, resource *
 	return nil
 }
 
-func (f *KubePrometheusRecordingRules) Delete(ctx context.Context, resource *chantico.DataCenterResource) error {
+func (f *PrometheusRecordingRuleConfigurer) Delete(ctx context.Context, resource *chantico.DataCenterResource) error {
 
 	scrapeConfig := &monitoringv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{

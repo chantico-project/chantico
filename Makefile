@@ -199,6 +199,7 @@ cluster-mock-resources: ## Apply the sample configurations for the mocks
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
+	mkdir -p $(CHANTICO_DATA_PATH)/snmp/mibs/
 	cp dev/mibs/* $(CHANTICO_DATA_PATH)/snmp/mibs/
 
 ##@ Build
