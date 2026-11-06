@@ -19,10 +19,9 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
     1. Login with (user: admin, password: admin)
     1. Upload your MIBS files in `snmp/mibs`
 1. Create the MeasurementDevice matching the required type of MeasurementDevice
-    1. Create a `measurement_device.yaml` file. The SNMP authentication is 
-       provided through `spec.authFrom`, which reads it from a `Secret` (see 
-       [Providing SNMP authentication](#providing-snmp-authentication) for 
-       other options):
+     1. Create a `measurement_device.yaml` file. The SNMP authentication is 
+        provided through `spec.authFrom`, which reads it from a `Secret` (see 
+        [Providing SNMP authentication]({{< relref "#providing-snmp-authentication" >}}) section for other options):
 
         ```yaml
           apiVersion: v1
@@ -139,4 +138,3 @@ If two metrics have the same name, there are two methods to disambiguate. Let's 
 
 1. the user can fully qualify the "path" within the MIB tree via human readable language `TNO-PDU-MIB::tnoPduEnergyValue`
 1. the user can fully qualify the "path" within the MIB tree via the OID `1.3.6.1.4.99999.1`
-
