@@ -61,12 +61,12 @@ func setupPhysicalMeasurementTest(t *testing.T, objs ...runtime.Object) (client.
 		WithRuntimeObjects(objs...).
 		Build()
 
-	targetConfigurer := &pm.KubePrometheusTargets{
+	targetConfigurer := &pm.PrometheusTargetConfigurer{
 		Client:              kubeClient,
 		SNMPExporterAddress: testSNMPExporterAddress,
 	}
 
-	return kubeClient, &PhysicalMeasurementReconciler{Client: kubeClient, Scheme: kubeClient.Scheme(), Targets: targetConfigurer}
+	return kubeClient, &PhysicalMeasurementReconciler{Client: kubeClient, TargetConfigurer: targetConfigurer}
 }
 
 func TestReconcileTargetFile_WritesTargetFile(t *testing.T) {
@@ -373,7 +373,7 @@ func TestReconcileTargets_SNMPRelabelConfigs(t *testing.T) {
 
 func TestReconcileTargets_SNMPRequiresExporterAddress(t *testing.T) {
 	_, reconciler := setupPhysicalMeasurementTest(t)
-	reconciler.Targets.(*pm.KubePrometheusTargets).SNMPExporterAddress = ""
+	reconciler.TargetConfigurer.(*pm.PrometheusTargetConfigurer).SNMPExporterAddress = ""
 
 	physicalMeasurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{Name: testPM},

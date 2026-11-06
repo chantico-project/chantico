@@ -188,26 +188,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	targets := &physicalmeasurement.KubePrometheusTargets{
+	targetConfigurer := &physicalmeasurement.PrometheusTargetConfigurer{
 		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
 		SNMPExporterAddress: snmpExporterAddress,
 	}
-	rules := &datacenterresource.KubePrometheusRecordingRules{
-		Client: mgr.GetClient(),
-	}
-
 	if err = (&controller.PhysicalMeasurementReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Targets: targets,
+		Client:           mgr.GetClient(),
+		TargetConfigurer: targetConfigurer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PhysicalMeasurement")
 		os.Exit(1)
 	}
+
+	ruleConfigurer := &datacenterresource.PrometheusRecordingRuleConfigurer{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}
 	if err := (&controller.DataCenterResourceReconciler{
 		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		RuleConfigurer: rules,
+		RuleConfigurer: ruleConfigurer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DataCenterResource")
 		os.Exit(1)

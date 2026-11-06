@@ -15,7 +15,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,7 +42,6 @@ type RecordingRuleConfigurer interface {
 // DataCenterResourceReconciler reconciles a DataCenterResource object
 type DataCenterResourceReconciler struct {
 	client.Client
-	Scheme         *runtime.Scheme
 	RuleConfigurer RecordingRuleConfigurer
 }
 

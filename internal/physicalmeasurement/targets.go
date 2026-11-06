@@ -7,6 +7,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"context"
 	"fmt"
@@ -17,12 +18,13 @@ import (
 
 type FileTargets struct{}
 
-type KubePrometheusTargets struct {
+type PrometheusTargetConfigurer struct {
 	Client              client.Client
+	Scheme              *runtime.Scheme
 	SNMPExporterAddress string
 }
 
-func (targets *KubePrometheusTargets) Reconcile(
+func (targets *PrometheusTargetConfigurer) Reconcile(
 	ctx context.Context,
 	measurement *chantico.PhysicalMeasurement,
 ) error {
@@ -88,7 +90,7 @@ func (targets *KubePrometheusTargets) Reconcile(
 	return nil
 }
 
-func (targets *KubePrometheusTargets) Delete(
+func (targets *PrometheusTargetConfigurer) Delete(
 	ctx context.Context,
 	measurement *chantico.PhysicalMeasurement,
 ) error {

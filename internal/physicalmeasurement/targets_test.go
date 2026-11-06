@@ -29,11 +29,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func setupKubePrometheusTargetsTest(t *testing.T) (*KubePrometheusTargets, *chantico.PhysicalMeasurement) {
+func setupKubePrometheusTargetsTest(t *testing.T) (*PrometheusTargetConfigurer, *chantico.PhysicalMeasurement) {
 	t.Helper()
 
 	kubeClient := testutil.NewFakeClientBuilder(t, monitoringv1alpha1.AddToScheme).Build()
-	targets := &KubePrometheusTargets{Client: kubeClient}
+	targets := &PrometheusTargetConfigurer{Client: kubeClient, Scheme: kubeClient.Scheme()}
 	measurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{Name: "measurement", Namespace: "chantico"},
 		Spec: chantico.PhysicalMeasurementSpec{
@@ -45,7 +45,7 @@ func setupKubePrometheusTargetsTest(t *testing.T) (*KubePrometheusTargets, *chan
 }
 
 // Call reconcile and retrieve the created ScrapeConfig
-func reconcileKubePrometheusTargetsForTest(t *testing.T, targets *KubePrometheusTargets, measurement *chantico.PhysicalMeasurement) *monitoringv1alpha1.ScrapeConfig {
+func reconcileKubePrometheusTargetsForTest(t *testing.T, targets *PrometheusTargetConfigurer, measurement *chantico.PhysicalMeasurement) *monitoringv1alpha1.ScrapeConfig {
 	t.Helper()
 
 	if err := targets.Reconcile(t.Context(), measurement); err != nil {

@@ -42,13 +42,13 @@ func setupDataCenterResourceRuleTest(t *testing.T) (client.WithWatch, *DataCente
 		WithStatusSubresource(&chantico.DataCenterResource{}).
 		Build()
 
-	ruleConfigurer := dcr.KubePrometheusRecordingRules{
+	ruleConfigurer := dcr.PrometheusRecordingRuleConfigurer{
 		Client: kubeClient,
+		Scheme: kubeClient.Scheme(),
 	}
 
 	return kubeClient, &DataCenterResourceReconciler{
 		Client:         kubeClient,
-		Scheme:         kubeClient.Scheme(),
 		RuleConfigurer: &ruleConfigurer,
 	}
 }

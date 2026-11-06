@@ -28,11 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func setupRecordingRulesTest(t *testing.T) (*KubePrometheusRecordingRules, *chantico.DataCenterResource) {
+func setupRecordingRulesTest(t *testing.T) (*PrometheusRecordingRuleConfigurer, *chantico.DataCenterResource) {
 	t.Helper()
 
-	kubeClient := testutil.NewFakeClientBuilder(t, monitoringv1.AddToScheme).Build()
-	rules := &KubePrometheusRecordingRules{Client: kubeClient}
+	kubeClient := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1.AddToScheme).Build()
+	rules := &PrometheusRecordingRuleConfigurer{Client: kubeClient, Scheme: kubeClient.Scheme()}
 	resource := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "pdu", Namespace: "chantico"},
 		Spec: chantico.DataCenterResourceSpec{
@@ -45,7 +45,7 @@ func setupRecordingRulesTest(t *testing.T) (*KubePrometheusRecordingRules, *chan
 	return rules, resource
 }
 
-func reconcileRecordingRulesForTest(t *testing.T, rules *KubePrometheusRecordingRules, resource *chantico.DataCenterResource) *monitoringv1.PrometheusRule {
+func reconcileRecordingRulesForTest(t *testing.T, rules *PrometheusRecordingRuleConfigurer, resource *chantico.DataCenterResource) *monitoringv1.PrometheusRule {
 	t.Helper()
 
 	if err := rules.Reconcile(t.Context(), resource); err != nil {

@@ -27,7 +27,6 @@ import (
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,8 +49,7 @@ type TargetConfigurer interface {
 // PhysicalMeasurementReconciler reconciles a PhysicalMeasurement object
 type PhysicalMeasurementReconciler struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	Targets TargetConfigurer
+	TargetConfigurer TargetConfigurer
 }
 
 func (r *PhysicalMeasurementReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -111,7 +109,7 @@ func (r *PhysicalMeasurementReconciler) reconcileDeletion(ctx context.Context, p
 		return steps.Stop()
 	}
 
-	if err := r.Targets.Delete(ctx, physicalMeasurement); err != nil {
+	if err := r.TargetConfigurer.Delete(ctx, physicalMeasurement); err != nil {
 		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting target: "+err.Error())
 		return steps.Error(err)
 	}
@@ -175,7 +173,7 @@ func (r *PhysicalMeasurementReconciler) validateMeasurementDevice(ctx context.Co
 }
 
 func (r *PhysicalMeasurementReconciler) reconcileTargets(ctx context.Context, physicalMeasurement *chantico.PhysicalMeasurement) steps.StepResult {
-	if err := r.Targets.Reconcile(ctx, physicalMeasurement); err != nil {
+	if err := r.TargetConfigurer.Reconcile(ctx, physicalMeasurement); err != nil {
 		physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, err.Error())
 		return steps.Error(err)
 	}
