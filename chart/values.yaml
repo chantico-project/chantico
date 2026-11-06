@@ -39,6 +39,16 @@ visualisationWebapp:
     pullPolicy: IfNotPresent
   service:
     type: "ClusterIP"
+  httpRoute:
+    enabled: false
+    annotations: {}
+    parentRefs: []
+    hostnames: []
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
 pv:
   enabled: false
   name: chantico-persistent-volume

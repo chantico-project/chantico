@@ -129,13 +129,13 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 # 	idempotent helm installation
 	helm upgrade --install chantico ./chart/ \
 		--namespace $(CHANTICO_NAMESPACE) \
-		--set controller.include=false \
+		--set controller.enabled=false \
 		--set securityContext.runAsUser="$(shell id -u)" \
 		--set securityContext.runAsGroup="$(shell id -g)" \
 		--set persistentVolumeClaimName=$(CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME) \
 		--set pvc.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
 		--set pvc.volumeName=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
-		--set pv.include=true \
+		--set pv.enabled=true \
 		--set pv.name=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
 		--set pv.storage=$(LOCAL_DEVELOPMENT_STORAGE) \
 		--set pv.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
@@ -145,7 +145,7 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 		--set prometheus.service.type="NodePort" \
 		--set victoriaMetrics.service.type="NodePort" \
 		--set grafana.service.type="NodePort" \
-		--set visualisationWebapp.include=true \
+		--set visualisationWebapp.enabled=true \
 		--set visualisationWebapp.image.repository="$(VISUALISATION_WEBAPP_REPOSITORY)" \
 		--set visualisationWebapp.image.tag="$(VISUALISATION_WEBAPP_TAG)" \
 		--set visualisationWebapp.service.type="NodePort"
