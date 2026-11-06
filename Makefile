@@ -202,6 +202,10 @@ cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the 
 	mkdir -p $(CHANTICO_DATA_PATH)/snmp/mibs/
 	cp dev/mibs/* $(CHANTICO_DATA_PATH)/snmp/mibs/
 
+.PHONY: cluster-dev-reset
+cluster-dev-reset: cluster-clean cluster-up cluster-configure cluster-mibs cluster-mocks cluster-mock-resources 
+	@echo "Cluster development environment has been reset."
+
 ##@ Build
 
 .PHONY: build
