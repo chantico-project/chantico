@@ -32,7 +32,7 @@ import (
 func setupKubePrometheusTargetsTest(t *testing.T) (*PrometheusTargetConfigurer, *chantico.PhysicalMeasurement) {
 	t.Helper()
 
-	kubeClient := testutil.NewFakeClientBuilder(t, monitoringv1alpha1.AddToScheme).Build()
+	kubeClient := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1alpha1.AddToScheme).Build()
 	targets := &PrometheusTargetConfigurer{Client: kubeClient, Scheme: kubeClient.Scheme()}
 	measurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{Name: "measurement", Namespace: "chantico"},
@@ -87,6 +87,33 @@ func TestKubePrometheusTargetsReconcile_UpdatesTarget(t *testing.T) {
 
 	if got := observed.Spec.StaticConfigs[0].Targets[0]; got != monitoringv1alpha1.Target(measurement.Spec.Ip) {
 		t.Fatalf("target = %q, want %q", got, measurement.Spec.Ip)
+	}
+}
+
+func TestKubePrometheusTargetsReconcile_SetsOwnerReference(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+
+	created := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+	assertControlledBy(t, created.OwnerReferences, measurement)
+
+	// The existing object is fetched before being updated, so the owner must survive an update too
+	measurement.Spec.Ip = "192.0.2.2:9100"
+	updated := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+	assertControlledBy(t, updated.OwnerReferences, measurement)
+}
+
+func assertControlledBy(t *testing.T, refs []metav1.OwnerReference, owner *chantico.PhysicalMeasurement) {
+	t.Helper()
+
+	if len(refs) != 1 {
+		t.Fatalf("expected one owner reference, got %v", refs)
+	}
+	ref := refs[0]
+	if ref.Kind != "PhysicalMeasurement" || ref.Name != owner.Name {
+		t.Fatalf("unexpected owner reference: %v", ref)
+	}
+	if ref.Controller == nil || !*ref.Controller {
+		t.Fatalf("owner reference is not a controller reference: %v", ref)
 	}
 }
 

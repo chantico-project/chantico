@@ -85,6 +85,33 @@ func TestKubePrometheusRecordingRulesReconcile_CreatesAndUpdatesRule(t *testing.
 	}
 }
 
+func TestKubePrometheusRecordingRulesReconcile_SetsOwnerReference(t *testing.T) {
+	rules, resource := setupRecordingRulesTest(t)
+
+	created := reconcileRecordingRulesForTest(t, rules, resource)
+	assertControlledBy(t, created.OwnerReferences, resource)
+
+	// The existing object is fetched before being updated, so the owner must survive an update too
+	resource.Spec.EnergyMetricFrom.Value = "updated_power_watts"
+	updated := reconcileRecordingRulesForTest(t, rules, resource)
+	assertControlledBy(t, updated.OwnerReferences, resource)
+}
+
+func assertControlledBy(t *testing.T, refs []metav1.OwnerReference, owner *chantico.DataCenterResource) {
+	t.Helper()
+
+	if len(refs) != 1 {
+		t.Fatalf("expected one owner reference, got %v", refs)
+	}
+	ref := refs[0]
+	if ref.Kind != "DataCenterResource" || ref.Name != owner.Name {
+		t.Fatalf("unexpected owner reference: %v", ref)
+	}
+	if ref.Controller == nil || !*ref.Controller {
+		t.Fatalf("owner reference is not a controller reference: %v", ref)
+	}
+}
+
 func TestKubePrometheusRecordingRulesReconcile_SkipsUnchangedRule(t *testing.T) {
 	rules, resource := setupRecordingRulesTest(t)
 	observed := reconcileRecordingRulesForTest(t, rules, resource)

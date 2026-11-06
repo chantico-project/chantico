@@ -13,7 +13,6 @@ import (
 	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type FileTargets struct{}
@@ -73,16 +72,8 @@ func (targets *PrometheusTargetConfigurer) Reconcile(
 			},
 		}
 	}
-	desired := scrapeConfig.DeepCopy()
-	_, err := controllerutil.CreateOrUpdate(ctx, targets.Client, scrapeConfig, func() error {
-		if scrapeConfig.Labels == nil {
-			scrapeConfig.Labels = make(map[string]string)
-		}
-		for key, value := range desired.Labels {
-			scrapeConfig.Labels[key] = value
-		}
-		scrapeConfig.Spec = desired.Spec
-		return nil
+	err := k8s.ApplyWithOwner(ctx, targets.Client, targets.Scheme, measurement, scrapeConfig, func(existing, desired *monitoringv1alpha1.ScrapeConfig) {
+		existing.Spec = desired.Spec
 	})
 	if err != nil {
 		return fmt.Errorf("reconcile scrape config: %w", err)

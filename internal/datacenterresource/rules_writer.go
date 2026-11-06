@@ -13,54 +13,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
-
-func BuildRuleFile(ctx context.Context, client client.Client, resource *chantico.DataCenterResource) (*RuleFile, error) {
-
-	renderer := NewTemplateRenderer(client, resource.Namespace)
-	resolvedExpressions, err := renderer.ResolvedExpressions(ctx, resource)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewRuleBuilder(resource, resolvedExpressions).BuildRuleFile(), nil
-}
 
 type PrometheusRecordingRuleConfigurer struct {
 	Client client.Client
 	Scheme *runtime.Scheme
 }
 
-func buildRuleGroup(group *RuleGroup) monitoringv1.RuleGroup {
-	promRules := []monitoringv1.Rule{}
-	for _, rule := range group.Rules {
-		promRules = append(promRules, monitoringv1.Rule{
-			Expr:   intstr.FromString(rule.Expr),
-			Labels: rule.Labels,
-			Record: rule.Record,
-		})
-	}
-
-	return monitoringv1.RuleGroup{
-		Name:  group.Name,
-		Rules: promRules,
-	}
-}
-
 func (f *PrometheusRecordingRuleConfigurer) Reconcile(ctx context.Context, resource *chantico.DataCenterResource) error {
-	ruleFile, err := BuildRuleFile(ctx, f.Client, resource)
+	generatedRules, err := generateRules(ctx, f.Client, resource)
 	if err != nil {
 		return err
 	}
-	if ruleFile == nil {
-		return f.Delete(ctx, resource)
-	}
 
-	promGroups := []monitoringv1.RuleGroup{}
-	for _, group := range ruleFile.Groups {
-		promGroups = append(promGroups, buildRuleGroup(&group))
-	}
+	promRuleSpec := convertPrometheusRuleSpec(generatedRules)
 
 	rule := &monitoringv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -68,26 +34,11 @@ func (f *PrometheusRecordingRuleConfigurer) Reconcile(ctx context.Context, resou
 			Namespace: resource.Namespace,
 			Labels:    k8s.PrometheusResourceLabels(),
 		},
-		Spec: monitoringv1.PrometheusRuleSpec{
-			Groups: promGroups,
-		},
+		Spec: promRuleSpec,
 	}
 
-	desired := rule.DeepCopy()
-
-	if err := controllerutil.SetControllerReference(resource, rule, f.Scheme); err != nil {
-		return fmt.Errorf("set controller reference: %w", err)
-	}
-
-	_, err = controllerutil.CreateOrUpdate(ctx, f.Client, rule, func() error {
-		if rule.Labels == nil {
-			rule.Labels = make(map[string]string)
-		}
-		for key, value := range desired.Labels {
-			rule.Labels[key] = value
-		}
-		rule.Spec = desired.Spec
-		return nil
+	err = k8s.ApplyWithOwner(ctx, f.Client, f.Scheme, resource, rule, func(existing, desired *monitoringv1.PrometheusRule) {
+		existing.Spec = desired.Spec
 	})
 	if err != nil {
 		return fmt.Errorf("reconcile prometheus rule: %w", err)
@@ -107,4 +58,38 @@ func (f *PrometheusRecordingRuleConfigurer) Delete(ctx context.Context, resource
 		return fmt.Errorf("delete scrape config: %w", err)
 	}
 	return nil
+}
+
+func generateRules(ctx context.Context, client client.Client, resource *chantico.DataCenterResource) (*RuleFile, error) {
+	renderer := NewTemplateRenderer(client, resource.Namespace)
+	resolvedExpressions, err := renderer.ResolvedExpressions(ctx, resource)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewRuleBuilder(resource, resolvedExpressions).BuildRuleFile(), nil
+}
+
+func convertPrometheusRuleSpec(generatedRules *RuleFile) monitoringv1.PrometheusRuleSpec {
+	promGroups := []monitoringv1.RuleGroup{}
+	for _, group := range generatedRules.Groups {
+		promRules := []monitoringv1.Rule{}
+		for _, rule := range group.Rules {
+			promRules = append(promRules, monitoringv1.Rule{
+				Expr:   intstr.FromString(rule.Expr),
+				Labels: rule.Labels,
+				Record: rule.Record,
+			})
+		}
+		promGroups = append(promGroups, monitoringv1.RuleGroup{
+			Name:  group.Name,
+			Rules: promRules,
+		})
+	}
+
+	spec := monitoringv1.PrometheusRuleSpec{
+		Groups: promGroups,
+	}
+
+	return spec
 }
