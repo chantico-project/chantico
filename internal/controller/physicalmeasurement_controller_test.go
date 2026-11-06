@@ -63,6 +63,7 @@ func setupPhysicalMeasurementTest(t *testing.T, objs ...runtime.Object) (client.
 
 	targetConfigurer := &pm.PrometheusTargetConfigurer{
 		Client:              kubeClient,
+		Scheme:              kubeClient.Scheme(),
 		SNMPExporterAddress: testSNMPExporterAddress,
 	}
 

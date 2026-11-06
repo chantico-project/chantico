@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"strings"
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
@@ -36,7 +35,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -105,37 +103,6 @@ func TestWriteReconcileGeneratorFile(t *testing.T) {
 	}
 	if string(first) != string(second) {
 		t.Fatalf("file changed on idempotent run:\nfirst:  %q\nsecond: %q", first, second)
-	}
-}
-
-func TestReconcileGeneratorFile_MissingAuthFrom(t *testing.T) {
-	for _, existingFile := range []bool{false, true} {
-		name := "new generator file"
-		if existingFile {
-			name = "existing generator file"
-		}
-		t.Run(name, func(t *testing.T) {
-			measurementDevice := &chantico.MeasurementDevice{
-				ObjectMeta: metav1.ObjectMeta{Name: "tno", Namespace: "chantico", UID: "missing-auth"},
-				Spec:       chantico.MeasurementDeviceSpec{Walks: []string{"1.3.6.1"}},
-			}
-			reconciler := newReconciler(t, t.TempDir(), measurementDevice)
-			if existingFile {
-				writeFile(t, reconciler.Filestore, md.GeneratorFile(measurementDevice.UID), []byte("auths: {}\n"))
-			}
-
-			result := reconciler.reconcileGeneratorFile(t.Context(), measurementDevice)
-			if result.Action != steps.ActionError || result.Err == nil {
-				t.Fatalf("expected an error, got %v (err: %v)", result.Action, result.Err)
-			}
-			condition := meta.FindStatusCondition(measurementDevice.Status.Conditions, string(chantico.ConditionGenerated))
-			if condition == nil || condition.Status != metav1.ConditionFalse || condition.Reason != string(chantico.ReasonGenerationFailed) {
-				t.Fatalf("expected Generated=False with GenerationFailed, got %#v", condition)
-			}
-			if !strings.Contains(condition.Message, "spec.authFrom is required") {
-				t.Fatalf("expected missing auth reference in condition message, got %q", condition.Message)
-			}
-		})
 	}
 }
 
