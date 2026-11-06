@@ -178,8 +178,8 @@ cluster-load-visualisation-webapp: kind ## Load the visualisation webapp image i
 
 .PHONY: cluster-load-mock-images
 cluster-load-mock-images: ## Load the SNMP and VM attribution mock images into the Kind cluster.
-	$(call kind_load,$(SNMP_MOCK_IMAGE),$(KIND_CLUSTER_NAME))
-	$(call kind_load,$(VM_ATTRIBUTION_MOCK_IMAGE),$(KIND_CLUSTER_NAME))
+	$(call kind_load,$(SNMP_MOCK_IMAGE_LOCAL),$(KIND_CLUSTER_NAME))
+	$(call kind_load,$(VM_ATTRIBUTION_MOCK_IMAGE_LOCAL),$(KIND_CLUSTER_NAME))
 
 .PHONY: cluster-mocks
 cluster-mocks: cluster-load-mock-images ## Apply the mock deployments and services.
@@ -232,16 +232,21 @@ docker-pull-visualisation-webapp: ## Pull docker image with the visualisation we
 docker-build-visualisation-webapp: ## Build docker image with the visualisation webapp.
 	$(BAKE) visualisation-webapp --load --set visualisation-webapp.tags=$(VISUALISATION_WEBAPP_IMG)
 
+SNMP_MOCK_IMAGE_LOCAL ?= chantico-snmp-mock:latest
+VM_ATTRIBUTION_MOCK_IMAGE_LOCAL ?= chantico-vm-attribution-mock:latest
+
 .PHONY: docker-pull-mocks
 docker-pull-mocks: ## Pull docker images with the SNMP and VM attribution mocks.
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
+	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) $(SNMP_MOCK_IMAGE_LOCAL)
 	$(CONTAINER_TOOL) pull $(VM_ATTRIBUTION_MOCK_IMAGE)
+	$(CONTAINER_TOOL) tag $(VM_ATTRIBUTION_MOCK_IMAGE) $(VM_ATTRIBUTION_MOCK_IMAGE_LOCAL)
 
 .PHONY: docker-build-mocks
 docker-build-mocks: ## Build docker images with the SNMP and VM attribution mocks.
 	$(BAKE) mocks --load \
-		--set snmp-mock.tags=$(SNMP_MOCK_IMAGE) \
-		--set vm-attribution-mock.tags=$(VM_ATTRIBUTION_MOCK_IMAGE)
+		--set snmp-mock.tags=$(SNMP_MOCK_IMAGE_LOCAL) \
+		--set vm-attribution-mock.tags=$(VM_ATTRIBUTION_MOCK_IMAGE_LOCAL)
 
 HELM_CHART_DIR ?= chart
 GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
