@@ -83,18 +83,27 @@ spec:
   scrapeInterval: 10s
   scrapeTimeout: 5s
   evaluationInterval: 5s
+  {{- $watchNamespace := .Values.controller.watchNamespace | default .Release.Namespace }}
   ruleSelector:
     matchLabels:
       app.kubernetes.io/managed-by: chantico
   ruleNamespaceSelector:
+    {{- if eq $watchNamespace "*" }}
+    {}
+    {{- else }}
     matchLabels:
-      kubernetes.io/metadata.name: {{ .Release.Namespace }}
+      kubernetes.io/metadata.name: {{ $watchNamespace }}
+    {{- end }}
   scrapeConfigSelector:
     matchLabels:
       app.kubernetes.io/managed-by: chantico
   scrapeConfigNamespaceSelector:
+    {{- if eq $watchNamespace "*" }}
+    {}
+    {{- else }}
     matchLabels:
-      kubernetes.io/metadata.name: {{ .Release.Namespace }}
+      kubernetes.io/metadata.name: {{ $watchNamespace }}
+    {{- end }}
   {{- if .Values.victoriaMetrics.include }}
   remoteWrite:
     - url: http://chantico-victoriametrics:8428/api/v1/write
