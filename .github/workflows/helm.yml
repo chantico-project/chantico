@@ -58,6 +58,7 @@ jobs:
         id: package
         run: |
           make sync-deployment-crds
+          helm dependency build chart/
           helm lint chart/
           for v in ${{ steps.meta.outputs.versions }}; do
             helm package chart/ --version "$v" --destination dist
