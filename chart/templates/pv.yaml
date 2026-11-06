@@ -1,4 +1,4 @@
-{{- if .Values.pv.include }}
+{{- if .Values.pv.enabled }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:

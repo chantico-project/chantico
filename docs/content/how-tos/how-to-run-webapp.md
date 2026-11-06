@@ -15,7 +15,7 @@ Chantico provides a webapp that visualizes the parent-child relationships of Dat
 The Helm chart does not deploy the webapp by default. Enable it when installing Chantico:
 
 ```sh
-helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set visualisationWebapp.include=true
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set visualisationWebapp.enabled=true
 ```
 
 The webapp Service is internal to the cluster by default. Forward it to your machine and open [http://localhost:8080](http://localhost:8080):

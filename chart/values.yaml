@@ -3,7 +3,7 @@ prometheusRetention: 5h
 snmpExporterAddress: chantico-snmp:9116
 imagePullSecretName: "" # Set if pulled from private registry, otherwise leave empty
 controller:
-  include: true
+  enabled: true
   image:
     repository: "ghcr.io/chantico-project/images/chantico"
     tag: "" # defaults to Chart.version
@@ -18,7 +18,7 @@ prometheus:
   service:
     type: "ClusterIP"
 victoriaMetrics:
-  include: true
+  enabled: true
   # Long-term retention period (e.g. 12 months)
   retention: 12
   # Storage path inside the PVC subPath
@@ -26,13 +26,13 @@ victoriaMetrics:
   service:
     type: "ClusterIP"
 grafana:
-  include: true
+  enabled: true
   adminPassword: admin
   anonymous: true
   service:
     type: "ClusterIP"
 visualisationWebapp:
-  include: false
+  enabled: false
   image:
     repository: "ghcr.io/chantico-project/images/chantico-visualisation-webapp"
     tag: "" # defaults to Chart.version
@@ -40,7 +40,7 @@ visualisationWebapp:
   service:
     type: "ClusterIP"
 pv:
-  include: false
+  enabled: false
   name: chantico-persistent-volume
   storage: "" # should probably match the pvc
   storageClassName: ""
@@ -49,7 +49,7 @@ pv:
   accessModes:
     - ReadWriteOnce
 pvc:
-  include: true
+  enabled: true
   storageClassName: "csi-rbd"
   storage: 3Gi
   accessModes:

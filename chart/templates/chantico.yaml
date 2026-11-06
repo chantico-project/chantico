@@ -1,4 +1,4 @@
-{{- if and .Values.controller.include .Values.controller.image.repository }}
+{{- if and .Values.controller.enabled .Values.controller.image.repository }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:

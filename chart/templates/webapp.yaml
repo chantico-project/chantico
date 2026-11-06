@@ -1,4 +1,4 @@
-{{- if (index .Values "visualisationWebapp").include }}
+{{- if (index .Values "visualisationWebapp").enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
