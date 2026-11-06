@@ -1,0 +1,192 @@
+/*
+Copyright 2025-2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package physicalmeasurement
+
+import (
+	"reflect"
+	"testing"
+
+	chantico "chantico/api/v1alpha1"
+	"chantico/internal/testutil"
+
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+func setupKubePrometheusTargetsTest(t *testing.T) (*PrometheusTargetConfigurer, *chantico.PhysicalMeasurement) {
+	t.Helper()
+
+	kubeClient := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1alpha1.AddToScheme).Build()
+	targets := &PrometheusTargetConfigurer{Client: kubeClient, Scheme: kubeClient.Scheme()}
+	measurement := &chantico.PhysicalMeasurement{
+		ObjectMeta: metav1.ObjectMeta{Name: "measurement", Namespace: "chantico"},
+		Spec: chantico.PhysicalMeasurementSpec{
+			Type: chantico.PhysicalMeasurementTypePrometheusExporter,
+			Ip:   "192.0.2.1:9100",
+		},
+	}
+	return targets, measurement
+}
+
+// Call reconcile and retrieve the created ScrapeConfig
+func reconcileKubePrometheusTargetsForTest(t *testing.T, targets *PrometheusTargetConfigurer, measurement *chantico.PhysicalMeasurement) *monitoringv1alpha1.ScrapeConfig {
+	t.Helper()
+
+	if err := targets.Reconcile(t.Context(), measurement); err != nil {
+		t.Fatal(err)
+	}
+
+	identifier := client.ObjectKey{Namespace: measurement.Namespace, Name: measurement.Name}
+	observed := &monitoringv1alpha1.ScrapeConfig{}
+	if err := targets.Client.Get(t.Context(), identifier, observed); err != nil {
+		t.Fatal(err)
+	}
+	return observed
+}
+
+func TestKubePrometheusTargetsReconcile_CreatesScrapeConfig(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+
+	if got := observed.Spec.StaticConfigs[0].Targets[0]; got != monitoringv1alpha1.Target(measurement.Spec.Ip) {
+		t.Fatalf("target = %q, want %q", got, measurement.Spec.Ip)
+	}
+	if observed.Labels["app.kubernetes.io/managed-by"] != "chantico" {
+		t.Fatalf("unexpected managed-by label: %v", observed.Labels)
+	}
+	if observed.Spec.MetricsPath == nil || *observed.Spec.MetricsPath != "/metrics" {
+		t.Fatalf("expected direct exporter metrics path, got %v", observed.Spec.MetricsPath)
+	}
+	if len(observed.Spec.RelabelConfigs) != 0 {
+		t.Fatal("Prometheus exporter has unexpected relabelings")
+	}
+}
+
+func TestKubePrometheusTargetsReconcile_UpdatesTarget(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+
+	measurement.Spec.Ip = "192.0.2.2:9100"
+	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+
+	if got := observed.Spec.StaticConfigs[0].Targets[0]; got != monitoringv1alpha1.Target(measurement.Spec.Ip) {
+		t.Fatalf("target = %q, want %q", got, measurement.Spec.Ip)
+	}
+}
+
+func TestKubePrometheusTargetsReconcile_SetsOwnerReference(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+
+	created := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+	assertControlledBy(t, created.OwnerReferences, measurement)
+
+	// The existing object is fetched before being updated, so the owner must survive an update too
+	measurement.Spec.Ip = "192.0.2.2:9100"
+	updated := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+	assertControlledBy(t, updated.OwnerReferences, measurement)
+}
+
+func assertControlledBy(t *testing.T, refs []metav1.OwnerReference, owner *chantico.PhysicalMeasurement) {
+	t.Helper()
+
+	if len(refs) != 1 {
+		t.Fatalf("expected one owner reference, got %v", refs)
+	}
+	ref := refs[0]
+	if ref.Kind != "PhysicalMeasurement" || ref.Name != owner.Name {
+		t.Fatalf("unexpected owner reference: %v", ref)
+	}
+	if ref.Controller == nil || !*ref.Controller {
+		t.Fatalf("owner reference is not a controller reference: %v", ref)
+	}
+}
+
+func TestKubePrometheusTargetsReconcile_SkipsUnchangedConfig(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+	unchanged := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+
+	if unchanged.ResourceVersion != observed.ResourceVersion {
+		t.Fatal("unchanged reconciliation updated the scrape config")
+	}
+}
+
+func TestKubePrometheusTargetsReconcile_RequiresSNMPExporterAddress(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	measurement.Spec.Type = chantico.PhysicalMeasurementTypeSNMP
+
+	if err := targets.Reconcile(t.Context(), measurement); err == nil {
+		t.Fatal("expected an error for a missing SNMP exporter address")
+	}
+}
+
+func TestKubePrometheusTargetsReconcile_ConfiguresSNMPExporter(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	measurement.Spec.Type = chantico.PhysicalMeasurementTypeSNMP
+	measurement.Spec.Ip = "192.0.2.3:1161"
+	measurement.Spec.MeasurementDevice = "tno"
+	targets.SNMPExporterAddress = "custom-snmp:9116"
+	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+
+	if len(observed.Spec.RelabelConfigs) != 3 {
+		t.Fatalf("expected 3 relabelings, got %d", len(observed.Spec.RelabelConfigs))
+	}
+	wantRelabelings := []monitoringv1.RelabelConfig{
+		{SourceLabels: []monitoringv1.LabelName{"__address__"}, TargetLabel: "__param_target"},
+		{SourceLabels: []monitoringv1.LabelName{"__param_target"}, TargetLabel: "instance"},
+		{TargetLabel: "__address__", Replacement: &targets.SNMPExporterAddress},
+	}
+	if !reflect.DeepEqual(observed.Spec.RelabelConfigs, wantRelabelings) {
+		t.Fatalf("relabelings = %#v, want %#v", observed.Spec.RelabelConfigs, wantRelabelings)
+	}
+	if observed.Spec.MetricsPath == nil || *observed.Spec.MetricsPath != "/snmp" {
+		t.Fatalf("expected SNMP metrics path, got %v", observed.Spec.MetricsPath)
+	}
+	if got := observed.Spec.StaticConfigs[0].Targets[0]; got != monitoringv1alpha1.Target(measurement.Spec.Ip) {
+		t.Fatalf("SNMP target = %q, want device address %q", got, measurement.Spec.Ip)
+	}
+	labels := observed.Spec.StaticConfigs[0].Labels
+	if labels["__param_auth"] != "tno" || labels["__param_module"] != "tno" {
+		t.Fatalf("unexpected SNMP parameters: %v", labels)
+	}
+}
+
+func TestKubePrometheusTargetsReconcile_RemovesSNMPRelabelingsForDirectExporter(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	measurement.Spec.Type = chantico.PhysicalMeasurementTypeSNMP
+	targets.SNMPExporterAddress = "custom-snmp:9116"
+	reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+
+	measurement.Spec.Type = chantico.PhysicalMeasurementTypePrometheusExporter
+	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+
+	if len(observed.Spec.RelabelConfigs) != 0 {
+		t.Fatal("direct exporter retained SNMP relabelings")
+	}
+	if observed.Spec.MetricsPath == nil || *observed.Spec.MetricsPath != "/metrics" {
+		t.Fatalf("expected direct exporter metrics path, got %v", observed.Spec.MetricsPath)
+	}
+}
+
+func TestKubePrometheusTargetsDelete_MissingScrapeConfig(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	if err := targets.Delete(t.Context(), measurement); err != nil {
+		t.Fatalf("deleting an absent scrape config failed: %v", err)
+	}
+}

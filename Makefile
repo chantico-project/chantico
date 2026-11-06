@@ -149,6 +149,7 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 # 	idempotent function to create namespace
 	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 # 	idempotent helm installation
+	helm dependency build ./chart/
 	helm upgrade --install chantico ./chart/ \
 		--namespace $(CHANTICO_NAMESPACE) \
 		--set controller.include=false \
@@ -198,7 +199,12 @@ cluster-mock-resources: ## Apply the sample configurations for the mocks
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
+	mkdir -p $(CHANTICO_DATA_PATH)/snmp/mibs/
 	cp dev/mibs/* $(CHANTICO_DATA_PATH)/snmp/mibs/
+
+.PHONY: cluster-dev-reset
+cluster-dev-reset: cluster-clean cluster-up cluster-configure cluster-mibs cluster-mocks cluster-mock-resources 
+	@echo "Cluster development environment has been reset."
 
 ##@ Build
 
@@ -253,6 +259,7 @@ GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
 
 .PHONY: helm-package
 helm-package: sync-deployment-crds ## Package Helm chart.
+	helm dependency build $(HELM_CHART_DIR)
 	helm package $(HELM_CHART_DIR)
 
 .PHONY: helm-push
