@@ -27,6 +27,7 @@ func BuildGeneratorJob(measurementDevice *chantico.MeasurementDevice) (*batchv1.
 	generatorPath := fs.Resolve(GeneratorFile(measurementDevice.GetUID()))
 	mibsDir := fs.Resolve(MibsSubDir)
 	outputPath := fs.Resolve(SnmpFile(measurementDevice.GetUID()))
+	claim := volume.PersistentVolumeClaim.ClaimName
 	backoffLimit := int32(0)
 	uid := int64(os.Getuid())
 	gid := int64(os.Getgid())
@@ -43,7 +44,11 @@ func BuildGeneratorJob(measurementDevice *chantico.MeasurementDevice) (*batchv1.
 		Spec: batchv1.JobSpec{
 			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{vol.DataVolumeLabel: claim},
+				},
 				Spec: corev1.PodSpec{
+					Affinity: vol.DataVolumeAffinity(claim),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: &runAsNonRoot,
 						RunAsUser:    &uid,

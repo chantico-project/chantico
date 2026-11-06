@@ -63,4 +63,14 @@ func TestBuildGeneratorJob(t *testing.T) {
 			t.Errorf("arg %q missing from %q", w, joined)
 		}
 	}
+
+	pod := job.Spec.Template
+	claim := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
+	if got := pod.Labels[vol.DataVolumeLabel]; got != claim {
+		t.Errorf("pod label %q = %q, want %q", vol.DataVolumeLabel, got, claim)
+	}
+	terms := pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+	if len(terms) != 1 || terms[0].LabelSelector.MatchLabels[vol.DataVolumeLabel] != claim {
+		t.Errorf("pod affinity does not select %q=%q: %+v", vol.DataVolumeLabel, claim, terms)
+	}
 }

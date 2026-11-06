@@ -1,0 +1,13 @@
+# hostPath is mounted from ./.chantico-persistent-volume via dev/kind-config.yaml, so `make run` can share it.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: chantico-persistent-volume
+spec:
+  capacity:
+    storage: 3Gi
+  storageClassName: local-development
+  hostPath:
+    path: /data/chantico-persistent-volume
+  accessModes:
+    - ReadWriteOnce

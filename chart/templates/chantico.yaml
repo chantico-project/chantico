@@ -23,9 +23,11 @@ spec:
     metadata:
       labels:
         control-plane: controller-manager
+        {{- include "chantico.dataVolumeLabel" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
+      {{- include "chantico.dataVolumeAffinity" . | nindent 6 }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}
@@ -46,7 +48,7 @@ spec:
             - name: CHANTICO_DATA_PATH
               value: "/data"
             - name: CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME
-              value: {{ .Values.persistentVolumeClaimName | quote }}
+              value: {{ include "chantico.dataClaimName" . | quote }}
             - name: CHANTICO_NAMESPACE
               value: {{ .Release.Namespace | quote }}
             - name: CHANTICO_WATCH_NAMESPACE
@@ -87,7 +89,7 @@ spec:
       volumes:
         - name: chantico-volume
           persistentVolumeClaim:
-            claimName: {{ .Values.persistentVolumeClaimName | quote }}
+            claimName: {{ include "chantico.dataClaimName" . | quote }}
       {{- if .Values.imagePullSecretName }}
       imagePullSecrets:
         - name: {{ .Values.imagePullSecretName }}

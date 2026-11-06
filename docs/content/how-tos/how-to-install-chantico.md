@@ -28,13 +28,22 @@ helm upgrade chantico oci://ghcr.io/chantico-project/charts/chantico --version <
 
 ## Using an alternative storage class
 
-The Chantico chart create a persistent volume claim to store Prometheus data.
-By default, the Chantico chart uses the `csi-rbd` storage class.
-As a user, you might want to use a different storage class.
-This can be done by overriding the `pvc.storageClassName` value when installing or upgrading Chantico.
+The Chantico chart creates persistent volume claims for:
+
+- `persistence`: data shared by the controller, SNMP generator jobs, SNMP exporter, filebrowser and Prometheus rules/targets.
+- `prometheus.persistence`: Prometheus TSDB storage.
+- `victoriaMetrics.persistence`: VictoriaMetrics long-term storage.
+
+By default, the shared and Prometheus claims use the `csi-rbd` storage class and
+the VictoriaMetrics claim uses the cluster default storage class.
+Override `storageClass` per claim when installing or upgrading Chantico.
+Each block also accepts `size`, `accessModes` and `existingClaim`.
 
 ```bash
-helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set pvc.storageClassName="STORAGE_CLASS_NAME"
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace \
+  --set persistence.storageClass="STORAGE_CLASS_NAME" \
+  --set prometheus.persistence.storageClass="STORAGE_CLASS_NAME" \
+  --set victoriaMetrics.persistence.storageClass="STORAGE_CLASS_NAME"
 ```
 
 You can list the storage classes available on your cluster with kubectl.
@@ -42,6 +51,14 @@ You can list the storage classes available on your cluster with kubectl.
 ```bash
 kubectl get storageclass
 ```
+
+### Multi-node clusters
+
+With the default `ReadWriteOnce` access mode, the shared volume can only be
+attached to one node. The chart and the controller therefore schedule all pods
+that use it, including SNMP generator jobs, on the same node. If your storage
+class supports `ReadWriteMany`, set `persistence.accessModes` to
+`[ReadWriteMany]` to remove this constraint for the chart's deployments.
 
 ## Watching resources in different namespaces
 

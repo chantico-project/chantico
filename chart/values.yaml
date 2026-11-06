@@ -1,5 +1,12 @@
-persistentVolumeClaimName: chantico-persistent-volume-claim
-prometheusRetention: 5h
+# Shared volume of controller, generator jobs, snmp exporter, filebrowser and prometheus rules/targets
+persistence:
+  enabled: true
+  existingClaim: "" # defaults to chantico-persistent-volume-claim
+  storageClass: "csi-rbd"
+  accessModes:
+    - ReadWriteOnce # pods sharing a ReadWriteOnce volume are scheduled on the same node
+  size: 3Gi
+  volumeName: ""
 snmpExporterAddress: chantico-snmp:9116
 imagePullSecretName: "" # Set if pulled from private registry, otherwise leave empty
 controller:
@@ -15,14 +22,26 @@ filebrowser:
   service:
     type: "ClusterIP"
 prometheus:
+  retention: 5h
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: "csi-rbd"
+    accessModes:
+      - ReadWriteOnce
+    size: 3Gi
   service:
     type: "ClusterIP"
 victoriaMetrics:
   enabled: true
-  # Long-term retention period (e.g. 12 months)
-  retention: 12
-  # Storage path inside the PVC subPath
-  storagePath: /tmp/victoria-metrics-volume/storage
+  retention: 12 # Long-term retention period (e.g. 12 months)
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 3Gi
   service:
     type: "ClusterIP"
 grafana:
@@ -49,21 +68,6 @@ visualisationWebapp:
           - path:
               type: PathPrefix
               value: /
-pv:
-  enabled: false
-  name: chantico-persistent-volume
-  storage: "" # should probably match the pvc
-  storageClassName: ""
-  hostPath:
-    path: "/data/chantico-persistent-volume"
-  accessModes:
-    - ReadWriteOnce
-pvc:
-  enabled: true
-  storageClassName: "csi-rbd"
-  storage: 3Gi
-  accessModes:
-    - ReadWriteOnce
 securityContext:
   runAsUser: 1000
   runAsGroup: 1000

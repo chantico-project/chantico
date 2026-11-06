@@ -8,15 +8,10 @@ VERSION ?= 0.24.0
 # Image REPOSITORY_URL to use all building/pushing image targets
 IMG ?= ghcr.io/chantico-project/images/chantico:latest
 CHANTICO_DATA_PATH ?= .chantico-persistent-volume
-CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
-CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
 CHANTICO_NAMESPACE ?= chantico
 VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visualisation-webapp
 VISUALISATION_WEBAPP_TAG ?= latest
 VISUALISATION_WEBAPP_IMG ?= $(VISUALISATION_WEBAPP_REPOSITORY):$(VISUALISATION_WEBAPP_TAG)
-
-LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
-LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 
 SNMP_MOCK_TAG ?= latest
 SNMP_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
@@ -126,29 +121,15 @@ cluster-clean: cluster-down cluster-delete-mount ## Delete Kind cluster and volu
 cluster-configure: sync-deployment-crds ## Configure cluster with namespace and helm installation
 # 	idempotent function to create namespace
 	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	$(KUBECTL) apply -f dev/k8s/persistent-volume.yaml
 # 	idempotent helm installation
 	helm upgrade --install chantico ./chart/ \
 		--namespace $(CHANTICO_NAMESPACE) \
-		--set controller.enabled=false \
+		--values dev/values-kind.yaml \
 		--set securityContext.runAsUser="$(shell id -u)" \
 		--set securityContext.runAsGroup="$(shell id -g)" \
-		--set persistentVolumeClaimName=$(CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME) \
-		--set pvc.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
-		--set pvc.volumeName=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
-		--set pv.enabled=true \
-		--set pv.name=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
-		--set pv.storage=$(LOCAL_DEVELOPMENT_STORAGE) \
-		--set pv.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
-		--set pv.hostPath.path="/data/chantico-persistent-volume" \
-		--set snmp.service.type="NodePort" \
-		--set filebrowser.service.type="NodePort" \
-		--set prometheus.service.type="NodePort" \
-		--set victoriaMetrics.service.type="NodePort" \
-		--set grafana.service.type="NodePort" \
-		--set visualisationWebapp.enabled=true \
 		--set visualisationWebapp.image.repository="$(VISUALISATION_WEBAPP_REPOSITORY)" \
-		--set visualisationWebapp.image.tag="$(VISUALISATION_WEBAPP_TAG)" \
-		--set visualisationWebapp.service.type="NodePort"
+		--set visualisationWebapp.image.tag="$(VISUALISATION_WEBAPP_TAG)"
 
 .PHONY: cluster-load-visualisation-webapp
 cluster-load-visualisation-webapp: kind ## Load the locally built visualisation webapp image into the Kind cluster

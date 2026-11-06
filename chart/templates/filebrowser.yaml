@@ -12,7 +12,9 @@ spec:
     metadata:
       labels:
         app: chantico-filebrowser
+        {{- include "chantico.dataVolumeLabel" . | nindent 8 }}
     spec:
+      {{- include "chantico.dataVolumeAffinity" . | nindent 6 }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}
@@ -46,7 +48,7 @@ spec:
       volumes:
       - name: chantico-volume-mount
         persistentVolumeClaim:
-          claimName: {{ .Values.persistentVolumeClaimName }}
+          claimName: {{ include "chantico.dataClaimName" . }}
 ---
 apiVersion: v1
 kind: Service
