@@ -44,6 +44,20 @@ func (r *TemplateRenderer) RenderHomePage(w io.Writer, d HomePageData) {
 	_ = r.tmpl.ExecuteTemplate(w, "home.html", d)
 }
 
+type NodePartialData struct {
+	ID                   string
+	Name                 string
+	Namespace            string
+	Type                 string
+	Parents              []string
+	EnergyMetric         string
+	PhysicalMeasurements []string
+}
+
+func (r *TemplateRenderer) RenderNodePartial(w io.Writer, d NodePartialData) error {
+	return r.tmpl.ExecuteTemplate(w, "node.html", d)
+}
+
 type ErrorPageData struct {
 	Error          string
 	Host           string

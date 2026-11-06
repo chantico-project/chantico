@@ -44,10 +44,13 @@ const cy = cytoscape({
 cy.on("mouseover", "node", (event) => event.target.addClass("hovered"));
 cy.on("mouseout", "node", (event) => event.target.removeClass("hovered"));
 
-const selectedNode = document.getElementById("selected-node");
+const panelContent = document.getElementById("panel-content");
 
 cy.on("tap", "node", (event) => {
-  selectedNode.textContent = event.target.id();
+  htmx.ajax("GET", `/api/nodes/${encodeURIComponent(event.target.id())}`, {
+    target: panelContent,
+    swap: "innerHTML",
+  });
 });
 
 const divider = document.getElementById("divider");

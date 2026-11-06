@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -82,6 +83,24 @@ type Pod struct {
 	Namespace string
 	Name      string
 }
+
+func (k *KubernetesClient) GetDataCenterResource(id string) (*v1alpha1.DataCenterResource, error) {
+	dcrList := &v1alpha1.DataCenterResourceList{}
+	if err := k.client.List(context.Background(), dcrList); err != nil {
+		return nil, fmt.Errorf("failed to list DataCenterResources: %w", err)
+	}
+
+	for i := range dcrList.Items {
+		dcr := &dcrList.Items[i]
+		if dcr.GetNamespace()+"-"+dcr.GetName() == id {
+			return dcr, nil
+		}
+	}
+
+	return nil, ErrNotFound
+}
+
+var ErrNotFound = errors.New("not found")
 
 func (k *KubernetesClient) GetDataCenterResources() ([]*graph.Node, error) {
 	dcrList := &v1alpha1.DataCenterResourceList{}

@@ -23,13 +23,17 @@
         <div id="graph" class="graph"></div>
         <div id="divider" class="divider" role="separator" aria-orientation="vertical"></div>
         <aside class="panel">
-          <h2>Selected node</h2>
-          <p id="selected-node">None</p>
+          <div id="panel-content">
+            <h2>Selected node</h2>
+            <p>None</p>
+          </div>
         </aside>
       </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
     <script src="/static/graph.js"></script>
+
   </body>
 </html>

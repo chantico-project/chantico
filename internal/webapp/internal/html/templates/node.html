@@ -1,0 +1,13 @@
+<h2>{{ .Name }}</h2>
+<dl>
+  <dt>Namespace</dt>
+  <dd>{{ .Namespace }}</dd>
+  <dt>Type</dt>
+  <dd>{{ .Type }}</dd>
+  <dt>Parents</dt>
+  <dd>{{ if .Parents }}{{ range $i, $p := .Parents }}{{ if $i }}, {{ end }}{{ $p }}{{ end }}{{ else }}none{{ end }}</dd>
+  <dt>EnergyMetric</dt>
+  <dd>{{ if .EnergyMetric }}{{ .EnergyMetric }}{{ else }}none{{ end }}</dd>
+  <dt>PhysicalMeasurements</dt>
+  <dd>{{ if .PhysicalMeasurements }}{{ range $i, $m := .PhysicalMeasurements }}{{ if $i }}, {{ end }}{{ $m }}{{ end }}{{ else }}none{{ end }}</dd>
+</dl>
