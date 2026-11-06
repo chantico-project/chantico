@@ -39,7 +39,7 @@ jobs:
             docs/go.sum
 
       - name: Cache Hugo modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/hugo_cache/modules
           key: ${{ runner.os }}-hugo-modules-${{ hashFiles('docs/go.sum') }}
@@ -51,6 +51,8 @@ jobs:
           make docs-mod-download
 
       - name: Build the documentation
+        env:
+          HUGO_PARAMS_KROKI_ENDPOINT: http://localhost:8000/
         run: |
           make docs-build
 
@@ -62,6 +64,20 @@ jobs:
         with:
           name: docs-${{ steps.clean_name.outputs.clean_ref }}
           path: docs/public
+
+    services:
+      kroki:
+        image: yuzutech/kroki:0.34.0
+        ports:
+          - 8000:8000
+        env:
+          KROKI_MERMAID_HOST: mermaid
+        options: >-
+          --health-cmd "wget -qO- http://localhost:8000/health || exit 1"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      mermaid:
+        image: yuzutech/kroki-mermaid:0.34.0 # same version as kroki
+
 
   # Deployment of documentation to GitHub Pages
   pages:
