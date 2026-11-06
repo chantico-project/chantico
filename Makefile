@@ -149,6 +149,7 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 # 	idempotent function to create namespace
 	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 # 	idempotent helm installation
+	helm dependency build ./chart/
 	helm upgrade --install chantico ./chart/ \
 		--namespace $(CHANTICO_NAMESPACE) \
 		--set controller.include=false \
@@ -253,6 +254,7 @@ GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
 
 .PHONY: helm-package
 helm-package: sync-deployment-crds ## Package Helm chart.
+	helm dependency build $(HELM_CHART_DIR)
 	helm package $(HELM_CHART_DIR)
 
 .PHONY: helm-push
