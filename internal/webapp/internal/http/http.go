@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -32,6 +33,7 @@ func New(h *HTTPServerHandler, config *HTTPServerConfig) *HTTPServer {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", h.HomePage)
 	mux.HandleFunc("GET /api/graph", h.GraphAPI)
+	mux.HandleFunc("GET /api/nodes/{id}", h.NodeAPI)
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(html.StaticFS()))))
 
 	server := &http.Server{
@@ -67,6 +69,36 @@ func (h *HTTPServerHandler) GraphAPI(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(graph.BuildElements(nodes))
+}
+
+func (h *HTTPServerHandler) NodeAPI(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	dcr, err := h.Kubernetes.GetDataCenterResource(id)
+	if errors.Is(err, kubernetes.ErrNotFound) {
+		http.Error(w, "node not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	parents := dcr.Spec.ParentNames()
+	data := html.NodePartialData{
+		ID:                   id,
+		Name:                 dcr.GetName(),
+		Namespace:            dcr.GetNamespace(),
+		Type:                 dcr.Spec.Type,
+		Parents:              parents,
+		EnergyMetric:         dcr.Spec.EnergyMetric,
+		PhysicalMeasurements: dcr.Spec.PhysicalMeasurements,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := h.Renderer.RenderNodePartial(w, data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (h *HTTPServerHandler) HomePage(w http.ResponseWriter, r *http.Request) {
