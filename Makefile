@@ -5,23 +5,37 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.24.0
 
+# PR_NUMBER selects the images built by CI for a pull request (repository suffix -pr, tag pr-<number>).
+# Set it to a number, or to "auto" to look up the PR of the current branch with the gh CLI.
+# When unset (or no PR is found), the regular images with the latest tag are used.
+PR_NUMBER ?=
+ifeq ($(PR_NUMBER),auto)
+override PR_NUMBER := $(shell command -v gh >/dev/null 2>&1 && gh pr view --json number -q .number 2>/dev/null)
+endif
+IMAGE_SUFFIX ?= $(if $(PR_NUMBER),-pr)
+IMAGE_TAG ?= $(if $(PR_NUMBER),pr-$(PR_NUMBER),latest)
+
 # Image REPOSITORY_URL to use all building/pushing image targets
-IMG ?= ghcr.io/chantico-project/images/chantico:latest
+REPO ?= ghcr.io/chantico-project/images/chantico$(IMAGE_SUFFIX)
+TAG ?= $(IMAGE_TAG)
+IMG ?= $(REPO):$(TAG)
 CHANTICO_DATA_PATH ?= .chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
 CHANTICO_NAMESPACE ?= chantico
-VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visualisation-webapp
-VISUALISATION_WEBAPP_TAG ?= latest
+VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visualisation-webapp$(IMAGE_SUFFIX)
+VISUALISATION_WEBAPP_TAG ?= $(IMAGE_TAG)
 VISUALISATION_WEBAPP_IMG ?= $(VISUALISATION_WEBAPP_REPOSITORY):$(VISUALISATION_WEBAPP_TAG)
 
 LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
 LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 
-SNMP_MOCK_TAG ?= latest
-SNMP_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
-VM_ATTRIBUTION_MOCK_TAG ?= latest
-VM_ATTRIBUTION_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-vm-attribution-mock:$(VM_ATTRIBUTION_MOCK_TAG)
+SNMP_MOCK_TAG ?= $(IMAGE_TAG)
+SNMP_MOCK_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-snmp-mock$(IMAGE_SUFFIX)
+SNMP_MOCK_IMAGE ?= $(SNMP_MOCK_REPOSITORY):$(SNMP_MOCK_TAG)
+VM_ATTRIBUTION_MOCK_TAG ?= $(IMAGE_TAG)
+VM_ATTRIBUTION_MOCK_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-vm-attribution-mock$(IMAGE_SUFFIX)
+VM_ATTRIBUTION_MOCK_IMAGE ?= $(VM_ATTRIBUTION_MOCK_REPOSITORY):$(VM_ATTRIBUTION_MOCK_TAG)
 
 # Name of the kind cluster created by cluster-up, and the kube context it produces.
 KIND_CLUSTER_NAME ?= kind
@@ -39,6 +53,14 @@ endif
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= docker
+
+# kind_load loads an image into a kind cluster.
+# This works for multi-arch images, avoiding exporting platforms whose blobs are
+# not present locally. Instead, only the host platform is saved and loaded.
+HOST_ARCH ?= $(shell go env GOARCH)
+define kind_load
+$(CONTAINER_TOOL) save --platform linux/$(HOST_ARCH) $(1) | $(KIND) load image-archive /dev/stdin --name $(2)
+endef
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -151,13 +173,13 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 		--set visualisationWebapp.service.type="NodePort"
 
 .PHONY: cluster-load-visualisation-webapp
-cluster-load-visualisation-webapp: kind ## Load the locally built visualisation webapp image into the Kind cluster
-	$(KIND) load docker-image $(VISUALISATION_WEBAPP_IMG) --name $(KIND_CLUSTER_NAME)
+cluster-load-visualisation-webapp: kind ## Load the visualisation webapp image into the Kind cluster.
+	$(call kind_load,$(VISUALISATION_WEBAPP_IMG),$(KIND_CLUSTER_NAME))
 
 .PHONY: cluster-load-mock-images
-cluster-load-mock-images:
-	$(KIND) load docker-image chantico-snmp-mock:latest --name kind
-	$(KIND) load docker-image chantico-vm-attribution-mock:latest --name kind
+cluster-load-mock-images: ## Load the SNMP and VM attribution mock images into the Kind cluster.
+	$(call kind_load,$(SNMP_MOCK_IMAGE_LOCAL),$(KIND_CLUSTER_NAME))
+	$(call kind_load,$(VM_ATTRIBUTION_MOCK_IMAGE_LOCAL),$(KIND_CLUSTER_NAME))
 
 .PHONY: cluster-mocks
 cluster-mocks: cluster-load-mock-images ## Apply the mock deployments and services.
@@ -188,40 +210,43 @@ build: manifests generate ## Build manager binary.
 run: manifests generate ## Run a controller from your host.
 	go run ./cmd/operator/main.go
 
-# If you wish to build the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
-# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
+# The docker-build* targets build images with docker buildx bake using the targets in docker-bake.hcl.
+# ARCH optionally sets comma-separated target architectures (i.e. make docker-build ARCH=arm64).
+# When ARCH is empty, images are built for the host architecture
+ARCH ?=
+BAKE = $(if $(ARCH),IMAGE_ARCH=$(ARCH) )$(CONTAINER_TOOL) buildx bake
+
+.PHONY: docker-pull
+docker-pull: ## Pull docker image with the manager.
+	$(CONTAINER_TOOL) pull ${IMG}
+
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+	$(BAKE) controller --load --set controller.tags=${IMG}
 
-.PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	$(CONTAINER_TOOL) push ${IMG}
+.PHONY: docker-pull-visualisation-webapp
+docker-pull-visualisation-webapp: ## Pull docker image with the visualisation webapp.
+	$(CONTAINER_TOOL) pull $(VISUALISATION_WEBAPP_IMG)
 
 .PHONY: docker-build-visualisation-webapp
 docker-build-visualisation-webapp: ## Build docker image with the visualisation webapp.
-	$(CONTAINER_TOOL) build -t $(VISUALISATION_WEBAPP_IMG) -f Dockerfile.webapp .
+	$(BAKE) visualisation-webapp --load --set visualisation-webapp.tags=$(VISUALISATION_WEBAPP_IMG)
 
-docker-push-visualisation-webapp: 
-	$(CONTAINER_TOOL) push $(VISUALISATION_WEBAPP_IMG)
+SNMP_MOCK_IMAGE_LOCAL ?= chantico-snmp-mock:latest
+VM_ATTRIBUTION_MOCK_IMAGE_LOCAL ?= chantico-vm-attribution-mock:latest
 
 .PHONY: docker-pull-mocks
-docker-pull-mocks:
+docker-pull-mocks: ## Pull docker images with the SNMP and VM attribution mocks.
 	$(CONTAINER_TOOL) pull $(SNMP_MOCK_IMAGE)
-	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) chantico-snmp-mock:latest
+	$(CONTAINER_TOOL) tag $(SNMP_MOCK_IMAGE) $(SNMP_MOCK_IMAGE_LOCAL)
 	$(CONTAINER_TOOL) pull $(VM_ATTRIBUTION_MOCK_IMAGE)
-	$(CONTAINER_TOOL) tag $(VM_ATTRIBUTION_MOCK_IMAGE) chantico-vm-attribution-mock:latest
+	$(CONTAINER_TOOL) tag $(VM_ATTRIBUTION_MOCK_IMAGE) $(VM_ATTRIBUTION_MOCK_IMAGE_LOCAL)
 
 .PHONY: docker-build-mocks
-docker-build-mocks:
-	$(CONTAINER_TOOL) build -t chantico-snmp-mock:latest -f Dockerfile.snmp-mock .
-	$(CONTAINER_TOOL) build -t chantico-vm-attribution-mock:latest -f Dockerfile.vm-attribution-mock .
-
-.PHONY: docker-push-mocks
-docker-push-mocks:
-	$(CONTAINER_TOOL) push chantico-snmp-mock:latest
-	$(CONTAINER_TOOL) push chantico-vm-attribution-mock:latest
+docker-build-mocks: ## Build docker images with the SNMP and VM attribution mocks.
+	$(BAKE) mocks --load \
+		--set snmp-mock.tags=$(SNMP_MOCK_IMAGE_LOCAL) \
+		--set vm-attribution-mock.tags=$(VM_ATTRIBUTION_MOCK_IMAGE_LOCAL)
 
 HELM_CHART_DIR ?= chart
 GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
@@ -233,26 +258,6 @@ helm-package: sync-deployment-crds ## Package Helm chart.
 .PHONY: helm-push
 helm-push: helm-package ## Package and push Helm chart to GHCR.
 	helm push chantico-$(VERSION).tgz $(GHCR_HELM_REPO)
-
-
-
-
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-.PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name chantico-builder
-	$(CONTAINER_TOOL) buildx use chantico-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm chantico-builder
-	rm Dockerfile.cross
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
