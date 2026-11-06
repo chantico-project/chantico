@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
@@ -27,6 +28,7 @@ import (
 	ch "chantico/internal/k8s"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
+	"chantico/internal/testutil"
 
 	config "chantico/internal/configuration"
 	md "chantico/internal/measurementdevice"
@@ -34,11 +36,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -49,26 +51,19 @@ const (
 
 func newReconciler(t *testing.T, root string, objs ...runtime.Object) *MeasurementDeviceReconciler {
 	t.Helper()
-	scheme := runtime.NewScheme()
-	if err := chantico.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := batchv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := appsv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	c := fake.NewClientBuilder().
-		WithScheme(scheme).
+
+	c := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, appsv1.AddToScheme, batchv1.AddToScheme).
 		WithRuntimeObjects(objs...).
 		Build()
 
 	t.Setenv(config.ChanticoNamespaceEnv, ChanticoNamespace)
+	previousEnv := config.ValidatedEnv
+	config.ValidatedEnv.PodNamespace = ChanticoNamespace
+	t.Cleanup(func() { config.ValidatedEnv = previousEnv })
 
 	return &MeasurementDeviceReconciler{
 		Client:    c,
-		Scheme:    scheme,
+		Scheme:    c.Scheme(),
 		Filestore: filestore.VolumeFileStore{Root: root},
 	}
 }
@@ -110,6 +105,37 @@ func TestWriteReconcileGeneratorFile(t *testing.T) {
 	}
 	if string(first) != string(second) {
 		t.Fatalf("file changed on idempotent run:\nfirst:  %q\nsecond: %q", first, second)
+	}
+}
+
+func TestReconcileGeneratorFile_MissingAuthFrom(t *testing.T) {
+	for _, existingFile := range []bool{false, true} {
+		name := "new generator file"
+		if existingFile {
+			name = "existing generator file"
+		}
+		t.Run(name, func(t *testing.T) {
+			measurementDevice := &chantico.MeasurementDevice{
+				ObjectMeta: metav1.ObjectMeta{Name: "tno", Namespace: "chantico", UID: "missing-auth"},
+				Spec:       chantico.MeasurementDeviceSpec{Walks: []string{"1.3.6.1"}},
+			}
+			reconciler := newReconciler(t, t.TempDir(), measurementDevice)
+			if existingFile {
+				writeFile(t, reconciler.Filestore, md.GeneratorFile(measurementDevice.UID), []byte("auths: {}\n"))
+			}
+
+			result := reconciler.reconcileGeneratorFile(t.Context(), measurementDevice)
+			if result.Action != steps.ActionError || result.Err == nil {
+				t.Fatalf("expected an error, got %v (err: %v)", result.Action, result.Err)
+			}
+			condition := meta.FindStatusCondition(measurementDevice.Status.Conditions, string(chantico.ConditionGenerated))
+			if condition == nil || condition.Status != metav1.ConditionFalse || condition.Reason != string(chantico.ReasonGenerationFailed) {
+				t.Fatalf("expected Generated=False with GenerationFailed, got %#v", condition)
+			}
+			if !strings.Contains(condition.Message, "spec.authFrom is required") {
+				t.Fatalf("expected missing auth reference in condition message, got %q", condition.Message)
+			}
+		})
 	}
 }
 

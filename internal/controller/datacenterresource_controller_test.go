@@ -17,126 +17,49 @@ limitations under the License.
 package controller
 
 import (
-	"net"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"os"
-	"path/filepath"
+	"fmt"
 	"reflect"
-	"strings"
-	"sync/atomic"
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
-	config "chantico/internal/configuration"
 	dcr "chantico/internal/datacenterresource"
 	"chantico/internal/k8s"
 	"chantico/internal/steps"
+	"chantico/internal/testutil"
 
-	"go.yaml.in/yaml/v2"
-	corev1 "k8s.io/api/core/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func setupDataCenterResourceRuleTest(t *testing.T) (string, *DataCenterResourceReconciler, *atomic.Int32) {
+func setupDataCenterResourceRuleTest(t *testing.T) (client.WithWatch, *DataCenterResourceReconciler) {
 	t.Helper()
 
-	tmpDir := t.TempDir()
-	reloads := &atomic.Int32{}
-	server := newReloadServer(t, reloads)
-	t.Cleanup(server.Close)
-
-	host, port := serverHostPort(t, server)
-	t.Setenv(config.ChanticoVolumeLocationEnv, tmpDir)
-	t.Setenv(config.ChanticoVolumeClaimEnv, "chantico-snmp-prometheus-volume-claim")
-	t.Setenv(config.ChanticoPrometheusServiceHostEnv, host)
-	t.Setenv(config.ChanticoPrometheusServicePortEnv, port)
-	t.Setenv(config.ChanticoNamespaceEnv, "chantico")
-	t.Setenv(config.ChanticoWatchNamespaceEnv, "chantico")
-
-	var errs []error
-	config.ValidatedEnv, errs = config.ValidateEnv()
-	if len(errs) > 0 {
-		t.Fatalf("validating test environment: %v", errs)
-	}
-
-	rulesDir := filepath.Join(tmpDir, prometheusRulesDir)
-	if err := os.MkdirAll(rulesDir, 0755); err != nil {
-		t.Fatalf("create rules directory %s: %v", rulesDir, err)
-	}
-
-	reconciler := newDataCenterResourceReconciler(t)
-
-	return tmpDir, reconciler, reloads
-}
-
-func newDataCenterResourceReconciler(t *testing.T, objs ...runtime.Object) *DataCenterResourceReconciler {
-	t.Helper()
-
-	scheme := runtime.NewScheme()
-	if err := chantico.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := corev1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-
-	client := fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithRuntimeObjects(objs...).
+	kubeClient := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1.AddToScheme).
+		WithStatusSubresource(&chantico.DataCenterResource{}).
 		Build()
 
-	return &DataCenterResourceReconciler{
-		Client: client,
-		Scheme: scheme,
+	ruleConfigurer := dcr.KubePrometheusRecordingRules{
+		Client: kubeClient,
+	}
+
+	return kubeClient, &DataCenterResourceReconciler{
+		Client:         kubeClient,
+		Scheme:         kubeClient.Scheme(),
+		RuleConfigurer: &ruleConfigurer,
 	}
 }
 
-func newReloadServer(t *testing.T, reloads *atomic.Int32) *httptest.Server {
-	t.Helper()
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen for mock Prometheus: %v", err)
+func fetchRuleResource(t *testing.T, r *chantico.DataCenterResource, client client.WithWatch) (*monitoringv1.PrometheusRule, error) {
+	rule := &monitoringv1.PrometheusRule{}
+	key := types.NamespacedName{Namespace: r.Namespace, Name: r.Name}
+	if err := client.Get(t.Context(), key, rule); err != nil {
+		return nil, fmt.Errorf("fetching PrometheusRule: %w", err)
 	}
-
-	server := &httptest.Server{
-		Listener: listener,
-		Config: &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-				return
-			}
-			if r.URL.Path != "/-/reload" {
-				http.NotFound(w, r)
-				return
-			}
-			reloads.Add(1)
-			w.WriteHeader(http.StatusOK)
-		})},
-	}
-	server.Start()
-
-	return server
-}
-
-func serverHostPort(t *testing.T, server *httptest.Server) (string, string) {
-	t.Helper()
-
-	serverURL, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatalf("parse server URL %q: %v", server.URL, err)
-	}
-	host, port, err := net.SplitHostPort(serverURL.Host)
-	if err != nil {
-		t.Fatalf("split server host %q: %v", serverURL.Host, err)
-	}
-	return host, port
+	return rule, nil
 }
 
 func TestNormalizeDataCenterResource(t *testing.T) {
@@ -185,8 +108,8 @@ func TestNormalizeDataCenterResource(t *testing.T) {
 	}
 }
 
-func TestReconcileWriteRuleFile_NonRootNode(t *testing.T) {
-	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
+func TestReconcileWriteRule_NonRootNode(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
 
 	bm := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
@@ -202,40 +125,34 @@ func TestReconcileWriteRuleFile_NonRootNode(t *testing.T) {
 		},
 	}
 
-	res := reconciler.reconcileWriteRuleFile(t.Context(), bm)
+	res := reconciler.reconcileWriteRule(t.Context(), bm)
 	if res.Action == steps.ActionError {
-		t.Fatalf("reconcileWriteRuleFile errored: %v", res.Err)
+		t.Fatalf("reconcileWriteRule errored: %v", res.Err)
 	}
 	if res.Action != steps.ActionContinue {
 		t.Fatalf("expected Continue, got %v", res.Action)
 	}
 
-	rulePath := filepath.Join(tmpDir, prometheusRulesDir, "bm1.yml")
-	data, err := os.ReadFile(rulePath)
+	prometheusRule, err := fetchRuleResource(t, bm, client)
 	if err != nil {
-		t.Fatalf("expected rule file to exist at %s: %v", rulePath, err)
+		t.Fatalf("fetching PrometheusRule: %v", err)
 	}
+	groups := prometheusRule.Spec.Groups
 
-	var ruleFile dcr.RuleFile
-	if err := yaml.Unmarshal(data, &ruleFile); err != nil {
-		t.Fatalf("parse rule file: %v", err)
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(groups))
 	}
-
-	if len(ruleFile.Groups) != 1 {
-		t.Fatalf("expected 1 group, got %d", len(ruleFile.Groups))
+	if groups[0].Name != "chantico_"+bm.Name {
+		t.Errorf("expected group name %q, got %q", "chantico_"+bm.Name, groups[0].Name)
 	}
-	if ruleFile.Groups[0].Name != "chantico_bm1" {
-		t.Errorf("expected group name %q, got %q", "chantico_bm1", ruleFile.Groups[0].Name)
-	}
-	if len(ruleFile.Groups[0].Rules) != 2 {
-		t.Fatalf("expected 2 rules, got %d", len(ruleFile.Groups[0].Rules))
+	if len(groups[0].Rules) != 2 {
+		t.Fatalf("expected 2 rules, got %d", len(groups[0].Rules))
 	}
 	assertDataCenterResourceCondition(t, bm, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
-	assertReloads(t, reloads, 1)
 }
 
-func TestReconcileWriteRuleFile_RootNodeWithEnergyMetric(t *testing.T) {
-	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
+func TestReconcileWriteRule_RootNodeWithEnergyMetric(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
 
 	pdu := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
@@ -249,21 +166,20 @@ func TestReconcileWriteRuleFile_RootNodeWithEnergyMetric(t *testing.T) {
 		},
 	}
 
-	res := reconciler.reconcileWriteRuleFile(t.Context(), pdu)
+	res := reconciler.reconcileWriteRule(t.Context(), pdu)
 	if res.Action == steps.ActionError {
-		t.Fatalf("reconcileWriteRuleFile errored: %v", res.Err)
+		t.Fatalf("reconcileWriteRule errored: %v", res.Err)
 	}
 
-	rulePath := filepath.Join(tmpDir, prometheusRulesDir, "pdu1.yml")
-	if _, err := os.Stat(rulePath); err != nil {
-		t.Fatalf("expected rule file to exist at %s: %v", rulePath, err)
+	_, err := fetchRuleResource(t, pdu, client)
+	if err != nil {
+		t.Fatalf("expected existing PrometheusRule but got error: %v", err)
 	}
 	assertDataCenterResourceCondition(t, pdu, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
-	assertReloads(t, reloads, 1)
 }
 
-func TestReconcileWriteRuleFile_OverwritesExisting(t *testing.T) {
-	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
+func TestReconcileWriteRule_OverwritesExisting(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
 
 	bm := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
@@ -279,29 +195,56 @@ func TestReconcileWriteRuleFile_OverwritesExisting(t *testing.T) {
 		},
 	}
 
-	if res := reconciler.reconcileWriteRuleFile(t.Context(), bm); res.Action == steps.ActionError {
-		t.Fatalf("first reconcileWriteRuleFile errored: %v", res.Err)
+	if res := reconciler.reconcileWriteRule(t.Context(), bm); res.Action == steps.ActionError {
+		t.Fatalf("first reconcileWriteRule errored: %v", res.Err)
 	}
-	bm.Spec.Parents[0].CoefficientFrom.SecretConfigMapSelector.Value = "0.8"
-	if res := reconciler.reconcileWriteRuleFile(t.Context(), bm); res.Action == steps.ActionError {
-		t.Fatalf("second reconcileWriteRuleFile errored: %v", res.Err)
+	bm.Spec.Parents[0].Name = "pdu2"
+	if res := reconciler.reconcileWriteRule(t.Context(), bm); res.Action == steps.ActionError {
+		t.Fatalf("second reconcileWriteRule errored: %v", res.Err)
 	}
 
-	rulePath := filepath.Join(tmpDir, prometheusRulesDir, "bm1.yml")
-	data, err := os.ReadFile(rulePath)
+	data, err := fetchRuleResource(t, bm, client)
 	if err != nil {
-		t.Fatalf("expected rule file to exist: %v", err)
+		t.Fatalf("expected existing PrometheusRule but got error: %v", err)
 	}
-	if !strings.Contains(string(data), "0.8") {
-		t.Errorf("expected updated coefficient 0.8 in rule file, got:\n%s", string(data))
+	assertDataCenterResourceCondition(t, bm, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
+
+	if len(data.Spec.Groups) != 1 {
+		t.Fatalf("expected 1 group in PrometheusRule, got %d", len(data.Spec.Groups))
 	}
-	assertReloads(t, reloads, 2)
+
+	found := false
+	for _, rule := range data.Spec.Groups[0].Rules {
+		if rule.Record == "chantico_power_coefficient" && rule.Labels["parent"] == "pdu2" {
+			found = true
+		}
+		if rule.Labels["parent"] == "pdu1" {
+			t.Errorf("expected stale parent 'pdu1' to be replaced, got rule %+v", rule)
+		}
+	}
+	if !found {
+		t.Errorf("expected coefficient rule with parent label 'pdu2', got %+v", data.Spec.Groups[0].Rules)
+	}
 }
 
 func TestReconcileDeletion_RemovesRuleFile(t *testing.T) {
-	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
-	rulePath := filepath.Join(tmpDir, prometheusRulesDir, "bm1.yml")
-	writeDCRTestFile(t, rulePath, []byte("groups: []\n"))
+	client, reconciler := setupDataCenterResourceRuleTest(t)
+
+	promRule := &monitoringv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bm1",
+			Namespace: "default",
+		},
+		Spec: monitoringv1.PrometheusRuleSpec{
+			Groups: []monitoringv1.RuleGroup{
+				{
+					Name:  "bm1",
+					Rules: []monitoringv1.Rule{},
+				},
+			},
+		},
+	}
+	writePrometheusRuleTestResource(t, client, promRule)
 
 	now := metav1.Now()
 	bm := &chantico.DataCenterResource{
@@ -319,17 +262,18 @@ func TestReconcileDeletion_RemovesRuleFile(t *testing.T) {
 	if res.Action != steps.ActionStop {
 		t.Fatalf("expected Stop, got %v", res.Action)
 	}
-	if _, err := os.Stat(rulePath); !os.IsNotExist(err) {
-		t.Fatalf("expected rule file to be deleted, stat err = %v", err)
+	if bm.DeletionTimestamp == nil {
+		t.Fatalf("expected DeletionTimestamp to be set")
 	}
+
+	assertPrometheusRuleExistence(t, client, bm, false)
 	if controllerutil.ContainsFinalizer(bm, chantico.DataCenterResourceGraphFinalizer) {
 		t.Fatalf("expected finalizer %q to be removed", chantico.DataCenterResourceGraphFinalizer)
 	}
-	assertReloads(t, reloads, 1)
 }
 
 func TestReconcileDeletion_NonExistentRuleFile(t *testing.T) {
-	_, reconciler, reloads := setupDataCenterResourceRuleTest(t)
+	_, reconciler := setupDataCenterResourceRuleTest(t)
 	now := metav1.Now()
 	bm := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{
@@ -346,11 +290,10 @@ func TestReconcileDeletion_NonExistentRuleFile(t *testing.T) {
 	if res.Action != steps.ActionStop {
 		t.Fatalf("expected Stop, got %v", res.Action)
 	}
-	assertReloads(t, reloads, 1)
 }
 
-func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
-	tmpDir, reconciler, _ := setupDataCenterResourceRuleTest(t)
+func TestReconcileWriteRule_FullThreeLayerHierarchy(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
 
 	pdu1 := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
@@ -404,25 +347,30 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 	}
 
 	for _, resource := range []*chantico.DataCenterResource{pdu1, bm1, vm1, vm2} {
-		if res := reconciler.reconcileWriteRuleFile(t.Context(), resource); res.Action == steps.ActionError {
-			t.Fatalf("reconcileWriteRuleFile(%s) errored: %v", resource.Name, res.Err)
+		if res := reconciler.reconcileWriteRule(t.Context(), resource); res.Action == steps.ActionError {
+			t.Fatalf("reconcileWriteRule(%s) errored: %v", resource.Name, res.Err)
 		}
 	}
 
-	rulesDir := filepath.Join(tmpDir, prometheusRulesDir)
-	assertDCRRuleFileExists(t, rulesDir, "pdu1.yml")
-	assertDCRRuleFileExists(t, rulesDir, "bm1.yml")
-	assertDCRRuleFileExists(t, rulesDir, "vm1.yml")
-	assertDCRRuleFileExists(t, rulesDir, "vm2.yml")
+	assertPrometheusRuleExistence(t, client, pdu1, true)
+	assertPrometheusRuleExistence(t, client, bm1, true)
+	assertPrometheusRuleExistence(t, client, vm1, true)
+	assertPrometheusRuleExistence(t, client, vm2, true)
 
-	pdu1RuleFile := readDCRRuleFile(t, filepath.Join(rulesDir, "pdu1.yml"))
-	if len(pdu1RuleFile.Groups[0].Rules) != 1 {
-		t.Errorf("PDU1: expected 1 alias rule, got %d", len(pdu1RuleFile.Groups[0].Rules))
+	pdu1Rule, err := readRuleResource(t, client, pdu1)
+	if err != nil {
+		t.Fatalf("PDU1: %v", err)
+	}
+	if len(pdu1Rule.Spec.Groups[0].Rules) != 1 {
+		t.Errorf("PDU1: expected 1 alias rule, got %d", len(pdu1Rule.Spec.Groups[0].Rules))
 	}
 
-	bm1RuleFile := readDCRRuleFile(t, filepath.Join(rulesDir, "bm1.yml"))
-	if len(bm1RuleFile.Groups[0].Rules) != 2 {
-		t.Errorf("BM1: expected 2 rules (1 coefficient + 1 energy), got %d", len(bm1RuleFile.Groups[0].Rules))
+	bm1Rule, err := readRuleResource(t, client, bm1)
+	if err != nil {
+		t.Fatalf("BM1: %v", err)
+	}
+	if len(bm1Rule.Spec.Groups[0].Rules) != 2 {
+		t.Errorf("BM1: expected 2 rules (1 coefficient + 1 energy), got %d", len(bm1Rule.Spec.Groups[0].Rules))
 	}
 }
 
@@ -441,41 +389,33 @@ func assertDataCenterResourceCondition(t *testing.T, resource *chantico.DataCent
 	}
 }
 
-func assertReloads(t *testing.T, reloads *atomic.Int32, want int32) {
+func readRuleResource(t *testing.T, client client.WithWatch, resource *chantico.DataCenterResource) (*monitoringv1.PrometheusRule, error) {
 	t.Helper()
 
-	if got := reloads.Load(); got != want {
-		t.Fatalf("expected %d Prometheus reloads, got %d", want, got)
-	}
-}
-
-func assertDCRRuleFileExists(t *testing.T, rulesDir, filename string) {
-	t.Helper()
-
-	path := filepath.Join(rulesDir, filename)
-	if _, err := os.Stat(path); err != nil {
-		t.Errorf("expected rule file %s to exist: %v", filename, err)
-	}
-}
-
-func readDCRRuleFile(t *testing.T, path string) dcr.RuleFile {
-	t.Helper()
-
-	data, err := os.ReadFile(path)
+	ruleResource, err := fetchRuleResource(t, resource, client)
 	if err != nil {
-		t.Fatalf("read rule file %s: %v", path, err)
+		return nil, fmt.Errorf("fetch rule resource: %w", err)
 	}
-	var ruleFile dcr.RuleFile
-	if err := yaml.Unmarshal(data, &ruleFile); err != nil {
-		t.Fatalf("parse rule file %s: %v", path, err)
-	}
-	return ruleFile
+
+	return ruleResource, nil
 }
 
-func writeDCRTestFile(t *testing.T, path string, data []byte) {
+func assertPrometheusRuleExistence(t *testing.T, client client.WithWatch, resource *chantico.DataCenterResource, exists bool) {
 	t.Helper()
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		t.Fatalf("write %s: %v", path, err)
+	_, err := readRuleResource(t, client, resource)
+	if exists && err != nil {
+		t.Fatalf("expected Prometheus rule to exist for resource %s: %v", resource.Name, err)
+	}
+	if !exists && err == nil {
+		t.Fatalf("expected Prometheus rule to not exist for resource %s, but it does", resource.Name)
+	}
+}
+
+func writePrometheusRuleTestResource(t *testing.T, client client.WithWatch, rule *monitoringv1.PrometheusRule) {
+	t.Helper()
+
+	if err := client.Create(t.Context(), rule); err != nil {
+		t.Fatalf("creating PrometheusRule: %v", err)
 	}
 }

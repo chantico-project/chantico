@@ -1,6 +1,71 @@
 persistentVolumeClaimName: chantico-persistent-volume-claim
 prometheusRetention: 5h
 snmpExporterAddress: chantico-snmp:9116
+kube-prometheus-stack:
+  crds:
+    upgradeJob:
+      enabled: true
+  defaultRules:
+    create: false
+  alertmanager:
+    enabled: false
+  grafana:
+    enabled: true
+    fullnameOverride: chantico-stack-grafana
+    adminPassword: admin
+    defaultDashboardsEnabled: false
+    grafana.ini:
+      auth.anonymous:
+        enabled: true
+        org_role: Viewer
+      security:
+        allow_embedding: true
+      users:
+        default_theme: light
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        labelValue: chantico
+        searchNamespace: "" # Search only the release namespace.
+        provider:
+          name: chantico
+          folder: Chantico
+          disableDelete: true
+          allowUiUpdates: false
+      datasources:
+        enabled: true
+        defaultDatasourceEnabled: false
+        label: grafana_datasource
+        labelValue: chantico
+        searchNamespace: ""
+  kubeApiServer:
+    enabled: false
+  kubelet:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  coreDns:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeProxy:
+    enabled: false
+  kubeStateMetrics:
+    enabled: false
+  nodeExporter:
+    enabled: false
+  prometheus:
+    enabled: false
+  prometheusOperator:
+    tls:
+      enabled: false
+    admissionWebhooks:
+      enabled: false
+    serviceMonitor:
+      selfMonitor: false
 imagePullSecretName: "" # Set if pulled from private registry, otherwise leave empty
 controller:
   include: true
@@ -15,6 +80,7 @@ filebrowser:
   service:
     type: "ClusterIP"
 prometheus:
+  useOperator: true
   service:
     type: "ClusterIP"
 victoriaMetrics:
@@ -26,9 +92,7 @@ victoriaMetrics:
   service:
     type: "ClusterIP"
 grafana:
-  include: true
-  adminPassword: admin
-  anonymous: true
+  # Compatibility endpoint; the Grafana workload is configured in kube-prometheus-stack.
   service:
     type: "ClusterIP"
 visualisationWebapp:
