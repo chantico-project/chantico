@@ -31,6 +31,16 @@
   --graph-width: 70%;
   --divider-width: 0.5rem;
   --diagram-min-height: 20rem;
+
+  --graph-node-color: var(--color-heading);
+  --graph-node-hovered-color: var(--color-highlight);
+  --graph-node-selected-color: var(--color-label);
+  --graph-node-label-color: var(--color-foreground);
+  --graph-edge-color: var(--color-border);
+  --graph-node-size: 18;
+  --graph-node-label-margin: 6;
+  --graph-label-font-size: 18;
+  --graph-edge-width: 1.5;
 }
 
 html {
