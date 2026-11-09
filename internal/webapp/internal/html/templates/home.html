@@ -23,7 +23,13 @@
         <div id="graph" class="graph"></div>
         <div id="divider" class="divider" role="separator" aria-orientation="vertical"></div>
         <aside class="panel">
-          <div id="panel-content">
+          <div id="panel-content"
+               hx-ext="path-params"
+               hx-get="/api/nodes/{id}"
+               hx-trigger="node-selected from:body"
+               hx-vals="js:{id: event.detail.id}"
+               hx-target="this"
+               hx-swap="innerHTML">
             <h2>Selected node</h2>
             <p>None</p>
           </div>
@@ -33,6 +39,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx-ext-path-params@2.0.0/path-params.js"></script>
     <script src="/static/graph.js"></script>
 
   </body>

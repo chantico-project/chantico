@@ -80,21 +80,27 @@ func newScheme() (*runtime.Scheme, error) {
 	return scheme, nil
 }
 
-type Pod struct {
-	Namespace string
-	Name      string
-}
-
-func (k *KubernetesClient) GetDataCenterResource(id string) (*v1alpha1.DataCenterResource, error) {
+func (k *KubernetesClient) listDataCenterResources() ([]v1alpha1.DataCenterResource, error) {
 	dcrList := &v1alpha1.DataCenterResourceList{}
 	if err := k.client.List(context.Background(), dcrList); err != nil {
 		return nil, fmt.Errorf("failed to list DataCenterResources: %w", err)
 	}
+	return dcrList.Items, nil
+}
 
-	for i := range dcrList.Items {
-		dcr := &dcrList.Items[i]
-		if dcr.GetNamespace()+"-"+dcr.GetName() == id {
-			return dcr, nil
+func nodeName(dcr *v1alpha1.DataCenterResource) string {
+	return dcr.GetNamespace() + "-" + dcr.GetName()
+}
+
+func (k *KubernetesClient) GetDataCenterResource(id string) (*v1alpha1.DataCenterResource, error) {
+	dcrs, err := k.listDataCenterResources()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range dcrs {
+		if nodeName(&dcrs[i]) == id {
+			return &dcrs[i], nil
 		}
 	}
 
@@ -138,25 +144,23 @@ func (k *KubernetesClient) DeleteDataCenterResource(id string) error {
 }
 
 func (k *KubernetesClient) GetDataCenterResources() ([]*graph.Node, error) {
-	dcrList := &v1alpha1.DataCenterResourceList{}
-	if err := k.client.List(context.Background(), dcrList); err != nil {
-		return nil, fmt.Errorf("failed to list DataCenterResources: %w", err)
+	dcrs, err := k.listDataCenterResources()
+	if err != nil {
+		return nil, err
 	}
 
 	var output []*graph.Node
 
-	for _, dcr := range dcrList.Items {
-		name := dcr.GetNamespace() + "-" + dcr.GetName()
+	for i := range dcrs {
+		dcr := &dcrs[i]
 		node := graph.Node{
-			Name: name,
+			Name: nodeName(dcr),
 		}
 
-		parents := dcr.Spec.ParentNames()
-		for _, parent := range parents {
-			p := &graph.Node{
+		for _, parent := range dcr.Spec.ParentNames() {
+			node.Parents = append(node.Parents, &graph.Node{
 				Name: dcr.GetNamespace() + "-" + parent,
-			}
-			node.Parents = append(node.Parents, p)
+			})
 		}
 		output = append(output, &node)
 	}
