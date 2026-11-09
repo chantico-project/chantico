@@ -27,6 +27,13 @@ const cy = cytoscape({
       },
     },
     {
+      selector: "node.selected",
+      style: {
+        "label": "data(id)",
+        "background-color": "#66d9ef",
+      },
+    },
+    {
       selector: "edge",
       style: {
         "width": 1.5,
@@ -47,6 +54,8 @@ cy.on("mouseout", "node", (event) => event.target.removeClass("hovered"));
 const panelContent = document.getElementById("panel-content");
 
 cy.on("tap", "node", (event) => {
+  cy.nodes(".selected").removeClass("selected");
+  event.target.addClass("selected");
   htmx.ajax("GET", `/api/nodes/${encodeURIComponent(event.target.id())}`, {
     target: panelContent,
     swap: "innerHTML",

@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	"chantico/api/v1alpha1"
 	"chantico/internal/webapp/internal/graph"
@@ -101,6 +102,40 @@ func (k *KubernetesClient) GetDataCenterResource(id string) (*v1alpha1.DataCente
 }
 
 var ErrNotFound = errors.New("not found")
+
+var ErrInvalidManifest = errors.New("invalid manifest")
+
+func (k *KubernetesClient) UpdateDataCenterResource(id string, manifest []byte) (*v1alpha1.DataCenterResource, error) {
+	existing, err := k.GetDataCenterResource(id)
+	if err != nil {
+		return nil, err
+	}
+
+	desired := &v1alpha1.DataCenterResource{}
+	if err := yaml.Unmarshal(manifest, desired); err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrInvalidManifest, err.Error())
+	}
+	if desired.GetNamespace() != existing.GetNamespace() || desired.GetName() != existing.GetName() {
+		return nil, fmt.Errorf("%w: name and namespace must match the node", ErrInvalidManifest)
+	}
+
+	desired.SetResourceVersion(existing.GetResourceVersion())
+	if err := k.client.Update(context.Background(), desired); err != nil {
+		return nil, fmt.Errorf("failed to update DataCenterResource: %w", err)
+	}
+	return desired, nil
+}
+
+func (k *KubernetesClient) DeleteDataCenterResource(id string) error {
+	existing, err := k.GetDataCenterResource(id)
+	if err != nil {
+		return err
+	}
+	if err := k.client.Delete(context.Background(), existing); err != nil {
+		return fmt.Errorf("failed to delete DataCenterResource: %w", err)
+	}
+	return nil
+}
 
 func (k *KubernetesClient) GetDataCenterResources() ([]*graph.Node, error) {
 	dcrList := &v1alpha1.DataCenterResourceList{}
