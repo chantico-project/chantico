@@ -22,3 +22,22 @@
             hx-swap="innerHTML">Delete</button>
   </div>
 </form>
+{{ with .PhysicalMeasurement }}
+<div class="panel-form">
+  <details>
+    <summary>Associated physical measurement</summary>
+    <dl>
+      <dt>Name</dt>
+      <dd>{{ .Name }}</dd>
+      {{ if .MeasurementDevice }}
+      <dt>Measurement device</dt>
+      <dd>{{ .MeasurementDevice }}</dd>
+      {{ end }}
+      {{ if .Walks }}
+      <dt>Metrics</dt>
+      <dd>{{ range .Walks }}<div>{{ . }}</div>{{ end }}</dd>
+      {{ end }}
+    </dl>
+  </details>
+</div>
+{{ end }}

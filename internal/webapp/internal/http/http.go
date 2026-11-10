@@ -143,16 +143,47 @@ func (h *HTTPServerHandler) renderNode(w http.ResponseWriter, id string, dcr *v1
 		return
 	}
 
+	pms, err := h.Kubernetes.ListPhysicalMeasurements(dcr.GetNamespace())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	mds, err := h.Kubernetes.ListMeasurementDevices(dcr.GetNamespace())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	mdByName := make(map[string]v1alpha1.MeasurementDevice, len(mds))
+	for _, md := range mds {
+		mdByName[md.GetName()] = md
+	}
+
+	var physicalMeasurement *html.PhysicalMeasurementRow
+	// There is only one PhysicalMeasurement per namespace, so the first entry is the one.
+	if len(dcr.Spec.PhysicalMeasurements) > 0 && len(pms) > 0 && pms[0].GetName() == dcr.Spec.PhysicalMeasurements[0] {
+		pm := pms[0]
+		row := html.PhysicalMeasurementRow{
+			Name:              pm.GetName(),
+			Type:              string(pm.Spec.Type),
+			MeasurementDevice: pm.Spec.MeasurementDevice,
+		}
+		if md, ok := mdByName[pm.Spec.MeasurementDevice]; ok {
+			row.Walks = md.Spec.Walks
+		}
+		physicalMeasurement = &row
+	}
+
 	parents := dcr.Spec.ParentNames()
 	data := html.NodePartialData{
-		ID:                   id,
-		Name:                 dcr.GetName(),
-		Namespace:            dcr.GetNamespace(),
-		Type:                 dcr.Spec.Type,
-		Parents:              parents,
-		EnergyMetric:         dcr.Spec.EnergyMetric,
-		PhysicalMeasurements: dcr.Spec.PhysicalMeasurements,
-		Manifest:             string(manifest),
+		ID:                  id,
+		Name:                dcr.GetName(),
+		Namespace:           dcr.GetNamespace(),
+		Type:                dcr.Spec.Type,
+		Parents:             parents,
+		EnergyMetric:        dcr.Spec.EnergyMetric,
+		PhysicalMeasurement: physicalMeasurement,
+		Manifest:            string(manifest),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

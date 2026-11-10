@@ -167,3 +167,19 @@ func (k *KubernetesClient) GetDataCenterResources() ([]*graph.Node, error) {
 
 	return output, nil
 }
+
+func (k *KubernetesClient) ListPhysicalMeasurements(namespace string) ([]v1alpha1.PhysicalMeasurement, error) {
+	list := &v1alpha1.PhysicalMeasurementList{}
+	if err := k.client.List(context.Background(), list, client.InNamespace(namespace)); err != nil {
+		return nil, fmt.Errorf("failed to list PhysicalMeasurements: %w", err)
+	}
+	return list.Items, nil
+}
+
+func (k *KubernetesClient) ListMeasurementDevices(namespace string) ([]v1alpha1.MeasurementDevice, error) {
+	list := &v1alpha1.MeasurementDeviceList{}
+	if err := k.client.List(context.Background(), list, client.InNamespace(namespace)); err != nil {
+		return nil, fmt.Errorf("failed to list MeasurementDevices: %w", err)
+	}
+	return list.Items, nil
+}

@@ -12,6 +12,7 @@
   --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-size-base: 1rem;
   --font-size-title: 1.5rem;
+  --font-size-heading: 1.25rem;
   --font-size-badge: 0.75rem;
   --font-weight-normal: 400;
   --font-weight-bold: 700;
@@ -88,8 +89,8 @@ h1 {
   padding: var(--space-xs) var(--space-sm);
   font-size: var(--font-size-badge);
   font-weight: var(--font-weight-bold);
-  color: var(--color-label);
-  background-color: var(--color-surface);
+  color: var(--color-background);
+  background-color: var(--color-label);
   border: var(--border-width) solid var(--color-label);
   border-radius: var(--radius-md);
 }
@@ -150,8 +151,8 @@ main {
 
 .panel h2 {
   margin: var(--zero) var(--zero) var(--space-sm);
-  color: var(--color-label);
-  font-size: var(--font-size-base);
+  color: var(--color-heading);
+  font-size: var(--font-size-heading);
 }
 
 .panel p {
@@ -177,6 +178,50 @@ main {
 .panel-form span {
   color: var(--color-label);
   font-weight: var(--font-weight-bold);
+}
+
+.panel details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.panel summary {
+  cursor: pointer;
+  color: var(--color-heading);
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+}
+
+.panel-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.panel-actions button {
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+  border: var(--border-width-accent) solid var(--color-label);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.panel-actions button:hover {
+  color: var(--color-background);
+  background-color: var(--color-label);
+}
+
+.panel-actions button.danger {
+  border-color: var(--color-accent);
+}
+
+.panel-actions button.danger:hover {
+  color: var(--color-background);
+  background-color: var(--color-accent);
 }
 
 .panel-form input,
