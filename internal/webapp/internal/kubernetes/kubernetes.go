@@ -10,10 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/yaml"
 
 	"chantico/api/v1alpha1"
@@ -26,8 +26,8 @@ type KubernetesClient struct {
 	Host           string
 }
 
-func New(kubeconfigPath string) (*KubernetesClient, error) {
-	config, currentContext, err := loadRESTConfig(kubeconfigPath)
+func New() (*KubernetesClient, error) {
+	config, err := ctrlconfig.GetConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -44,32 +44,20 @@ func New(kubeconfigPath string) (*KubernetesClient, error) {
 
 	return &KubernetesClient{
 		client:         k,
-		CurrentContext: currentContext,
+		CurrentContext: currentContext(),
 		Host:           config.Host,
 	}, nil
 }
 
-func loadRESTConfig(kubeconfigPath string) (*rest.Config, string, error) {
-	if kubeconfigPath == "" {
-		config, err := rest.InClusterConfig()
-		return config, "in-cluster", err
+func currentContext() string {
+	rawConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(),
+		&clientcmd.ConfigOverrides{},
+	).RawConfig()
+	if err != nil || rawConfig.CurrentContext == "" {
+		return "in-cluster"
 	}
-
-	return loadKubeconfig(kubeconfigPath)
-}
-
-func loadKubeconfig(kubeconfigPath string) (*rest.Config, string, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-	if err != nil {
-		return nil, "", err
-	}
-
-	rawConfig, err := clientcmd.LoadFromFile(kubeconfigPath)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return config, rawConfig.CurrentContext, nil
+	return rawConfig.CurrentContext
 }
 
 func newScheme() (*runtime.Scheme, error) {
@@ -180,18 +168,15 @@ func NodeStatus(conditions []metav1.Condition) string {
 }
 
 func (k *KubernetesClient) GetDataCenterResources(namespace string) ([]*graph.Node, error) {
-	dcrs, err := k.listDataCenterResources()
-	if err != nil {
-		return nil, err
+	dcrList := &v1alpha1.DataCenterResourceList{}
+	if err := k.client.List(context.Background(), dcrList, client.InNamespace(namespace)); err != nil {
+		return nil, fmt.Errorf("failed to list DataCenterResources: %w", err)
 	}
 
 	var output []*graph.Node
 
-	for i := range dcrs {
-		dcr := &dcrs[i]
-		if dcr.GetNamespace() != namespace {
-			continue
-		}
+	for i := range dcrList.Items {
+		dcr := &dcrList.Items[i]
 		node := graph.Node{
 			Name:   nodeName(dcr),
 			Label:  dcr.GetName(),
