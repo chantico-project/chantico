@@ -8,13 +8,21 @@
   </head>
   <body>
     <header>
-      <img class="logo" src="/static/chantico-dark.png" alt="Chantico">
-      <h1>Kubernetes cluster information <span class="badge">Experimental</span></h1>
+      <div class="brand">
+        <img class="logo" src="/static/chantico-dark.png" alt="Chantico">
+        <h1><span class="badge">Experimental web app</span></h1>
+      </div>
       <dl>
         <dt>Host</dt>
         <dd>{{ .Host }}</dd>
         <dt>CurrentContext</dt>
         <dd>{{ .CurrentContext }}</dd>
+        <dt><label for="namespace">Namespace</label></dt>
+        <dd>
+          <select id="namespace">
+            {{ range .Namespaces }}<option value="{{ . }}">{{ . }}</option>{{ end }}
+          </select>
+        </dd>
       </dl>
     </header>
 

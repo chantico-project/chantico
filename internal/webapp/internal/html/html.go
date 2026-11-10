@@ -38,6 +38,7 @@ func New() (*TemplateRenderer, error) {
 type HomePageData struct {
 	Host           string
 	CurrentContext string
+	Namespaces     []string
 }
 
 func (r *TemplateRenderer) RenderHomePage(w io.Writer, d HomePageData) {

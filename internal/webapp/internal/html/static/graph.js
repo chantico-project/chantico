@@ -2,7 +2,27 @@ const REFRESH_INTERVAL_MS = 5000;
 
 const API = {
   graph: "/api/graph",
+  namespaces: "/api/namespaces",
 };
+
+const namespaceSelect = document.getElementById("namespace");
+
+function graphURL() {
+  return `${API.graph}?namespace=${encodeURIComponent(namespaceSelect.value)}`;
+}
+
+async function refreshNamespaces() {
+  const response = await window.fetch(API.namespaces);
+  if (!response.ok) {
+    return;
+  }
+  const namespaces = await response.json();
+  const previous = namespaceSelect.value;
+
+  namespaceSelect.replaceChildren(...namespaces.map((namespace) => new Option(namespace, namespace)));
+  namespaceSelect.value = namespaces.includes(previous) ? previous : namespaces[0] ?? "";
+}
+
 
 const cssValues = window.getComputedStyle(document.documentElement);
 const cssToken = (name) => cssValues.getPropertyValue(name).trim();
@@ -62,14 +82,14 @@ const cy = window.cytoscape({
     {
       selector: "node.hovered",
       style: {
-        "label": "data(id)",
+        "label": "data(label)",
         "background-color": STYLE.hovered.color,
       },
     },
     {
       selector: "node.selected",
       style: {
-        "label": "data(id)",
+        "label": "data(label)",
         "background-color": STYLE.selected.color,
       },
     },
@@ -127,7 +147,7 @@ cy.on("zoom", updateLabelSize);
 
 // Graph logic
 async function refreshGraph() {
-  const response = await window.fetch(API.graph);
+  const response = await window.fetch(graphURL());
   if (!response.ok) {
     return;
   }
@@ -167,5 +187,7 @@ async function refreshGraph() {
   }
 }
 
-refreshGraph();
+namespaceSelect.addEventListener("change", refreshGraph);
+refreshNamespaces().then(refreshGraph);
+window.setInterval(refreshNamespaces, REFRESH_INTERVAL_MS);
 window.setInterval(refreshGraph, REFRESH_INTERVAL_MS);
