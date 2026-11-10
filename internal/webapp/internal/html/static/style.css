@@ -8,6 +8,8 @@
   --color-accent: #00a86b;
   --color-highlight: #c9f2dc;
   --color-selected: #d4f5e4;
+  --color-faulty: #e5484d;
+  --color-pending: #9fd8ff;
 
   --font-family-base: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -37,6 +39,8 @@
   --graph-node-color: var(--color-heading);
   --graph-node-hovered-color: var(--color-highlight);
   --graph-node-selected-color: var(--color-selected);
+  --graph-node-faulty-color: var(--color-faulty);
+  --graph-node-pending-color: var(--color-pending);
   --graph-node-label-color: var(--color-foreground);
   --graph-edge-color: var(--color-border);
   --graph-node-size: 18;

@@ -196,6 +196,7 @@ func (h *HTTPServerHandler) renderNode(w http.ResponseWriter, id string, dcr *v1
 		Type:                dcr.Spec.Type,
 		Parents:             parents,
 		EnergyMetric:        dcr.Spec.EnergyMetric,
+		Status:              kubernetes.NodeStatus(dcr.Status.Conditions),
 		PhysicalMeasurement: physicalMeasurement,
 		Manifest:            string(manifest),
 	}
