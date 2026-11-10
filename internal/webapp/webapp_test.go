@@ -18,28 +18,26 @@ limitations under the License.
 
 import "testing"
 
-func TestLoadConfigKubeconfigPath(t *testing.T) {
-	kubeconfigPath := t.TempDir()
+func TestLoadConfigPort(t *testing.T) {
 	tests := []struct {
-		name string
-		env  map[string]string
-		want string
+		name    string
+		env     map[string]string
+		want    int
+		wantErr bool
 	}{
-		{name: "local default", want: expandPath("~/.kube/config")},
-		{name: "in cluster", env: map[string]string{"KUBERNETES_SERVICE_HOST": "kubernetes.default.svc"}},
-		{name: "explicit kubeconfig in cluster", env: map[string]string{
-			"KUBERNETES_SERVICE_HOST": "kubernetes.default.svc",
-			"KUBECONFIG":              kubeconfigPath,
-		}, want: kubeconfigPath},
+		{name: "default", want: DefaultPort},
+		{name: "explicit", env: map[string]string{"PORT": "9090"}, want: 9090},
+		{name: "not a number", env: map[string]string{"PORT": "abc"}, wantErr: true},
+		{name: "out of range", env: map[string]string{"PORT": "70000"}, wantErr: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cfg, err := loadConfig(func(key string) string { return test.env[key] })
-			if err != nil {
-				t.Fatal(err)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, test.wantErr)
 			}
-			if cfg.KubeconfigPath != test.want {
-				t.Fatalf("KubeconfigPath = %q, want %q", cfg.KubeconfigPath, test.want)
+			if cfg.Port != test.want {
+				t.Fatalf("Port = %d, want %d", cfg.Port, test.want)
 			}
 		})
 	}
