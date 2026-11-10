@@ -38,6 +38,8 @@ const STYLE = {
   },
   hovered: { color: cssToken("--graph-node-hovered-color") },
   selected: { color: cssToken("--graph-node-selected-color") },
+  faulty: { color: cssToken("--graph-node-faulty-color") },
+  pending: { color: cssToken("--graph-node-pending-color") },
   edge: {
     width: cssNumber("--graph-edge-width"),
     color: cssToken("--graph-edge-color"),
@@ -78,6 +80,14 @@ const cy = window.cytoscape({
         "width": STYLE.node.size,
         "height": STYLE.node.size,
       },
+    },
+    {
+      selector: "node[status = 'faulty']",
+      style: { "background-color": STYLE.faulty.color },
+    },
+    {
+      selector: "node[status = 'pending']",
+      style: { "background-color": STYLE.pending.color },
     },
     {
       selector: "node.hovered",
@@ -168,9 +178,16 @@ async function refreshGraph() {
   });
 
   nodes.forEach((element) => {
-    if (cy.getElementById(element.data.id).empty()) {
+    const existing = cy.getElementById(element.data.id);
+    if (existing.empty()) {
       cy.add({ group: "nodes", data: element.data });
       changed = true;
+      return;
+    }
+    for (const [key, value] of Object.entries(element.data)) {
+      if (existing.data(key) !== value) {
+        existing.data(key, value);
+      }
     }
   });
 

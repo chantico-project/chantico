@@ -7,6 +7,8 @@ import (
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -163,6 +165,20 @@ func (k *KubernetesClient) ListDataCenterNamespaces() ([]string, error) {
 	return namespaces, nil
 }
 
+func NodeStatus(conditions []metav1.Condition) string {
+	ready := meta.FindStatusCondition(conditions, string(v1alpha1.ConditionReady))
+	switch {
+	case ready == nil, ready.Status == metav1.ConditionUnknown:
+		return "pending"
+	case ready.Status == metav1.ConditionTrue:
+		return "ok"
+	case ready.Reason == string(v1alpha1.ReasonReconciling), ready.Reason == string(v1alpha1.ReasonGenerationPending):
+		return "pending"
+	default:
+		return "faulty"
+	}
+}
+
 func (k *KubernetesClient) GetDataCenterResources(namespace string) ([]*graph.Node, error) {
 	dcrs, err := k.listDataCenterResources()
 	if err != nil {
@@ -177,8 +193,9 @@ func (k *KubernetesClient) GetDataCenterResources(namespace string) ([]*graph.No
 			continue
 		}
 		node := graph.Node{
-			Name:  nodeName(dcr),
-			Label: dcr.GetName(),
+			Name:   nodeName(dcr),
+			Label:  dcr.GetName(),
+			Status: NodeStatus(dcr.Status.Conditions),
 		}
 
 		for _, parent := range dcr.Spec.ParentNames() {

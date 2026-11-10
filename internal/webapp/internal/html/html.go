@@ -59,6 +59,7 @@ type NodePartialData struct {
 	Type                string
 	Parents             []string
 	EnergyMetric        string
+	Status              string
 	PhysicalMeasurement *PhysicalMeasurementRow
 	Manifest            string
 }
