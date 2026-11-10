@@ -4,7 +4,7 @@ const API = {
   graph: "/api/graph",
 };
 
-const cssValues = getComputedStyle(document.documentElement);
+const cssValues = window.getComputedStyle(document.documentElement);
 const cssToken = (name) => cssValues.getPropertyValue(name).trim();
 const cssNumber = (name) => parseFloat(cssToken(name));
 
@@ -44,7 +44,7 @@ const Containers = {
 
 
 
-const cy = cytoscape({
+const cy = window.cytoscape({
   container: Containers.graphPane,
   style: [
     {
@@ -96,7 +96,7 @@ cy.on("tap", "node", (event) => {
   cy.nodes(".selected").removeClass("selected");
   event.target.addClass("selected");
   document.body.dispatchEvent(
-    new CustomEvent("node-selected", { bubbles: true, detail: { id: event.target.id() } }),
+    new window.CustomEvent("node-selected", { bubbles: true, detail: { id: event.target.id() } }),
   );
 });
 
@@ -127,7 +127,7 @@ cy.on("zoom", updateLabelSize);
 
 // Graph logic
 async function refreshGraph() {
-  const response = await fetch(API.graph);
+  const response = await window.fetch(API.graph);
   if (!response.ok) {
     return;
   }
@@ -168,4 +168,4 @@ async function refreshGraph() {
 }
 
 refreshGraph();
-setInterval(refreshGraph, REFRESH_INTERVAL_MS);
+window.setInterval(refreshGraph, REFRESH_INTERVAL_MS);
