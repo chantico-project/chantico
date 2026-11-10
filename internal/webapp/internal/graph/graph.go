@@ -2,6 +2,7 @@ package graph
 
 type Node struct {
 	Name    string
+	Label   string
 	Parents []*Node
 }
 
@@ -22,7 +23,7 @@ func BuildElements(nodes []*Node) Elements {
 
 	for _, node := range nodes {
 		elements.Nodes = append(elements.Nodes, Element{
-			Data: map[string]string{"id": node.Name},
+			Data: map[string]string{"id": node.Name, "label": node.Label},
 		})
 		for _, parent := range node.Parents {
 			elements.Edges = append(elements.Edges, Element{

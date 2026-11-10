@@ -1,12 +1,13 @@
 :root {
-  --color-background: #272822;
-  --color-surface: #3e3d32;
-  --color-border: #75715e;
-  --color-foreground: #f8f8f2;
-  --color-heading: #a6e22e;
-  --color-label: #66d9ef;
-  --color-accent: #f92672;
-  --color-highlight: #e6db74;
+  --color-background: #0b1f16;
+  --color-surface: #3a3f3b;
+  --color-border: #2e6b4a;
+  --color-foreground: #e8f5ee;
+  --color-heading: #2fd08a;
+  --color-label: #7ee0b0;
+  --color-accent: #00a86b;
+  --color-highlight: #c9f2dc;
+  --color-selected: #d4f5e4;
 
   --font-family-base: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -35,7 +36,7 @@
 
   --graph-node-color: var(--color-heading);
   --graph-node-hovered-color: var(--color-highlight);
-  --graph-node-selected-color: var(--color-label);
+  --graph-node-selected-color: var(--color-selected);
   --graph-node-label-color: var(--color-foreground);
   --graph-edge-color: var(--color-border);
   --graph-node-size: 18;
@@ -68,11 +69,21 @@ header {
   border-bottom: var(--border-width) solid var(--color-border);
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.brand h1 {
+  margin: var(--zero);
+}
+
 .logo {
   display: block;
   height: var(--logo-height);
   width: auto;
-  margin-bottom: var(--space-md);
 }
 
 h1 {

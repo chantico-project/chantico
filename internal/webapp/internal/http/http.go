@@ -36,6 +36,7 @@ func New(h *HTTPServerHandler, config *HTTPServerConfig) *HTTPServer {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", h.HomePage)
 	mux.HandleFunc("GET /api/graph", h.GraphAPI)
+	mux.HandleFunc("GET /api/namespaces", h.NamespacesAPI)
 	mux.HandleFunc("GET /api/nodes/{id}", h.NodeAPI)
 	mux.HandleFunc("PUT /api/nodes/{id}", h.UpdateNodeAPI)
 	mux.HandleFunc("DELETE /api/nodes/{id}", h.DeleteNodeAPI)
@@ -66,7 +67,7 @@ func (s HTTPServer) Stop(ctx context.Context) error {
 }
 
 func (h *HTTPServerHandler) GraphAPI(w http.ResponseWriter, r *http.Request) {
-	nodes, err := h.Kubernetes.GetDataCenterResources()
+	nodes, err := h.Kubernetes.GetDataCenterResources(r.URL.Query().Get("namespace"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -74,6 +75,17 @@ func (h *HTTPServerHandler) GraphAPI(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(graph.BuildElements(nodes))
+}
+
+func (h *HTTPServerHandler) NamespacesAPI(w http.ResponseWriter, r *http.Request) {
+	namespaces, err := h.Kubernetes.ListDataCenterNamespaces()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(namespaces)
 }
 
 func (h *HTTPServerHandler) NodeAPI(w http.ResponseWriter, r *http.Request) {
@@ -160,9 +172,10 @@ func (h *HTTPServerHandler) renderNode(w http.ResponseWriter, id string, dcr *v1
 	}
 
 	var physicalMeasurement *html.PhysicalMeasurementRow
-	// There is only one PhysicalMeasurement per namespace, so the first entry is the one.
-	if len(dcr.Spec.PhysicalMeasurements) > 0 && len(pms) > 0 && pms[0].GetName() == dcr.Spec.PhysicalMeasurements[0] {
-		pm := pms[0]
+	for _, pm := range pms {
+		if len(dcr.Spec.PhysicalMeasurements) == 0 || pm.GetName() != dcr.Spec.PhysicalMeasurements[0] {
+			continue
+		}
 		row := html.PhysicalMeasurementRow{
 			Name:              pm.GetName(),
 			Type:              string(pm.Spec.Type),
@@ -172,6 +185,7 @@ func (h *HTTPServerHandler) renderNode(w http.ResponseWriter, id string, dcr *v1
 			row.Walks = md.Spec.Walks
 		}
 		physicalMeasurement = &row
+		break
 	}
 
 	parents := dcr.Spec.ParentNames()
@@ -195,7 +209,8 @@ func (h *HTTPServerHandler) renderNode(w http.ResponseWriter, id string, dcr *v1
 func (h *HTTPServerHandler) HomePage(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Handling home page request:", r.URL.Path)
 
-	if _, err := h.Kubernetes.GetDataCenterResources(); err != nil {
+	namespaces, err := h.Kubernetes.ListDataCenterNamespaces()
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		h.Renderer.RenderErrorPage(w, html.ErrorPageData{
 			Host:           h.Kubernetes.Host,
@@ -208,5 +223,6 @@ func (h *HTTPServerHandler) HomePage(w http.ResponseWriter, r *http.Request) {
 	h.Renderer.RenderHomePage(w, html.HomePageData{
 		Host:           h.Kubernetes.Host,
 		CurrentContext: h.Kubernetes.CurrentContext,
+		Namespaces:     namespaces,
 	})
 }

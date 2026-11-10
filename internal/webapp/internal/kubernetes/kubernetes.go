@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -143,7 +144,26 @@ func (k *KubernetesClient) DeleteDataCenterResource(id string) error {
 	return nil
 }
 
-func (k *KubernetesClient) GetDataCenterResources() ([]*graph.Node, error) {
+func (k *KubernetesClient) ListDataCenterNamespaces() ([]string, error) {
+	dcrs, err := k.listDataCenterResources()
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]bool{}
+	var namespaces []string
+	for i := range dcrs {
+		ns := dcrs[i].GetNamespace()
+		if !seen[ns] {
+			seen[ns] = true
+			namespaces = append(namespaces, ns)
+		}
+	}
+	sort.Strings(namespaces)
+	return namespaces, nil
+}
+
+func (k *KubernetesClient) GetDataCenterResources(namespace string) ([]*graph.Node, error) {
 	dcrs, err := k.listDataCenterResources()
 	if err != nil {
 		return nil, err
@@ -153,8 +173,12 @@ func (k *KubernetesClient) GetDataCenterResources() ([]*graph.Node, error) {
 
 	for i := range dcrs {
 		dcr := &dcrs[i]
+		if dcr.GetNamespace() != namespace {
+			continue
+		}
 		node := graph.Node{
-			Name: nodeName(dcr),
+			Name:  nodeName(dcr),
+			Label: dcr.GetName(),
 		}
 
 		for _, parent := range dcr.Spec.ParentNames() {
