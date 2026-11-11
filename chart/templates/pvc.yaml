@@ -17,12 +17,13 @@ spec:
     requests:
       storage: {{ .Values.pvc.storage }}
 {{- end }}
-{{- if and .Values.victoriaMetrics.include .Values.victoriaMetrics.pvc.include }}
+{{- $vmClaim := .Values.victoriaMetrics.persistentVolumeClaimName | default .Values.persistentVolumeClaimName }}
+{{- if and .Values.victoriaMetrics.include .Values.victoriaMetrics.pvc.include (ne $vmClaim .Values.persistentVolumeClaimName) }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Values.victoriaMetrics.persistentVolumeClaimName }}
+  name: {{ $vmClaim }}
   namespace: {{ .Release.Namespace }}
 spec:
   {{- if .Values.victoriaMetrics.pvc.volumeName }}

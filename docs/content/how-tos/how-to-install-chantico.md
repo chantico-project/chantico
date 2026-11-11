@@ -28,30 +28,31 @@ helm upgrade chantico oci://ghcr.io/chantico-project/charts/chantico --version <
 
 ## Using an alternative storage class
 
-The Chantico chart creates persistent volume claims for:
+The Chantico chart creates a persistent volume claim for:
 
-- `pvc`: data shared by the controller, SNMP generator jobs, SNMP exporter,
-  filebrowser and Prometheus, including its TSDB, rules and targets.
-- `victoriaMetrics.pvc`: VictoriaMetrics long-term storage.
+- `pvc`: data shared by the controller, SNMP generator jobs, SNMP exporter, filebrowser, Prometheus and VictoriaMetrics.
 
-By default, the shared claim uses the `csi-rbd` storage class and the
-VictoriaMetrics claim uses the cluster default storage class. Override
-`storageClassName` per claim when installing or upgrading Chantico. Each block
-also accepts `storage`, `accessModes` and `volumeName`.
+By default, the shared claim `pvc` uses the `csi-rbd` storage class. Override `storageClassName` when installing or upgrading Chantico. The block also accepts `storage`, `accessModes` and `volumeName`.
 
 ```bash
 helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace \
-  --set pvc.storageClassName="STORAGE_CLASS_NAME" \
+  --set pvc.storageClassName="STORAGE_CLASS_NAME"
+```
+
+The shared claim name is configured with `persistentVolumeClaimName`. To use an existing claim, set its name and disable creation with `pvc.include=false`. Disabling creation does not disable the volume mount.
+
+### Separate VictoriaMetrics storage
+
+VictoriaMetrics uses the shared claim by default. To give it its own claim, for example for a different storage class or size, enable `victoriaMetrics.pvc`. The claim is named by `victoriaMetrics.persistentVolumeClaimName` and accepts the same `storageClassName`, `storage`, `accessModes` and `volumeName` settings as `pvc`.
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace \
+  --set victoriaMetrics.pvc.include=true \
+  --set victoriaMetrics.persistentVolumeClaimName="chantico-victoriametrics-data" \
   --set victoriaMetrics.pvc.storageClassName="STORAGE_CLASS_NAME"
 ```
 
-The shared claim name is configured with `persistentVolumeClaimName`.
-VictoriaMetrics uses `victoriaMetrics.persistentVolumeClaimName`, which defaults
-to `chantico-victoriametrics-data`. To use an existing claim, set its name and
-disable creation with `pvc.include=false` or
-`victoriaMetrics.pvc.include=false`, respectively. Disabling creation does not
-disable the volume mount. Use different claim names to keep VictoriaMetrics
-independent of the shared volume.
+To use an existing claim instead, set only `victoriaMetrics.persistentVolumeClaimName`. VictoriaMetrics stores its data in the `victoria-metrics/` directory of its claim.
 
 You can list the storage classes available on your cluster with kubectl.
 
@@ -61,21 +62,11 @@ kubectl get storageclass
 
 ### Multi-node clusters
 
-With the default `ReadWriteOnce` access mode, the shared volume can only be
-attached to one node. The chart and the controller therefore schedule all pods
-that use it, including SNMP generator jobs and Prometheus, on the same node.
-Required pod affinity selects pods using the same claim in the same namespace
-and uses `kubernetes.io/hostname` as the topology key. Each pod has the matching
-label, so the first pod can be scheduled even when no other consumer exists yet.
+With the default `ReadWriteOnce` access mode, the shared volume can only be attached to one node. The chart and the controller therefore schedule all pods that use it, including SNMP generator jobs and Prometheus, on the same node. Required pod affinity selects pods using the same claim in the same namespace and uses `kubernetes.io/hostname` as the topology key.
 
-VictoriaMetrics has its own `ReadWriteOnce` claim and no affinity to the shared
-volume. It can run on a different node. Its deployment uses `Recreate` to avoid
-overlapping database writers and cross-node attachment during upgrades.
+VictoriaMetrics follows the same rule when it uses the shared claim. With a separate claim it has no affinity to the shared volume and can run on a different node.
 
-Use a CSI storage class for multi-node deployments. The chart's optional
-`hostPath` PV remains intended for single-node development. Co-location does not
-provide high availability; moving the shared volume requires moving all its
-consumers and reattaching it on another node.
+Use a CSI storage class for multi-node deployments. The chart's optional `hostPath` PV remains intended for single-node development.
 
 ## Watching resources in different namespaces
 

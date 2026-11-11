@@ -23,9 +23,11 @@ victoriaMetrics:
   retention: 12
   # Storage path inside the PVC subPath
   storagePath: /tmp/victoria-metrics-volume/storage
-  persistentVolumeClaimName: chantico-victoriametrics-data
+  # Empty uses the shared claim (persistentVolumeClaimName)
+  persistentVolumeClaimName: ""
   pvc:
-    include: true
+    # Create a separate claim, named by persistentVolumeClaimName above
+    include: false
     storageClassName: ""
     storage: 3Gi
     accessModes:

@@ -1,4 +1,6 @@
 {{- if .Values.victoriaMetrics.include }}
+{{- $vmClaim := .Values.victoriaMetrics.persistentVolumeClaimName | default .Values.persistentVolumeClaimName }}
+{{- $sharedClaim := eq $vmClaim .Values.persistentVolumeClaimName }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -36,7 +38,19 @@ spec:
     metadata:
       labels:
         app: chantico-victoriametrics
+        {{- if $sharedClaim }}
+        chantico-project.github.io/data-volume: {{ $vmClaim | quote }}
+        {{- end }}
     spec:
+      {{- if and $sharedClaim (has "ReadWriteOnce" .Values.pvc.accessModes) }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  chantico-project.github.io/data-volume: {{ $vmClaim | quote }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}
@@ -111,7 +125,7 @@ spec:
       volumes:
       - name: chantico-volume-mount
         persistentVolumeClaim:
-          claimName: {{ .Values.victoriaMetrics.persistentVolumeClaimName }}
+          claimName: {{ $vmClaim }}
       - name: chantico-victoriametrics-config
         configMap:
           name: chantico-victoriametrics-config
