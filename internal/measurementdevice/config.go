@@ -9,6 +9,7 @@ import (
 	img "chantico/internal/images"
 	vol "chantico/internal/volumes"
 	"os"
+	"path"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,14 @@ func BuildGeneratorJob(measurementDevice *chantico.MeasurementDevice) (*batchv1.
 	gid := int64(os.Getgid())
 	runAsNonRoot := uid != 0
 
+	mount := func(subDir string, readOnly bool) corev1.VolumeMount {
+		return corev1.VolumeMount{
+			Name:      vol.ChanticoVolumeMount,
+			MountPath: fs.Resolve(subDir),
+			SubPath:   path.Clean(subDir),
+			ReadOnly:  readOnly,
+		}
+	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      measurementDevice.GetName(),
@@ -71,10 +80,9 @@ func BuildGeneratorJob(measurementDevice *chantico.MeasurementDevice) (*batchv1.
 								"--mibs-dir", mibsDir,
 							},
 							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      vol.ChanticoVolumeMount,
-									MountPath: podMountPath,
-								},
+								mount(MibsSubDir, true),
+								mount(GeneratorsSubDir, true),
+								mount(SnmpSubDir, false),
 							},
 						},
 					},

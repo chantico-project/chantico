@@ -13,6 +13,7 @@ const (
 
 // Subdirectories under the chantico data volume.
 const (
+	GeneratorsSubDir  = "snmp/generators/"
 	GeneratorTemplate = "snmp/generators/generator-%s.yaml"
 
 	SnmpSubDir     = "snmp/yml/"

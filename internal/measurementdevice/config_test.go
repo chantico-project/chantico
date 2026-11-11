@@ -83,4 +83,27 @@ func TestBuildGeneratorJob(t *testing.T) {
 	if len(terms) == 1 && terms[0].TopologyKey != corev1.LabelHostname {
 		t.Errorf("topology key = %q, want %q", terms[0].TopologyKey, corev1.LabelHostname)
 	}
+
+	wantMounts := map[string]bool{
+		"/data/snmp/mibs":       true,
+		"/data/snmp/generators": true,
+		"/data/snmp/yml":        false,
+	}
+	mounts := containers[0].VolumeMounts
+	if len(mounts) != len(wantMounts) {
+		t.Fatalf("expected %d mounts, got %d: %+v", len(wantMounts), len(mounts), mounts)
+	}
+	for _, m := range mounts {
+		readOnly, ok := wantMounts[m.MountPath]
+		if !ok {
+			t.Errorf("unexpected mount path %q", m.MountPath)
+			continue
+		}
+		if m.ReadOnly != readOnly {
+			t.Errorf("mount %q ReadOnly = %v, want %v", m.MountPath, m.ReadOnly, readOnly)
+		}
+		if want := strings.TrimPrefix(m.MountPath, "/data/"); m.SubPath != want {
+			t.Errorf("mount %q SubPath = %q, want %q", m.MountPath, m.SubPath, want)
+		}
+	}
 }
