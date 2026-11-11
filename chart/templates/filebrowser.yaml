@@ -12,9 +12,17 @@ spec:
     metadata:
       labels:
         app: chantico-filebrowser
-        {{- include "chantico.dataVolumeLabel" . | nindent 8 }}
+        chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
     spec:
-      {{- include "chantico.dataVolumeAffinity" . | nindent 6 }}
+      {{- if has "ReadWriteOnce" .Values.pvc.accessModes }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}
@@ -48,7 +56,7 @@ spec:
       volumes:
       - name: chantico-volume-mount
         persistentVolumeClaim:
-          claimName: {{ include "chantico.dataClaimName" . }}
+          claimName: {{ .Values.persistentVolumeClaimName }}
 ---
 apiVersion: v1
 kind: Service

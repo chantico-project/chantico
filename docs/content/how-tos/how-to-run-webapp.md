@@ -15,43 +15,13 @@ Chantico provides a webapp that visualizes the parent-child relationships of Dat
 The Helm chart does not deploy the webapp by default. Enable it when installing Chantico:
 
 ```sh
-helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set visualisationWebapp.enabled=true
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set visualisationWebapp.include=true
 ```
-
-#### Expose the webapp through port forwarding
 
 The webapp Service is internal to the cluster by default. Forward it to your machine and open [http://localhost:8080](http://localhost:8080):
 
 ```sh
 kubectl port-forward -n chantico service/chantico-visualisation-webapp 8080:80
-```
-
-#### Expose the webapp through a Gateway
-
-The chart can create a Gateway API `HTTPRoute` that attaches the webapp Service to an existing Gateway. Prerequisites:
-- Gateway API CRDs (`gateway.networking.k8s.io/v1`) installed in the cluster.
-- A Gateway controller (e.g. Envoy Gateway, Istio, Cilium, NGINX Gateway).
-- A `Gateway` whose listener allows routes from the Chantico namespace (`allowedRoutes.namespaces`).
-
-Example values for Gateway under `visualisationWebapp` HTTPRoute:
-
-```yaml
-visualisationWebapp:
-  enabled: true
-  httpRoute:
-    enabled: true
-    parentRefs:
-      - name: shared-gateway
-        namespace: gateway-system
-        sectionName: https
-    hostnames:
-      - chantico.example.com
-```
-
-Check that the Gateway accepted the route:
-
-```sh
-kubectl get httproute -n chantico chantico-visualisation-webapp -o jsonpath='{.status.parents[*].conditions}'
 ```
 
 #### Use a locally built image in the development cluster

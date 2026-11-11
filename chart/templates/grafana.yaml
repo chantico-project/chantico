@@ -1,4 +1,4 @@
-{{- if .Values.grafana.enabled }}
+{{- if .Values.grafana.include }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

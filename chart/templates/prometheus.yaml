@@ -11,7 +11,7 @@ data:
       evaluation_interval: 5s
     rule_files:
       - /tmp/prometheus-volume/rules/*.yml
-    {{- if .Values.victoriaMetrics.enabled }}
+    {{- if .Values.victoriaMetrics.include }}
     remote_write:
       - url: http://chantico-victoriametrics:8428/api/v1/write
     {{- end }}
@@ -55,9 +55,17 @@ spec:
     metadata:
       labels:
         app: chantico-prometheus
-        {{- include "chantico.dataVolumeLabel" . | nindent 8 }}
+        chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
     spec:
-      {{- include "chantico.dataVolumeAffinity" . | nindent 6 }}
+      {{- if has "ReadWriteOnce" .Values.pvc.accessModes }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}
@@ -69,13 +77,11 @@ spec:
       - image: docker.io/prom/prometheus:v3.7.3
         name: prometheus
         command: ["prometheus"]
-        args: ["--config.file=/tmp/prometheus-config/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time={{ .Values.prometheus.retention }}", "--web.enable-lifecycle", "--storage.tsdb.no-lockfile"]
+        args: ["--config.file=/tmp/prometheus-config/prometheus.yml", "--storage.tsdb.path=/tmp/prometheus-volume/storage", "--storage.tsdb.retention.time={{ .Values.prometheusRetention }}", "--web.enable-lifecycle", "--storage.tsdb.no-lockfile"]
         volumeMounts:
         - mountPath: "/tmp/prometheus-volume"
           name: chantico-volume-mount
           subPath: "prometheus"
-        - mountPath: /prometheus
-          name: data
         - mountPath: "/tmp/prometheus-config"
           name: chantico-prometheus-config
           readOnly: true
@@ -105,6 +111,7 @@ spec:
           - -c
           - |
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/config;
+            mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/storage;
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/targets;
             mkdir -m 777 -p /tmp/chantico-volume-mount/prometheus/rules;
             chmod -R 1777 /tmp/chantico-volume-mount/prometheus
@@ -114,9 +121,7 @@ spec:
       volumes:
       - name: chantico-volume-mount
         persistentVolumeClaim:
-          claimName: {{ include "chantico.dataClaimName" . }}
-      - name: data
-        {{- include "chantico.volumeSource" (dict "name" "chantico-prometheus-data" "persistence" .Values.prometheus.persistence) | nindent 8 }}
+          claimName: {{ .Values.persistentVolumeClaimName }}
       - name: chantico-prometheus-config
         configMap:
           name: chantico-prometheus-config

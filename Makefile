@@ -20,6 +20,8 @@ REPO ?= ghcr.io/chantico-project/images/chantico$(IMAGE_SUFFIX)
 TAG ?= $(IMAGE_TAG)
 IMG ?= $(REPO):$(TAG)
 CHANTICO_DATA_PATH ?= .chantico-persistent-volume
+CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
+CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
 CHANTICO_NAMESPACE ?= chantico
 VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visualisation-webapp$(IMAGE_SUFFIX)
 VISUALISATION_WEBAPP_TAG ?= $(IMAGE_TAG)
@@ -146,15 +148,29 @@ cluster-clean: cluster-down cluster-delete-mount ## Delete Kind cluster and volu
 cluster-configure: sync-deployment-crds ## Configure cluster with namespace and helm installation
 # 	idempotent function to create namespace
 	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	$(KUBECTL) apply -f dev/k8s/persistent-volume.yaml
 # 	idempotent helm installation
 	helm upgrade --install chantico ./chart/ \
 		--namespace $(CHANTICO_NAMESPACE) \
-		--values dev/values-kind.yaml \
+		--set controller.include=false \
 		--set securityContext.runAsUser="$(shell id -u)" \
 		--set securityContext.runAsGroup="$(shell id -g)" \
+		--set persistentVolumeClaimName=$(CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME) \
+		--set pvc.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
+		--set pvc.volumeName=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
+		--set pv.include=true \
+		--set pv.name=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
+		--set pv.storage=$(LOCAL_DEVELOPMENT_STORAGE) \
+		--set pv.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
+		--set pv.hostPath.path="/data/chantico-persistent-volume" \
+		--set snmp.service.type="NodePort" \
+		--set filebrowser.service.type="NodePort" \
+		--set prometheus.service.type="NodePort" \
+		--set victoriaMetrics.service.type="NodePort" \
+		--set grafana.service.type="NodePort" \
+		--set visualisationWebapp.include=true \
 		--set visualisationWebapp.image.repository="$(VISUALISATION_WEBAPP_REPOSITORY)" \
-		--set visualisationWebapp.image.tag="$(VISUALISATION_WEBAPP_TAG)"
+		--set visualisationWebapp.image.tag="$(VISUALISATION_WEBAPP_TAG)" \
+		--set visualisationWebapp.service.type="NodePort"
 
 .PHONY: cluster-load-visualisation-webapp
 cluster-load-visualisation-webapp: kind ## Load the visualisation webapp image into the Kind cluster.

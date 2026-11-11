@@ -1,4 +1,4 @@
-{{- if and .Values.controller.enabled .Values.controller.image }}
+{{- if and .Values.controller.include .Values.controller.image }}
 {{- $watchNamespace := .Values.controller.watchNamespace | default .Release.Namespace }}
 {{- $allNamespaces := eq $watchNamespace "*" }}
 {{- $deploymentsCoveredByManagerRole := or $allNamespaces (eq $watchNamespace .Release.Namespace) }}

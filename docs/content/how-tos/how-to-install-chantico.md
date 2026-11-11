@@ -16,7 +16,7 @@ helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico
 
 - The command above installs the latest version of Chantico. See available [chart versions](https://github.com/chantico-project/chantico/pkgs/container/charts%2Fchantico). Also check out the [releases](https://github.com/chantico-project/chantico/releases) or the [changelog](/technical/changelog.md) on the documentation website for the list of changes throughout the version history.
 
-- Inspect the [values.yaml](https://github.com/chantico-project/chantico/blob/main/chart/values.yaml) file to see what parameters can be provided. For example, excluding the Chantico controller from the installation can be done with `--set controller.enabled=false`.
+- Inspect the [values.yaml](https://github.com/chantico-project/chantico/blob/main/chart/values.yaml) file to see what parameters can be provided. For example, excluding the Chantico controller from the installation can be done with `--set controller.include=false`.
 
 ## Upgrading using OCI Registry
 
@@ -30,21 +30,28 @@ helm upgrade chantico oci://ghcr.io/chantico-project/charts/chantico --version <
 
 The Chantico chart creates persistent volume claims for:
 
-- `persistence`: data shared by the controller, SNMP generator jobs, SNMP exporter, filebrowser and Prometheus rules/targets.
-- `prometheus.persistence`: Prometheus TSDB storage.
-- `victoriaMetrics.persistence`: VictoriaMetrics long-term storage.
+- `pvc`: data shared by the controller, SNMP generator jobs, SNMP exporter,
+  filebrowser and Prometheus, including its TSDB, rules and targets.
+- `victoriaMetrics.pvc`: VictoriaMetrics long-term storage and recording rules.
 
-By default, the shared and Prometheus claims use the `csi-rbd` storage class and
-the VictoriaMetrics claim uses the cluster default storage class.
-Override `storageClass` per claim when installing or upgrading Chantico.
-Each block also accepts `size`, `accessModes` and `existingClaim`.
+By default, the shared claim uses the `csi-rbd` storage class and the
+VictoriaMetrics claim uses the cluster default storage class. Override
+`storageClassName` per claim when installing or upgrading Chantico. Each block
+also accepts `storage`, `accessModes` and `volumeName`.
 
 ```bash
 helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace \
-  --set persistence.storageClass="STORAGE_CLASS_NAME" \
-  --set prometheus.persistence.storageClass="STORAGE_CLASS_NAME" \
-  --set victoriaMetrics.persistence.storageClass="STORAGE_CLASS_NAME"
+  --set pvc.storageClassName="STORAGE_CLASS_NAME" \
+  --set victoriaMetrics.pvc.storageClassName="STORAGE_CLASS_NAME"
 ```
+
+The shared claim name is configured with `persistentVolumeClaimName`.
+VictoriaMetrics uses `victoriaMetrics.persistentVolumeClaimName`, which defaults
+to `chantico-victoriametrics-data`. To use an existing claim, set its name and
+disable creation with `pvc.include=false` or
+`victoriaMetrics.pvc.include=false`, respectively. Disabling creation does not
+disable the volume mount. Use different claim names to keep VictoriaMetrics
+independent of the shared volume.
 
 You can list the storage classes available on your cluster with kubectl.
 
@@ -56,9 +63,19 @@ kubectl get storageclass
 
 With the default `ReadWriteOnce` access mode, the shared volume can only be
 attached to one node. The chart and the controller therefore schedule all pods
-that use it, including SNMP generator jobs, on the same node. If your storage
-class supports `ReadWriteMany`, set `persistence.accessModes` to
-`[ReadWriteMany]` to remove this constraint for the chart's deployments.
+that use it, including SNMP generator jobs and Prometheus, on the same node.
+Required pod affinity selects pods using the same claim in the same namespace
+and uses `kubernetes.io/hostname` as the topology key. Each pod has the matching
+label, so the first pod can be scheduled even when no other consumer exists yet.
+
+VictoriaMetrics has its own `ReadWriteOnce` claim and no affinity to the shared
+volume. It can run on a different node. Its deployment uses `Recreate` to avoid
+overlapping database writers and cross-node attachment during upgrades.
+
+Use a CSI storage class for multi-node deployments. The chart's optional
+`hostPath` PV remains intended for single-node development. Co-location does not
+provide high availability; moving the shared volume requires moving all its
+consumers and reattaching it on another node.
 
 ## Watching resources in different namespaces
 

@@ -9,7 +9,7 @@ import (
 
 const (
 	ChanticoVolumeMount = "chantico-volume-mount"
-	// DataVolumeLabel must match chantico.dataVolumeLabel in the Helm chart.
+	// DataVolumeLabel must match the shared-volume label in the Helm chart.
 	DataVolumeLabel = "chantico-project.github.io/data-volume"
 )
 

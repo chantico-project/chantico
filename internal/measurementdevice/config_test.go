@@ -6,14 +6,18 @@ import (
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	vol "chantico/internal/volumes"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestBuildGeneratorJob(t *testing.T) {
-	t.Setenv(vol.ChanticoVolumeMount, "chantico-volume-claim")
+	previousEnv := config.ValidatedEnv
+	config.ValidatedEnv.VolumeClaim = "chantico-volume-claim"
+	t.Cleanup(func() { config.ValidatedEnv = previousEnv })
 
 	dev := &chantico.MeasurementDevice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -66,11 +70,17 @@ func TestBuildGeneratorJob(t *testing.T) {
 
 	pod := job.Spec.Template
 	claim := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
+	if claim != "chantico-volume-claim" {
+		t.Errorf("volume claim = %q, want %q", claim, "chantico-volume-claim")
+	}
 	if got := pod.Labels[vol.DataVolumeLabel]; got != claim {
 		t.Errorf("pod label %q = %q, want %q", vol.DataVolumeLabel, got, claim)
 	}
 	terms := pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 	if len(terms) != 1 || terms[0].LabelSelector.MatchLabels[vol.DataVolumeLabel] != claim {
 		t.Errorf("pod affinity does not select %q=%q: %+v", vol.DataVolumeLabel, claim, terms)
+	}
+	if len(terms) == 1 && terms[0].TopologyKey != corev1.LabelHostname {
+		t.Errorf("topology key = %q, want %q", terms[0].TopologyKey, corev1.LabelHostname)
 	}
 }
