@@ -32,7 +32,7 @@ The Chantico chart creates persistent volume claims for:
 
 - `pvc`: data shared by the controller, SNMP generator jobs, SNMP exporter,
   filebrowser and Prometheus, including its TSDB, rules and targets.
-- `victoriaMetrics.pvc`: VictoriaMetrics long-term storage and recording rules.
+- `victoriaMetrics.pvc`: VictoriaMetrics long-term storage.
 
 By default, the shared claim uses the `csi-rbd` storage class and the
 VictoriaMetrics claim uses the cluster default storage class. Override
