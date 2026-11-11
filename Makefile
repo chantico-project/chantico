@@ -25,12 +25,6 @@ VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visu
 VISUALISATION_WEBAPP_TAG ?= $(IMAGE_TAG)
 VISUALISATION_WEBAPP_IMG ?= $(VISUALISATION_WEBAPP_REPOSITORY):$(VISUALISATION_WEBAPP_TAG)
 
-<<<<<<< HEAD
-SNMP_MOCK_TAG ?= latest
-SNMP_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-snmp-mock:$(SNMP_MOCK_TAG)
-VM_ATTRIBUTION_MOCK_TAG ?= latest
-VM_ATTRIBUTION_MOCK_IMAGE ?= ghcr.io/chantico-project/images/chantico-vm-attribution-mock:$(VM_ATTRIBUTION_MOCK_TAG)
-=======
 LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
 LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 
@@ -40,7 +34,6 @@ SNMP_MOCK_IMAGE ?= $(SNMP_MOCK_REPOSITORY):$(SNMP_MOCK_TAG)
 VM_ATTRIBUTION_MOCK_TAG ?= $(IMAGE_TAG)
 VM_ATTRIBUTION_MOCK_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-vm-attribution-mock$(IMAGE_SUFFIX)
 VM_ATTRIBUTION_MOCK_IMAGE ?= $(VM_ATTRIBUTION_MOCK_REPOSITORY):$(VM_ATTRIBUTION_MOCK_TAG)
->>>>>>> main
 
 # Name of the kind cluster created by cluster-up, and the kube context it produces.
 KIND_CLUSTER_NAME ?= kind
