@@ -1,41 +1,54 @@
+<!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="utf-8"/>
-</head>
-
-<body>
-    <div>
-      <div>
-        Kubernetes cluster information:
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chantico</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <img class="logo" src="/static/chantico-dark.png" alt="Chantico">
+        <h1><span class="badge">Experimental web app</span></h1>
       </div>
-      <div>
-        Host: {{ .Host }}
+      <dl>
+        <dt>Host</dt>
+        <dd>{{ .Host }}</dd>
+        <dt>CurrentContext</dt>
+        <dd>{{ .CurrentContext }}</dd>
+        <dt><label for="namespace">Namespace</label></dt>
+        <dd>
+          <select id="namespace">
+            {{ range .Namespaces }}<option value="{{ . }}">{{ . }}</option>{{ end }}
+          </select>
+        </dd>
+      </dl>
+    </header>
+
+    <main>
+      <div class="layout">
+        <div id="graph" class="graph"></div>
+        <div id="divider" class="divider" role="separator" aria-orientation="vertical"></div>
+        <aside class="panel">
+          <div id="panel-content"
+               hx-ext="path-params"
+               hx-get="/api/nodes/{id}"
+               hx-trigger="node-selected from:body"
+               hx-vals="js:{id: event.detail.id}"
+               hx-target="this"
+               hx-swap="innerHTML">
+            <h2>Selected node</h2>
+            <p>None</p>
+          </div>
+        </aside>
       </div>
-      <div>
-        CurrentContext: {{ .CurrentContext }}
-      </div>
-    </div>
-    {{ if .Diagram }}
+    </main>
 
-    <pre class="mermaid" style="visibility: hidden;">
-        {{ .Diagram }}
-    </pre>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx-ext-path-params@2.0.0/path-params.js"></script>
+    <script src="/static/graph.js"></script>
 
-    {{ else }}
-
-    <div>There is no input to generate the graph.</div>
-
-    {{ end }}
-
-    <script type="module">
-        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-        mermaid.initialize({ startOnLoad: true });
-
-        document.addEventListener("DOMContentLoaded", () => {
-            const diagrams = document.querySelectorAll("pre.mermaid");
-            diagrams.forEach(pre => pre.style.visibility = "visible");
-        })
-    </script>
-</body>
+  </body>
 </html>

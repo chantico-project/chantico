@@ -58,7 +58,7 @@ go run cmd/webapp/main.go
 
 We currently allow environment variables to configure the webapp:
 - PORT (default: 8080, port number for http server)
-- KUBECONFIG (default: ~/.kube/config, path to kubernetes config)
+- KUBECONFIG (path to kubernetes config; when unset, the default loading rules apply, i.e. ~/.kube/config, or in-cluster config when running in a cluster)
 
 ### Example
 

@@ -1,0 +1,43 @@
+<h2>{{ .Name }}</h2>
+<form class="panel-form">
+  <p class="panel-status">
+    <span>Status</span>
+    <strong>{{ .Status }}</strong>
+  </p>
+  <label>
+    <span>Manifest</span>
+    <textarea name="manifest" rows="20">{{ .Manifest }}</textarea>
+  </label>
+  <div class="panel-actions">
+    <button type="button"
+            hx-put="/api/nodes/{{ .ID }}"
+            hx-include="closest form"
+            hx-target="#panel-content"
+            hx-swap="innerHTML">Update</button>
+    <button type="button"
+            class="danger"
+            hx-delete="/api/nodes/{{ .ID }}"
+            hx-confirm="Delete {{ .Name }}?"
+            hx-target="#panel-content"
+            hx-swap="innerHTML">Delete</button>
+  </div>
+</form>
+{{ with .PhysicalMeasurement }}
+<div class="panel-form">
+  <details>
+    <summary>Associated physical measurement</summary>
+    <dl>
+      <dt>Name</dt>
+      <dd>{{ .Name }}</dd>
+      {{ if .MeasurementDevice }}
+      <dt>Measurement device</dt>
+      <dd>{{ .MeasurementDevice }}</dd>
+      {{ end }}
+      {{ if .Walks }}
+      <dt>Metrics</dt>
+      <dd>{{ range .Walks }}<div>{{ . }}</div>{{ end }}</dd>
+      {{ end }}
+    </dl>
+  </details>
+</div>
+{{ end }}
