@@ -40,6 +40,6 @@ In our First use-case (see `goal.md`) this corresponds to the `createPDU1` and `
   kubectl port-forward -n chantico svc/chantico-prometheus 9090:9090
   ```
   1. Check the targets at http://localhost:9090/targets. It can take a few seconds for Prometheus Operator to apply the new scrape config.
-  1. If you are using `./dev/port-forward.sh`, Prometheus is forwarded to `localhost:19090` instead.
+  1. If you are using the local development setup with kind, Prometheus is forwarded to `localhost:19090` instead.
 
 Deleting the `PhysicalMeasurement` also deletes its `ScrapeConfig`.

@@ -37,7 +37,7 @@ It hosts a [VictoriaMetrics](https://victoriametrics.com/) instance that stores 
 #### chantico-grafana
 
 The `chantico-grafana` is a kubernetes service living in the `chantico` namespace.
-It routes to the [Grafana](https://grafana.com/) instance deployed by the `kube-prometheus-stack` Helm dependency. Chantico provisions its dashboards and datasources through Grafana's sidecars to visualize metrics stored in `chantico-prometheus` and `chantico-victoriametrics` for reporting and analysis of the energy domain.
+It exposes the [Grafana](https://grafana.com/) instance deployed by Chantico using the `kube-prometheus-stack` Helm dependency. Chantico provisions its dashboards and datasources through Grafana's sidecars to visualize metrics stored in `chantico-prometheus` and `chantico-victoriametrics` for reporting and analysis of the energy domain.
 
 ## Technical choices
 

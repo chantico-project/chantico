@@ -23,10 +23,13 @@ Chantico creates, updates and deletes these resources during reconciliation.
 Each one has the same name and namespace as the Chantico resource that it is
 generated from, and carries the label `app.kubernetes.io/managed-by: chantico`.
 
-```text
-PhysicalMeasurement ──▶ ScrapeConfig ──┐
-                                       ├──▶ Prometheus Operator ──▶ Prometheus
-DataCenterResource  ──▶ PrometheusRule ┘
+```kroki {_type=d2 _output=embed}
+direction: right
+
+PhysicalMeasurement -> ScrapeConfig -> Operator -> Prometheus
+DataCenterResource -> PrometheusRule -> Operator
+
+Operator: "Prometheus Operator"
 ```
 
 ## Scrape configuration

@@ -36,7 +36,6 @@ Grafana is configured under the `kube-prometheus-stack.grafana` key in the chart
 helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set kube-prometheus-stack.grafana.adminPassword=<password>
 ```
 
-When installing from a local checkout of the repository, fetch the dependency first with `helm dependency build ./chart/`.
 See [Prometheus Operator integration](/technical/prometheus-operator.md) for details.
 
 ## Using an alternative storage class
