@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.24.0
+VERSION ?= 0.25.0
 
 # PR_NUMBER selects the images built by CI for a pull request (repository suffix -pr, tag pr-<number>).
 # Set it to a number, or to "auto" to look up the PR of the current branch with the gh CLI.
