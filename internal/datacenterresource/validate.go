@@ -16,7 +16,9 @@ const (
 	DataCenterResourceTypeGenerator = "generator"
 	DataCenterResourceTypeBattery   = "battery"
 
+	DataCenterResourceTypeSite      = "site"
 	DataCenterResourceTypePowerFeed = "power-feed"
+	DataCenterResourceTypePDU       = "pdu"
 	DataCenterResourceTypeOutlet    = "outlet"
 
 	DataCenterResourceTypeBaremetal  = "baremetal"
@@ -131,6 +133,8 @@ func validateResourceType(dataCenterResource *chantico.DataCenterResource) error
 	switch dataCenterResource.Spec.Type {
 	case
 		"",
+		DataCenterResourceTypeSite,
+		DataCenterResourceTypePDU,
 		DataCenterResourceTypeOutlet,
 		DataCenterResourceTypeBaremetal,
 		DataCenterResourceTypeVM,
