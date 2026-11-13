@@ -51,9 +51,8 @@ spec:
           - -retentionPeriod={{ .Values.victoriaMetrics.retention }}
           - -httpListenAddr=:8428
         volumeMounts:
-        - mountPath: "/tmp/victoria-metrics-volume"
+        - mountPath: {{ .Values.victoriaMetrics.storagePath | quote }}
           name: chantico-volume-mount
-          subPath: "victoria-metrics"
         ports:
         - containerPort: 8428
         securityContext:
@@ -87,26 +86,6 @@ spec:
           runAsNonRoot: true
           seccompProfile:
             type: RuntimeDefault
-      initContainers:
-      - image: busybox
-        name: victoriametrics-initialization
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
-        command: ["/bin/sh"]
-        args:
-          - -c
-          - |
-            mkdir -m 777 -p /tmp/chantico-volume-mount/victoria-metrics/storage;
-            chmod -R 1777 /tmp/chantico-volume-mount/victoria-metrics
-        volumeMounts:
-        - mountPath: "/tmp/chantico-volume-mount"
-          name: chantico-volume-mount
       volumes:
       - name: chantico-victoriametrics-config
         configMap:

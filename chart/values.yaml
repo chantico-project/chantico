@@ -21,8 +21,8 @@ victoriaMetrics:
   include: true
   # Long-term retention period (e.g. 12 months)
   retention: 12
-  # Storage path inside the PVC subPath
-  storagePath: /tmp/victoria-metrics-volume/storage
+  # VictoriaMetrics data directory, backed directly by its PVC
+  storagePath: /victoria-metrics-data
   # Settings of the claim template of the StatefulSet
   pvc:
     storageClassName: "" # empty uses the cluster default storage class
