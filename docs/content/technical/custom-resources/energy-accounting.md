@@ -29,7 +29,7 @@ timeseries. The `resource` label identifies the node, while labels such as
 |---|---|---|
 | **Alias rule** | Root node (has `energyMetricFrom` set) | `chantico_power_watts{resource="pdu1", type="pdu"} = tnoPduPowerValue{job="tno"}` |
 | **Coefficient rule** | Child node, per parent with a coefficient | `chantico_power_coefficient{child="bm1", parent="pdu1"} = 1` |
-| **Energy rule** | Child node (has parents) | `chantico_power_watts{resource="bm1", type="baremetal", parents="pdu1"} = sum(chantico_power_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_power_watts, "parent", "$1", "resource", "(.*)"))` | 
+| **Energy rule** | Child node (has parents) | `chantico_power_watts{resource="bm1", type="baremetal", parents="pdu1"} = sum(chantico_power_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))` |
 
 ---
 
@@ -108,6 +108,7 @@ The default time series labels applied to every resource are:
 | `resource` | The name of the resource (from `metadata.name`) |
 | `type` | The type of the resource (from `spec.type`) |
 | `parents` | Comma-separated list of parent resource names (from `spec.parents`) |
+| `kind` | Energy allocation category: `total` for the per-resource rule, or `attributed` and `overhead` for the static allocation rules |
 
 The `additionalLabels` field allows you to attach arbitrary identification information to the resource's Prometheus timeseries. These labels are merged with the default labels when generating the recording rules. For example:
 
@@ -194,15 +195,18 @@ groups:
     expr: "1"
     labels:
       child: datacenterresource-misd-gbm-01
+      kind: attribution
       parent: datacenterresource-pdu1
   - record: chantico_power_coefficient
     expr: "1"
     labels:
       child: datacenterresource-misd-gbm-01
+      kind: attribution
       parent: datacenterresource-pdu2
   - record: chantico_power_watts
-    expr: sum(chantico_power_coefficient{child="datacenterresource-misd-gbm-01"} * on (parent) group_left () label_replace(chantico_power_watts, "parent", "$1", "resource", "(.*)"))
+    expr: sum(chantico_power_coefficient{child="datacenterresource-misd-gbm-01"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))
     labels:
+      kind: total
       parents: datacenterresource-pdu1,datacenterresource-pdu2
       resource: datacenterresource-misd-gbm-01
       serviceId: 1ec4f74e-35bc-4e7e-aef2-9db3c94e55be
@@ -275,8 +279,10 @@ chantico_power_watts
 ```
 
 The result should contain one series for each configured resource: two PDU
-series and one aggregated bare-metal series. All three use the same metric
-name. Labels are used to identify the resource and its type.
+series and one aggregated bare-metal series. The `kind="total"` filter selects
+the complete power of each resource; without it, the query can also return
+`attributed` and `overhead` allocation series. Labels identify the resource
+and its type.
 
 The PDU series should contain the values supplied by the SNMP mock's
 `tnoPduPowerValue` metric. To inspect only the PDU resources, query:
@@ -295,6 +301,12 @@ chantico_power_watts{resource="datacenterresource-misd-gbm-01"}
 This value is the sum of `coefficient × parent_energy` for both PDU parents.
 The coefficient-to-parent relationship is visible in the active recording
 rules at <http://localhost:19090/rules>.
+
+View the overhead of each resource by querying with `kind="overhead"`:
+
+```promql
+chantico_power_watts{kind="overhead"}
+```
 
 Other useful queries include:
 
@@ -334,7 +346,22 @@ chantico_power_watts{resource="datacenterresource-pdu1"}
   the node, so children can reference any parent uniformly regardless of
   whether it is a root node or an intermediate aggregation node.
 
-4. **Pure logic + I/O separation.** `rules.go` contains only pure functions
+4. **Static allocation rules.** The attributed and overhead portions of a
+  resource's power can be calculated without traversing the resource graph.
+  Prometheus aggregates the outgoing attribution coefficients by parent
+  resource, then applies the result to that resource's `kind="total"`
+  series. These calculations are therefore defined once in the static
+  Prometheus configuration instead of generating equivalent rules for every
+  DataCenterResource.
+
+5. **Per-resource total energy rules.** A static aggregation rule was
+  considered for `chantico_power_watts{kind="total"}`, but calculating a
+  child's total requires following its parent relationships through the
+  resource graph. PromQL aggregation cannot perform that graph
+  traversal, so Chantico generates a total-energy recording rule for each
+  DataCenterResource from its declared parents and coefficients.
+
+6. **Pure logic + I/O separation.** `rules.go` contains only pure functions
    (no file system, no K8s client). `rules_io.go` handles the file writes.
    This makes the rule generation logic easy to unit-test.
 
@@ -343,7 +370,7 @@ chantico_power_watts{resource="datacenterresource-pdu1"}
   templated expression using `templateParameters`. Examples include a literal
   (`"1"`, `"0.5"`) or an expression referencing an externally published
   metric. Chantico always records it under the shared `chantico_power_coefficient`
-   metric with `parent` and `child` labels, so the power rule is decoupled 
+  metric with `parent` and `child` labels, so the power rule is decoupled
    from whatever name the external source uses.
 
    For example, at the BM → VM level the power share per VM is determined by
