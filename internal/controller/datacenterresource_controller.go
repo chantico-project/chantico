@@ -2,7 +2,6 @@ package controller
 
 import (
 	chantico "chantico/api/v1alpha1"
-	"chantico/internal/datacenterresource"
 	"chantico/internal/k8s"
 	"chantico/internal/steps"
 	"context"
@@ -211,10 +210,7 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 	dataCenterResources := &chantico.DataCenterResourceList{}
 	_ = r.List(ctx, dataCenterResources, listOptions...)
 
-	physicalMeasurements := &chantico.PhysicalMeasurementList{}
-	_ = r.List(ctx, physicalMeasurements, listOptions...)
-
-	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
+	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items)
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
 		dataCenterResource.Status.InvolvedResource = involvedResource
@@ -246,7 +242,7 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
 	l := log.FromContext(ctx)
 
-	renderer := datacenterresource.NewTemplateRenderer(r.Client, dataCenterResource.Namespace)
+	renderer := dcr.NewTemplateRenderer(r.Client, dataCenterResource.Namespace)
 	resolvedExpressions, err := renderer.ResolvedExpressions(ctx, dataCenterResource)
 	if err != nil {
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve templates: "+err.Error())

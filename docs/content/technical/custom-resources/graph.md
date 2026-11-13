@@ -27,7 +27,6 @@ consumption.
 |---|---|---|
 | `metadata.name` | `string` | The name of the resource. This is used to reference the resource in `spec.parents` of other resources. |
 | `spec.type` | `string` | The type of the resource (e.g. PDU, bare metal, VM, pod) |
-| `spec.physicalMeasurements` | list of `string` | The list of physical measurements that are associated with this resource. A portion of these are the metrics that are relevant for energy usage calculation of this resource. |
 | `spec.energyMetricFrom` | `TemplateFrom` | Prometheus expression source for a root resource, supplied by `value` or `valueFrom` |
 | `spec.parents` | list of `ParentRef` | Parent resources; each entry requires a coefficient expression in `coefficientFrom` |
 | `spec.additionalLabels` | map of `string` to `string` | Any additional fields to associate with the resource. This can be used to group resources together for energy accounting purposes. |

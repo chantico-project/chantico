@@ -23,8 +23,6 @@ metadata:
   name: datacenterresource-pdu1
 spec:
   type: pdu
-  physicalMeasurements:
-    - physicalMeasurement-pdu1-out
   energyMetricFrom:
     valueFrom:
       configMapKeyRef:
@@ -43,8 +41,6 @@ metadata:
   name: datacenterresource-pdu2
 spec:
   type: pdu
-  physicalMeasurements:
-    - physicalMeasurement-pdu2-out
   energyMetricFrom:
     valueFrom:
       configMapKeyRef:

@@ -398,10 +398,6 @@ spec:
                       set
                     rule: has(self.coefficient) != has(self.coefficientFrom)
                 type: array
-              physicalMeasurements:
-                items:
-                  type: string
-                type: array
               type:
                 type: string
             required:

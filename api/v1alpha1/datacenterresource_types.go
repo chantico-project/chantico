@@ -52,9 +52,6 @@ type DataCenterResourceSpec struct {
 
 	Type string `json:"type"`
 
-	// +optional
-	PhysicalMeasurements []string `json:"physicalMeasurements,omitempty"`
-
 	// Parents lists the parent DataCenterResources that feed energy into
 	// this node. Each entry carries an optional coefficient representing
 	// the proportional share of the parent's energy attributable to this
