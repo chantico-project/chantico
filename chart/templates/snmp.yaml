@@ -53,6 +53,15 @@ spec:
           readOnly: true
         ports:
         - containerPort: 9116
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
       volumes:
       - name: snmp-config
         configMap:
