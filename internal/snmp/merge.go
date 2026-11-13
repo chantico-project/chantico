@@ -2,17 +2,11 @@ package snmp
 
 import (
 	"bytes"
-	"chantico/internal/filestore"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"io/fs"
 	"maps"
-	"path/filepath"
 	"sort"
-	"strings"
 
 	"go.yaml.in/yaml/v2"
 )
@@ -55,40 +49,7 @@ func sortedConfigs(filesByName map[string][]byte) [][]byte {
 	return out
 }
 
-// readPerDeviceSnmpConfigs reads every snmp-*.yaml in the SNMP dir and returns them keyed by filename.
-func readPerDeviceSnmpConfigs(filestore filestore.FileStore, dir string) (map[string][]byte, error) {
-	entries, err := filestore.CollectSubFiles(context.Background(), dir)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("list %s: %w", dir, err)
-	}
-	out := map[string][]byte{}
-	for _, name := range entries {
-		// Only per-device files: snmp-<uid>.yaml. Excludes the merged snmp.yml.
-		if !strings.HasPrefix(filepath.Base(name), "snmp-") || filepath.Ext(name) != ".yaml" {
-			continue
-		}
-		content, err := filestore.ReadAll(context.Background(), filepath.Join(name))
-
-		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", name, err)
-		}
-
-		if len(bytes.TrimSpace(content)) == 0 {
-			continue // empty placeholder before generator job runs
-		}
-		out[name] = content
-	}
-	return out, nil
-}
-
-// GetMergedSortedSNMPConfig reads all per-device SNMP configs in dir, sorts them and returns the merged result.
-func GetMergedSortedSNMPConfig(filestore filestore.FileStore, dir string) ([]byte, error) {
-	filesByName, err := readPerDeviceSnmpConfigs(filestore, dir)
-	if err != nil {
-		return nil, err
-	}
-	return merge(sortedConfigs(filesByName))
+// MergeSortedSNMPConfigs sorts the SNMP configs of the devices by name and returns the merged result.
+func MergeSortedSNMPConfigs(configsByName map[string][]byte) ([]byte, error) {
+	return merge(sortedConfigs(configsByName))
 }

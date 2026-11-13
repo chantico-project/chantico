@@ -55,7 +55,17 @@ spec:
     metadata:
       labels:
         app: chantico-prometheus
+        chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
     spec:
+      {{- if has "ReadWriteOnce" .Values.pvc.accessModes }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}

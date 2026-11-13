@@ -6,14 +6,18 @@ import (
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
+	config "chantico/internal/configuration"
 	vol "chantico/internal/volumes"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestBuildGeneratorJob(t *testing.T) {
-	t.Setenv(vol.ChanticoVolumeMount, "chantico-volume-claim")
+	previousEnv := config.ValidatedEnv
+	config.ValidatedEnv.VolumeClaim = "chantico-volume-claim"
+	t.Cleanup(func() { config.ValidatedEnv = previousEnv })
 
 	dev := &chantico.MeasurementDevice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -48,19 +52,62 @@ func TestBuildGeneratorJob(t *testing.T) {
 	}
 	args := containers[0].Args
 	wantContains := []string{
-		"--output-path", "/data/snmp/yml/snmp-" + string(dev.UID) + ".yaml",
-		"--generator-path", "/data/snmp/generators/generator-" + string(dev.UID) + ".yaml",
+		"--output-path", "/tmp/snmp.yml",
+		"--generator-path", "/data/snmp/generators/" + GeneratorConfigKey,
 		"--mibs-dir", "/data/snmp/mibs",
 	}
 
 	// Check arguments in job.
-	joined := ""
-	for _, a := range args {
-		joined += a + " "
-	}
+	joined := strings.Join(args, " ")
 	for _, w := range wantContains {
 		if !strings.Contains(joined, w) {
 			t.Errorf("arg %q missing from %q", w, joined)
 		}
+	}
+
+	pod := job.Spec.Template
+	claim := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
+	if claim != "chantico-volume-claim" {
+		t.Errorf("volume claim = %q, want %q", claim, "chantico-volume-claim")
+	}
+	if got := pod.Labels[vol.DataVolumeLabel]; got != claim {
+		t.Errorf("pod label %q = %q, want %q", vol.DataVolumeLabel, got, claim)
+	}
+	terms := pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+	if len(terms) != 1 || terms[0].LabelSelector.MatchLabels[vol.DataVolumeLabel] != claim {
+		t.Errorf("pod affinity does not select %q=%q: %+v", vol.DataVolumeLabel, claim, terms)
+	}
+	if len(terms) == 1 && terms[0].TopologyKey != corev1.LabelHostname {
+		t.Errorf("topology key = %q, want %q", terms[0].TopologyKey, corev1.LabelHostname)
+	}
+
+	// The data volume is only read, the output goes to the pod log.
+	wantMounts := map[string]bool{
+		"/data/snmp/mibs":       true,
+		"/data/snmp/generators": true,
+	}
+	mounts := containers[0].VolumeMounts
+	if len(mounts) != len(wantMounts) {
+		t.Fatalf("expected %d mounts, got %d: %+v", len(wantMounts), len(mounts), mounts)
+	}
+	for _, m := range mounts {
+		readOnly, ok := wantMounts[m.MountPath]
+		if !ok {
+			t.Errorf("unexpected mount path %q", m.MountPath)
+			continue
+		}
+		if m.ReadOnly != readOnly {
+			t.Errorf("mount %q ReadOnly = %v, want %v", m.MountPath, m.ReadOnly, readOnly)
+		}
+		if m.Name == vol.ChanticoVolumeMount {
+			if want := strings.TrimPrefix(m.MountPath, "/data/"); m.SubPath != want {
+				t.Errorf("mount %q SubPath = %q, want %q", m.MountPath, m.SubPath, want)
+			}
+		}
+	}
+
+	volumes := pod.Spec.Volumes
+	if len(volumes) != 2 || volumes[1].ConfigMap == nil || volumes[1].ConfigMap.Name != "tno-generator" {
+		t.Errorf("expected generator ConfigMap volume %q, got %+v", "tno-generator", volumes)
 	}
 }

@@ -23,9 +23,19 @@ spec:
     metadata:
       labels:
         control-plane: controller-manager
+        chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
+      {{- if has "ReadWriteOnce" .Values.pvc.accessModes }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}

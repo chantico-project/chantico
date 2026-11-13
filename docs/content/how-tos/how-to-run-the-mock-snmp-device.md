@@ -88,11 +88,12 @@ participant "Prometheus" as Prom
 
 User -> K8s: Apply MeasurementDevice CR
 K8s --> MDO: Reconcile MeasurementDevice
-MDO -> MDO: Write generator_<uid>.yml
-MDO -> SNMPJob: Create Job (mounts snmp/mibs + config paths)
-SNMPJob -> SNMPJob: Resolve OIDs from MIBs\nand generate config_<uid>.yml
+MDO -> MDO: Write ConfigMap <device>-generator
+MDO -> SNMPJob: Create Job (mounts snmp/mibs + generator ConfigMap)
+SNMPJob -> SNMPJob: Resolve OIDs from MIBs\nand print the generated SNMP config to its log
 SNMPJob --> MDO: Job Succeeded
-MDO -> MDO: Merge config_*.yml -> snmp.yml
+MDO -> K8s: Read Job log and write ConfigMap <device>-snmp
+MDO -> MDO: Merge <device>-snmp ConfigMaps -> chantico-snmp-config
 MDO -> SNMP: Trigger rollout/reload
 SNMP --> MDO: New module/auth config active
 

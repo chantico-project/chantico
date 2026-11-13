@@ -28,6 +28,7 @@ import (
 	uzap "go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -41,6 +42,7 @@ import (
 	config "chantico/internal/configuration"
 	"chantico/internal/controller"
 	"chantico/internal/filestore"
+	md "chantico/internal/measurementdevice"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -153,6 +155,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// MIB uploads and the generator Jobs expect this directory on the data volume.
+	mibsDir := filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation}.Resolve(md.MibsSubDir)
+	if err := os.MkdirAll(mibsDir, 0777); err != nil {
+		setupLog.Error(err, "unable to create MIB directory", "path", mibsDir)
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -167,10 +176,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// ClientSet is needed because  controller-runtime client does not provide direct access to pod logs.
+	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create clientset")
+		os.Exit(1)
+	}
+
 	if err = (&controller.MeasurementDeviceReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Filestore: filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation},
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Logs:   md.ClientsetJobLogReader{Clientset: clientset},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)
