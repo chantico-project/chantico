@@ -60,11 +60,13 @@ on the resource's power timeseries.
 | `wind` | Wind generation directly connected to the data center, from one or more turbines. |
 | `generator` | An engine-driven electrical generator, such as a diesel generator. The type does not prescribe a particular fuel. |
 | `battery` | Battery energy storage that can supply the data center. |
+| `site` | A physical site or building hosting the data center. |
 | `power-feed` | A supply path connecting one or more power sources to all or part of the data center. |
+| `pdu` | A power distribution unit (PDU) supplying one or more connected resources. |
 | `outlet` | An individual PDU outlet supplying a connected resource or service, not an entire PDU. |
 | `baremetal` | A physical server, distinct from the virtual workloads running on it. |
 | `hypervisor` | The virtualization layer hosting VMs on a bare-metal server, represented separately from the physical host. |
-| `vm` | A virtual machine. |
+| `vm` | A virtual machine running on a hypervisor (or on a baremetal) with some way of selecting metrics for the individual VM. |
 | `kubernetes` | A Kubernetes cluster whose parent resources can be bare-metal servers or VMs, not an individual pod. |
 | `heat` | A heat output or heat reuse resource. |
 
@@ -77,10 +79,10 @@ The existing `kubernetes` value denotes a cluster. There is no separate
 nodes for distinguishing whole-server power from the power attributed to hosted
 workloads.
 
-The former `pdu` value has been replaced by `outlet` and is no longer accepted.
-Migrate outlet-level resources to `outlet` and update dashboard queries that
-select `type="pdu"`. Whole-PDU measurements should not simply be relabeled as
-individual outlets.
+The graph does not require all types to be present in the graph. As such, the 
+controller does not require exact parent-child relationships between types. For 
+example, a `baremetal` resource can have a `pdu` or `outlet` as a parent, and 
+a `vm` resource can have a `baremetal` or `hypervisor` as a parent.
 
 ## Example graph
 
