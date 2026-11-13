@@ -60,7 +60,10 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
         ```sh
         kubectl get jobs -n chantico | grep update-snmp
         ```
-    1. The generated config is stored on the shared volume at `snmp/yml/snmp.yml`.
+    1. The operator reads the generated config from the log of the generator job and stores it in the ConfigMap `<device>-snmp`. It then merges all of these into the ConfigMap `chantico-snmp-config`, which the SNMP exporter mounts.
+        ```sh
+        kubectl get configmap -n chantico chantico-snmp-config -o yaml
+        ```
     1. Port-forward the SNMP exporter
         ```sh
         kubectl port-forward -n chantico deployment/chantico-snmp 9116:9116

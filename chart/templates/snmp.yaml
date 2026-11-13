@@ -1,3 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chantico-snmp-config
+  namespace: {{ .Release.Namespace }}
+data:
+  snmp.yml: |
+    auths:
+      default:
+        community: public
+        security_level: noAuthNoPriv
+        username: guest
+        auth_protocol: MD5
+        priv_protocol: DES
+        version: 3
+    modules:
+      init:
+        walk: []
+        metrics: []
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,10 +55,11 @@ spec:
       containers:
       - image: docker.io/ricardbejarano/snmp_exporter:0.26.0
         name: snmp
+        args:
+        - --config.file=/snmp/snmp.yml
         volumeMounts:
-        - mountPath: "/snmp.yml"
-          name: chantico-volume-mount
-          subPath: "snmp/yml/snmp.yml"
+        - mountPath: /snmp
+          name: snmp-config
           readOnly: true
         ports:
         - containerPort: 9116
@@ -50,23 +71,6 @@ spec:
           - -c
           - |
             mkdir -p /tmp/chantico-volume-mount/snmp/mibs;
-            mkdir -p /tmp/chantico-volume-mount/snmp/generators;
-            mkdir -p /tmp/chantico-volume-mount/snmp/yml;
-            if [ ! -f /tmp/chantico-volume-mount/snmp/yml/snmp.yml ]; then
-              touch /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "auths:" > /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "  default:" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "    community: public" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "    security_level: noAuthNoPriv" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "    username: guest" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "    auth_protocol: MD5" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "    priv_protocol: DES" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "    version: 3" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "modules:" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "  init:" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "    walk: []" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-              echo "    metrics: []" >> /tmp/chantico-volume-mount/snmp/yml/snmp.yml;
-            fi
             chmod -R 0777 /tmp/chantico-volume-mount/snmp
         securityContext:
           allowPrivilegeEscalation: false
@@ -83,6 +87,9 @@ spec:
       - name: chantico-volume-mount
         persistentVolumeClaim:
           claimName: {{ .Values.persistentVolumeClaimName }}
+      - name: snmp-config
+        configMap:
+          name: chantico-snmp-config
       restartPolicy: Always
 ---
 apiVersion: v1

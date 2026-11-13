@@ -52,16 +52,13 @@ func TestBuildGeneratorJob(t *testing.T) {
 	}
 	args := containers[0].Args
 	wantContains := []string{
-		"--output-path", "/data/snmp/yml/snmp-" + string(dev.UID) + ".yaml",
-		"--generator-path", "/data/snmp/generators/generator-" + string(dev.UID) + ".yaml",
+		"--output-path", "/tmp/snmp.yml",
+		"--generator-path", "/data/snmp/generators/" + GeneratorConfigKey,
 		"--mibs-dir", "/data/snmp/mibs",
 	}
 
 	// Check arguments in job.
-	joined := ""
-	for _, a := range args {
-		joined += a + " "
-	}
+	joined := strings.Join(args, " ")
 	for _, w := range wantContains {
 		if !strings.Contains(joined, w) {
 			t.Errorf("arg %q missing from %q", w, joined)
@@ -84,10 +81,10 @@ func TestBuildGeneratorJob(t *testing.T) {
 		t.Errorf("topology key = %q, want %q", terms[0].TopologyKey, corev1.LabelHostname)
 	}
 
+	// The data volume is only read, the output goes to the pod log.
 	wantMounts := map[string]bool{
 		"/data/snmp/mibs":       true,
 		"/data/snmp/generators": true,
-		"/data/snmp/yml":        false,
 	}
 	mounts := containers[0].VolumeMounts
 	if len(mounts) != len(wantMounts) {
@@ -102,8 +99,15 @@ func TestBuildGeneratorJob(t *testing.T) {
 		if m.ReadOnly != readOnly {
 			t.Errorf("mount %q ReadOnly = %v, want %v", m.MountPath, m.ReadOnly, readOnly)
 		}
-		if want := strings.TrimPrefix(m.MountPath, "/data/"); m.SubPath != want {
-			t.Errorf("mount %q SubPath = %q, want %q", m.MountPath, m.SubPath, want)
+		if m.Name == vol.ChanticoVolumeMount {
+			if want := strings.TrimPrefix(m.MountPath, "/data/"); m.SubPath != want {
+				t.Errorf("mount %q SubPath = %q, want %q", m.MountPath, m.SubPath, want)
+			}
 		}
+	}
+
+	volumes := pod.Spec.Volumes
+	if len(volumes) != 2 || volumes[1].ConfigMap == nil || volumes[1].ConfigMap.Name != "tno-generator" {
+		t.Errorf("expected generator ConfigMap volume %q, got %+v", "tno-generator", volumes)
 	}
 }
