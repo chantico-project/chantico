@@ -4,6 +4,7 @@ go 1.26.4
 
 require (
 	github.com/go-logr/logr v1.4.4
+	github.com/google/renameio v1.0.1
 	github.com/gosnmp/gosnmp v1.43.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.67.5
@@ -51,7 +52,6 @@ require (
 	github.com/google/cel-go v0.29.0 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/renameio v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

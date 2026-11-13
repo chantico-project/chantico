@@ -28,8 +28,8 @@ timeseries. The `resource` label identifies the node, while labels such as
 | Rule kind | When generated | Example |
 |---|---|---|
 | **Alias rule** | Root node (has `energyMetricFrom` set) | `chantico_power_watts{resource="pdu1", type="pdu"} = tnoPduPowerValue{job="tno"}` |
-| **Coefficient rule** | Child node, per parent with a coefficient | `chantico_power_coefficient{resource="bm1", parent="pdu1"} = 1` |
-| **Energy rule** | Child node (has parents) | `chantico_power_watts{resource="bm1", type="baremetal", parents="pdu1"} = sum(chantico_power_coefficient{resource="bm1"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))` |
+| **Coefficient rule** | Child node, per parent with a coefficient | `chantico_power_coefficient{child="bm1", parent="pdu1"} = 1` |
+| **Energy rule** | Child node (has parents) | `chantico_power_watts{resource="bm1", type="baremetal", parents="pdu1"} = sum(chantico_power_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))` |
 
 ---
 
@@ -194,17 +194,17 @@ groups:
   - record: chantico_power_coefficient
     expr: "1"
     labels:
+      child: datacenterresource-misd-gbm-01
       kind: attribution
-      resource: datacenterresource-misd-gbm-01
       parent: datacenterresource-pdu1
   - record: chantico_power_coefficient
     expr: "1"
     labels:
+      child: datacenterresource-misd-gbm-01
       kind: attribution
-      resource: datacenterresource-misd-gbm-01
       parent: datacenterresource-pdu2
   - record: chantico_power_watts
-    expr: sum(chantico_power_coefficient{resource="datacenterresource-misd-gbm-01"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))
+    expr: sum(chantico_power_coefficient{child="datacenterresource-misd-gbm-01"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))
     labels:
       kind: total
       parents: datacenterresource-pdu1,datacenterresource-pdu2
@@ -305,7 +305,7 @@ rules at <http://localhost:19090/rules>.
 View the overhead of each resource by querying with `kind="overhead"`:
 
 ```promql
-chantico_energy_watts{kind="overhead"}
+chantico_power_watts{kind="overhead"}
 ```
 
 Other useful queries include:
@@ -355,7 +355,7 @@ chantico_power_watts{resource="datacenterresource-pdu1"}
   DataCenterResource.
 
 5. **Per-resource total energy rules.** A static aggregation rule was
-  considered for `chantico_energy_watts{kind="total"}`, but calculating a
+  considered for `chantico_power_watts{kind="total"}`, but calculating a
   child's total requires following its parent relationships through the
   resource graph. PromQL aggregation cannot perform that graph
   traversal, so Chantico generates a total-energy recording rule for each
@@ -370,7 +370,7 @@ chantico_power_watts{resource="datacenterresource-pdu1"}
   templated expression using `templateParameters`. Examples include a literal
   (`"1"`, `"0.5"`) or an expression referencing an externally published
   metric. Chantico always records it under the shared `chantico_power_coefficient`
-  metric with `resource` and `parent` labels, so the power rule is decoupled
+  metric with `parent` and `child` labels, so the power rule is decoupled
    from whatever name the external source uses.
 
    For example, at the BM → VM level the power share per VM is determined by
@@ -392,7 +392,7 @@ chantico_power_watts{resource="datacenterresource-pdu1"}
    - record: chantico_power_coefficient
      labels:
        parent: datacenterresource-misd-gbm-01
-       resource: datacenterresource-vm1
+       child: datacenterresource-vm1
      expr: external_provider_power_share_vm1
    ```
 

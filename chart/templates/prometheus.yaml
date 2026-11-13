@@ -43,40 +43,40 @@ data:
     groups:
     - name: const-coefficients
       rules:
-      - record: chantico_energy_coefficient
+      - record: chantico_power_coefficient
         expr: |
           sum by (resource) (
             label_replace(
               1 - sum by (parent) (
-                chantico_energy_coefficient{kind="attribution"}
+                chantico_power_coefficient{kind="attribution"}
               ),
               "resource", "$1", "parent", "(.*)"
             )
           )
         labels:
           kind: overhead
-      - record: chantico_energy_watts
+      - record: chantico_power_watts
         expr: |
-          chantico_energy_watts{kind="total"}
+          chantico_power_watts{kind="total"}
           * on(resource) group_left()
           sum by(resource) (
             label_replace(
               1 - sum by(parent) (
-                chantico_energy_coefficient{kind="attribution"}
+                chantico_power_coefficient{kind="attribution"}
               ),
               "resource", "$1", "parent", "(.*)"
             )
           )
         labels:
           kind: overhead
-      - record: chantico_energy_watts
+      - record: chantico_power_watts
         expr: |
-          chantico_energy_watts{kind="total"}
+          chantico_power_watts{kind="total"}
           * on(resource) group_left()
           sum by(resource) (
             label_replace(
               sum by(parent) (
-                chantico_energy_coefficient{kind="attribution"}
+                chantico_power_coefficient{kind="attribution"}
               ),
               "resource", "$1", "parent", "(.*)"
             )
