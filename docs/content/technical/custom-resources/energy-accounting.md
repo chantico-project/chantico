@@ -28,8 +28,8 @@ timeseries. The `resource` label identifies the node, while labels such as
 | Rule kind | When generated | Example |
 |---|---|---|
 | **Alias rule** | Root node (has `energyMetricFrom` set) | `chantico_power_watts{resource="pdu1", type="pdu"} = tnoPduPowerValue{job="tno"}` |
-| **Coefficient rule** | Child node, per parent with a coefficient | `chantico_power_coefficient{resource="bm1", parent="pdu1"} = 1` |
-| **Energy rule** | Child node (has parents) | `chantico_power_watts{resource="bm1", type="baremetal", parents="pdu1"} = sum(chantico_power_coefficient{resource="bm1"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))` |
+| **Coefficient rule** | Child node, per parent with a coefficient | `chantico_power_coefficient{child="bm1", parent="pdu1"} = 1` |
+| **Energy rule** | Child node (has parents) | `chantico_power_watts{resource="bm1", type="baremetal", parents="pdu1"} = sum(chantico_power_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))` |
 
 ---
 
@@ -388,7 +388,7 @@ chantico_power_watts{resource="datacenterresource-pdu1"}
   templated expression using `templateParameters`. Examples include a literal
   (`"1"`, `"0.5"`) or an expression referencing an externally published
   metric. Chantico always records it under the shared `chantico_power_coefficient`
-  metric with `resource` and `parent` labels, so the power rule is decoupled
+  metric with `parent` and `child` labels, so the power rule is decoupled
    from whatever name the external source uses.
 
    For example, at the BM → VM level the power share per VM is determined by
@@ -410,7 +410,7 @@ chantico_power_watts{resource="datacenterresource-pdu1"}
    - record: chantico_power_coefficient
      labels:
        parent: datacenterresource-misd-gbm-01
-       resource: datacenterresource-vm1
+       child: datacenterresource-vm1
      expr: external_provider_power_share_vm1
    ```
 

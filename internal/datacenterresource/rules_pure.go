@@ -80,7 +80,7 @@ func EnergyMetricQuery(resourceName string) string {
 
 // coefficientMetricQuery returns the Prometheus query for the coefficient from parent to child.
 func coefficientMetricQuery(parentName, childName string) string {
-	return fmt.Sprintf(`%s{parent="%s", resource="%s"}`, CoefficientMetricName, parentName, childName)
+	return fmt.Sprintf(`%s{parent="%s", child="%s"}`, CoefficientMetricName, parentName, childName)
 }
 
 // sanitizeMetricName replaces characters that are not valid in Prometheus
@@ -206,14 +206,13 @@ func (b *RuleBuilder) buildCoefficientRules() []RecordingRule {
 	sort.Slice(pcs, func(i, j int) bool { return pcs[i].parentName < pcs[j].parentName })
 
 	baseLabels := map[string]string{
-		"resource": b.resource.Name,
-		"kind":     EnergyCoefficientKindAttribution,
+		"child": b.resource.Name,
+		"kind":  EnergyCoefficientKindAttribution,
 	}
 
 	rules := make([]RecordingRule, 0, len(pcs))
 	for _, pc := range pcs {
 		baseLabels["parent"] = pc.parentName
-		baseLabels["resource"] = b.resource.Name
 		labels := b.buildSharedLabels(baseLabels)
 
 		rules = append(rules, RecordingRule{
@@ -245,7 +244,7 @@ func (b *RuleBuilder) buildEnergyRule() []RecordingRule {
 
 	// Construct the Prometheus aggregation expression for the energy recording rule.
 	expr := fmt.Sprintf(
-		`sum(%s{resource="%s"} * on (parent) group_left () label_replace(%s{kind="%s"}, "parent", "$1", "resource", "(.*)"))`,
+		`sum(%s{child="%s"} * on (parent) group_left () label_replace(%s{kind="%s"}, "parent", "$1", "resource", "(.*)"))`,
 		CoefficientMetricName, b.resource.Name, EnergyMetricName, EnergyMetricKindTotal,
 	)
 

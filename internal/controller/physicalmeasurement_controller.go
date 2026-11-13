@@ -42,13 +42,6 @@ type TargetConfigurer interface {
 	Delete(context.Context, *chantico.PhysicalMeasurement) error
 }
 
-type typeToSubdirMap map[chantico.PhysicalMeasurementType]string
-
-var targetFileSubdirs = typeToSubdirMap{
-	chantico.PhysicalMeasurementTypeSNMP:               "snmp",
-	chantico.PhysicalMeasurementTypePrometheusExporter: "prometheus-exporter",
-}
-
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/finalizers,verbs=create;update;patch
