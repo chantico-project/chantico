@@ -1,6 +1,5 @@
 persistentVolumeClaimName: chantico-persistent-volume-claim
 prometheusRetention: 5h
-snmpExporterAddress: chantico-snmp:9116
 kube-prometheus-stack:
   crds:
     upgradeJob:
@@ -89,10 +88,6 @@ victoriaMetrics:
   retention: 12
   # Storage path inside the PVC subPath
   storagePath: /tmp/victoria-metrics-volume/storage
-  service:
-    type: "ClusterIP"
-grafana:
-  # Compatibility endpoint; the Grafana workload is configured in kube-prometheus-stack.
   service:
     type: "ClusterIP"
 visualisationWebapp:

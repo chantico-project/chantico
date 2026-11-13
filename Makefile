@@ -167,7 +167,7 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 		--set filebrowser.service.type="NodePort" \
 		--set prometheus.service.type="NodePort" \
 		--set victoriaMetrics.service.type="NodePort" \
-		--set grafana.service.type="NodePort" \
+		--set kube-prometheus-stack.grafana.service.type="NodePort" \
 		--set visualisationWebapp.include=true \
 		--set visualisationWebapp.image.repository="$(VISUALISATION_WEBAPP_REPOSITORY)" \
 		--set visualisationWebapp.image.tag="$(VISUALISATION_WEBAPP_TAG)" \

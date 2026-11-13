@@ -43,14 +43,14 @@ metadata:
   name: chantico-grafana
   namespace: {{ .Release.Namespace }}
 spec:
-  type: {{ .Values.grafana.service.type }}
+  type: {{ $grafana.service.type }}
   selector:
 {{ include "grafana.selectorLabels" (index .Subcharts "kube-prometheus-stack").Subcharts.grafana | indent 4 }}
   ports:
     - protocol: TCP
       port: 3000
       targetPort: 3000
-      {{- if eq .Values.grafana.service.type "NodePort" }}
+      {{- if eq $grafana.service.type "NodePort" }}
       nodePort: 30004
       {{- end }}
 {{- end }}

@@ -29,8 +29,6 @@ the local `<root-project>/bin` folder.
 Set up the following environment variables (this can be automated using [direnv](https://direnv.net/))
 
 ```bash
-export CHANTICO_PROMETHEUS_SERVICE_HOST="localhost"
-export CHANTICO_PROMETHEUS_SERVICE_PORT="19090"
 export CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME="chantico-persistent-volume-claim"
 export CHANTICO_DATA_PATH=".chantico-persistent-volume"
 export CHANTICO_NAMESPACE="chantico"

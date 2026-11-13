@@ -42,7 +42,6 @@ spec:
           args:
             - --leader-elect
             - --health-probe-bind-address=:8081
-            - --snmp-exporter-address={{ .Values.snmpExporterAddress }}
           env:
             - name: CHANTICO_DATA_PATH
               value: "/data"
@@ -52,6 +51,10 @@ spec:
               value: {{ .Release.Namespace | quote }}
             - name: CHANTICO_WATCH_NAMESPACE
               value: {{ .Values.controller.watchNamespace | default .Release.Namespace | quote }}
+            - name: CHANTICO_SNMP_EXPORTER_SERVICE_HOST
+              value: "chantico-snmp.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: CHANTICO_SNMP_EXPORTER_SERVICE_PORT
+              value: "9116"
           ports:
             - containerPort: 8443
               name: https
