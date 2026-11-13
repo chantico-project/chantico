@@ -37,7 +37,7 @@ spec:
   {{- $watchNamespace := .Values.controller.watchNamespace | default .Release.Namespace }}
   ruleSelector:
     matchLabels:
-      app.kubernetes.io/managed-by: chantico
+      chantico-project.io/prometheus-rule: "true"
   ruleNamespaceSelector:
     {{- if eq $watchNamespace "*" }}
     {}

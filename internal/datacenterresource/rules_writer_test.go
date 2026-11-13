@@ -67,6 +67,9 @@ func TestKubePrometheusRecordingRulesReconcile_CreatesAndUpdatesRule(t *testing.
 	if observed.Labels["app.kubernetes.io/managed-by"] != "chantico" {
 		t.Fatalf("unexpected managed-by label: %v", observed.Labels)
 	}
+	if observed.Labels["chantico-project.io/prometheus-rule"] != "true" {
+		t.Fatalf("unexpected Prometheus rule selector label: %v", observed.Labels)
+	}
 	if len(observed.Spec.Groups) != 1 || observed.Spec.Groups[0].Name != "chantico_pdu" {
 		t.Fatalf("unexpected rule groups: %#v", observed.Spec.Groups)
 	}
