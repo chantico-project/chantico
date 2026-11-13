@@ -130,8 +130,6 @@ metadata:
   namespace: chantico
 spec:
   type: pdu
-  physicalMeasurements:
-    - physicalMeasurement-pdu1-out
   energyMetricFrom:
     value: 'tnoPduPowerValue{job="tno"}'
 ```

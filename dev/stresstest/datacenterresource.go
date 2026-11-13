@@ -30,9 +30,8 @@ func NewDataCenterResourceBuilder() *DataCenterResourceBuilder {
 	}
 }
 
-func (d *DataCenterResourceBuilder) AddEnergyMetric(energyMetric, physicalMeasurement string) *DataCenterResourceBuilder {
+func (d *DataCenterResourceBuilder) AddEnergyMetric(energyMetric string) *DataCenterResourceBuilder {
 	d.EnergyMetric = energyMetric
-	d.Physicalmeasurement = physicalMeasurement
 	return d
 }
 
@@ -58,10 +57,6 @@ func (d *DataCenterResourceBuilder) SetNamespace(namespace string) *DataCenterRe
 
 func (d *DataCenterResourceBuilder) Build() chapi.DataCenterResource {
 	dcr := chapi.DataCenterResource{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "DataCenterResource",
-			APIVersion: "chantico/v1alpha1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      d.Name,
 			Namespace: d.Namespace,
@@ -69,20 +64,22 @@ func (d *DataCenterResourceBuilder) Build() chapi.DataCenterResource {
 	}
 
 	dcr.Spec = chapi.DataCenterResourceSpec{
-		Type:                 d.Type,
-		PhysicalMeasurements: []string{d.Physicalmeasurement},
-		Parents:              d.Parents,
-		EnergyMetric:         d.EnergyMetric,
+		Type:         d.Type,
+		Parents:      d.Parents,
+		EnergyMetric: d.EnergyMetric,
 	}
 	return dcr
 }
 
-func generateDcRootLayer(namespace string, mdPmCombination []MeasurementDevicePhysicalMeasurementCombination) []chapi.DataCenterResource {
+func generateDcRootLayer(
+	namespace string,
+	mdPmCombination []MeasurementDevicePhysicalMeasurementCombination,
+) []chapi.DataCenterResource {
 	dcrs := make([]chapi.DataCenterResource, 0, len(mdPmCombination))
 	for idx, mdPm := range mdPmCombination {
 		walks := mdPm.MeasurementDevice.Spec.Walks
 		dcr := NewDataCenterResourceBuilder().
-			AddEnergyMetric(walks[rand.Intn(len(walks))], mdPm.PhysicalMeasurements.Name).
+			AddEnergyMetric(walks[rand.Intn(len(walks))]).
 			SetName(idx).
 			SetType("pdu").
 			SetNamespace(namespace).
@@ -92,8 +89,12 @@ func generateDcRootLayer(namespace string, mdPmCombination []MeasurementDevicePh
 	return dcrs
 }
 
-func generateDcFirstLayer(namespace string, rootDCRS []chapi.DataCenterResource, expansionRate int) []chapi.DataCenterResource {
-	// Usefull for the new ids
+func generateDcFirstLayer(
+	namespace string,
+	rootDCRS []chapi.DataCenterResource,
+	expansionRate int,
+) []chapi.DataCenterResource {
+	// Useful for the new ids
 	n := len(rootDCRS)
 	m := n * (expansionRate - 1)
 
@@ -129,7 +130,11 @@ func generateDcFirstLayer(namespace string, rootDCRS []chapi.DataCenterResource,
 	return dcrs
 }
 
-func generateDataCenterResources(namespace string, mdPmCombinations []MeasurementDevicePhysicalMeasurementCombination, expansionRate int) []chapi.DataCenterResource {
+func generateDataCenterResources(
+	namespace string,
+	mdPmCombinations []MeasurementDevicePhysicalMeasurementCombination,
+	expansionRate int,
+) []chapi.DataCenterResource {
 	rootDCRS := generateDcRootLayer(namespace, mdPmCombinations)
 	dcrs := generateDcFirstLayer(namespace, rootDCRS, expansionRate)
 	return slices.Concat(rootDCRS, dcrs)
