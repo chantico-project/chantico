@@ -59,7 +59,8 @@ hypervisor -> vm1
 hypervisor -> vm2
 ```
 
-In this example we would have 3 `PhysicalMeasurement`s, and 5 `DataCenterResource`s. 
+This example uses three `PhysicalMeasurement` resources and five
+`DataCenterResource` resources.
 
 ## 1. Install Alumet on the hypervisor
 
@@ -187,7 +188,7 @@ its parent. Use a coefficient query that selects the series for that VM and
 returns its share of the host's energy.
 
 The repository includes a basic Proxmox 9 Alumet template in
-[proxmox_alumet_vm_attribution_basic.yaml](../../../config/samples/attribution-templates/proxmox_alumet_vm_attribution_basic.yaml).
+[proxmox_alumet_vm_attribution_basic.yaml](https://github.com/chantico-project/chantico/blob/main/config/samples/attribution-templates/proxmox_alumet_vm_attribution_basic.yaml).
 It uses `cpu_percent_alumet_ratio` and expects `resourceName` to match the
 hypervisor's `PhysicalMeasurement` name and `vmid` to match the VM's ID in Proxmox. Apply
 it from the repository root:
