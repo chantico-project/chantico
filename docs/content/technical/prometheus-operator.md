@@ -5,8 +5,9 @@ main:
   parent: technical
 ---
 
-Chantico does not write Prometheus configuration files or trigger Prometheus
-reloads. Instead, it manages [Prometheus Operator](https://prometheus-operator.dev/)
+
+Chantico uses the [Prometheus Operator](https://prometheus-operator.dev/) 
+to handle configuration of the Prometheus instance. Chantico manages the relevant
 custom resources and lets the operator apply them to a Prometheus instance.
 This keeps Chantico focused on energy attribution and allows other monitoring
 configuration to share the same Prometheus.

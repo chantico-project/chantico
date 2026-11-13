@@ -32,7 +32,7 @@ func (f *PrometheusRecordingRuleConfigurer) Reconcile(ctx context.Context, resou
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resource.Name,
 			Namespace: resource.Namespace,
-			Labels:    k8s.PrometheusResourceLabels(),
+			Labels:    k8s.PrometheusResourceLabels,
 		},
 		Spec: promRuleSpec,
 	}

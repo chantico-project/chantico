@@ -16,8 +16,6 @@ limitations under the License.
 
 package k8s
 
-func PrometheusResourceLabels() map[string]string {
-	return map[string]string{
-		"app.kubernetes.io/managed-by": "chantico",
-	}
+var PrometheusResourceLabels = map[string]string{
+	"app.kubernetes.io/managed-by": "chantico",
 }
