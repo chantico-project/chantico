@@ -1,6 +1,4 @@
 {{- if .Values.victoriaMetrics.include }}
-{{- $vmClaim := .Values.victoriaMetrics.persistentVolumeClaimName | default .Values.persistentVolumeClaimName }}
-{{- $sharedClaim := eq $vmClaim .Values.persistentVolumeClaimName }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -21,7 +19,7 @@ data:
               )
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   labels:
     app: chantico
@@ -29,8 +27,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
+  serviceName: chantico-victoriametrics
   selector:
     matchLabels:
       app: chantico-victoriametrics
@@ -38,19 +35,7 @@ spec:
     metadata:
       labels:
         app: chantico-victoriametrics
-        {{- if $sharedClaim }}
-        chantico-project.github.io/data-volume: {{ $vmClaim | quote }}
-        {{- end }}
     spec:
-      {{- if and $sharedClaim (has "ReadWriteOnce" .Values.pvc.accessModes) }}
-      affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchLabels:
-                  chantico-project.github.io/data-volume: {{ $vmClaim | quote }}
-              topologyKey: kubernetes.io/hostname
-      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}
@@ -123,13 +108,25 @@ spec:
         - mountPath: "/tmp/chantico-volume-mount"
           name: chantico-volume-mount
       volumes:
-      - name: chantico-volume-mount
-        persistentVolumeClaim:
-          claimName: {{ $vmClaim }}
       - name: chantico-victoriametrics-config
         configMap:
           name: chantico-victoriametrics-config
       restartPolicy: Always
+  volumeClaimTemplates:
+  - metadata:
+      name: chantico-volume-mount
+    spec:
+      {{- if .Values.victoriaMetrics.pvc.volumeName }}
+      volumeName: {{ .Values.victoriaMetrics.pvc.volumeName }}
+      {{- end }}
+      {{- if .Values.victoriaMetrics.pvc.storageClassName }}
+      storageClassName: {{ .Values.victoriaMetrics.pvc.storageClassName }}
+      {{- end }}
+      accessModes:
+        {{- toYaml .Values.victoriaMetrics.pvc.accessModes | nindent 8 }}
+      resources:
+        requests:
+          storage: {{ .Values.victoriaMetrics.pvc.storage }}
 ---
 apiVersion: v1
 kind: Service

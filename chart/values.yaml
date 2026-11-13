@@ -23,12 +23,9 @@ victoriaMetrics:
   retention: 12
   # Storage path inside the PVC subPath
   storagePath: /tmp/victoria-metrics-volume/storage
-  # Empty uses the shared claim (persistentVolumeClaimName)
-  persistentVolumeClaimName: ""
+  # Settings of the claim template of the StatefulSet
   pvc:
-    # Create a separate claim, named by persistentVolumeClaimName above
-    include: false
-    storageClassName: ""
+    storageClassName: "" # empty uses the cluster default storage class
     storage: 3Gi
     accessModes:
       - ReadWriteOnce
@@ -59,7 +56,7 @@ pv:
     - ReadWriteOnce
 pvc:
   include: true
-  storageClassName: "csi-rbd"
+  storageClassName: "" # empty uses the cluster default storage class
   storage: 3Gi
   accessModes:
     - ReadWriteOnce

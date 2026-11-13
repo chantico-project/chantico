@@ -30,6 +30,21 @@ spec:
         fsGroup: {{ .Values.securityContext.runAsGroup }}
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+      - name: structure-initialization
+        image: docker.io/library/busybox:1.36.1-glibc
+        command: ["/bin/sh", "-c", "mkdir -p /srv/snmp/mibs"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: chantico-volume-mount
+          mountPath: /srv
       containers:
       - name: filebrowser
         image: docker.io/filebrowser/filebrowser:v2.32.2

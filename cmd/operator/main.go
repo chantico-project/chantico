@@ -41,6 +41,7 @@ import (
 	chanticov1alpha1 "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
 	"chantico/internal/controller"
+	"chantico/internal/filestore"
 	md "chantico/internal/measurementdevice"
 	// +kubebuilder:scaffold:imports
 )
@@ -151,6 +152,13 @@ func main() {
 		for _, err := range errs {
 			setupLog.Error(err, "error reading environment variable")
 		}
+		os.Exit(1)
+	}
+
+	// MIB uploads and the generator Jobs expect this directory on the data volume.
+	mibsDir := filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation}.Resolve(md.MibsSubDir)
+	if err := os.MkdirAll(mibsDir, 0777); err != nil {
+		setupLog.Error(err, "unable to create MIB directory", "path", mibsDir)
 		os.Exit(1)
 	}
 

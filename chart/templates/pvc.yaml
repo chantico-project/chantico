@@ -17,24 +17,3 @@ spec:
     requests:
       storage: {{ .Values.pvc.storage }}
 {{- end }}
-{{- $vmClaim := .Values.victoriaMetrics.persistentVolumeClaimName | default .Values.persistentVolumeClaimName }}
-{{- if and .Values.victoriaMetrics.include .Values.victoriaMetrics.pvc.include (ne $vmClaim .Values.persistentVolumeClaimName) }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ $vmClaim }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  {{- if .Values.victoriaMetrics.pvc.volumeName }}
-  volumeName: {{ .Values.victoriaMetrics.pvc.volumeName }}
-  {{- end }}
-  {{- if .Values.victoriaMetrics.pvc.storageClassName }}
-  storageClassName: {{ .Values.victoriaMetrics.pvc.storageClassName }}
-  {{- end }}
-  accessModes:
-    {{- toYaml .Values.victoriaMetrics.pvc.accessModes | nindent 4 }}
-  resources:
-    requests:
-      storage: {{ .Values.victoriaMetrics.pvc.storage }}
-{{- end }}
