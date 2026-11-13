@@ -270,6 +270,7 @@ func (r *MeasurementDeviceReconciler) createGeneratorJob(
 		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to set controller reference for SNMP Generator job: "+err.Error())
 		return steps.Error(err)
 	}
+	// TODO: Maybe this can use k8s.ApplyWithOwner
 	if err := r.Create(ctx, job); err != nil {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to create SNMP Generator job: "+err.Error())
 		return steps.Error(err)

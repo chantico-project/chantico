@@ -149,6 +149,7 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 # 	idempotent function to create namespace
 	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 # 	idempotent helm installation
+	helm dependency build ./chart/
 	helm upgrade --install chantico ./chart/ \
 		--namespace $(CHANTICO_NAMESPACE) \
 		--set controller.include=false \
@@ -166,7 +167,7 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 		--set filebrowser.service.type="NodePort" \
 		--set prometheus.service.type="NodePort" \
 		--set victoriaMetrics.service.type="NodePort" \
-		--set grafana.service.type="NodePort" \
+		--set kube-prometheus-stack.grafana.service.type="NodePort" \
 		--set visualisationWebapp.include=true \
 		--set visualisationWebapp.image.repository="$(VISUALISATION_WEBAPP_REPOSITORY)" \
 		--set visualisationWebapp.image.tag="$(VISUALISATION_WEBAPP_TAG)" \
@@ -198,7 +199,12 @@ cluster-mock-resources: ## Apply the sample configurations for the mocks
 
 .PHONY: cluster-mibs
 cluster-mibs: ## Copy MIBs to volume. Not tested: maybe we need to wait for the mibs directory to be created?
+	mkdir -p $(CHANTICO_DATA_PATH)/snmp/mibs/
 	cp dev/mibs/* $(CHANTICO_DATA_PATH)/snmp/mibs/
+
+.PHONY: cluster-dev-reset
+cluster-dev-reset: cluster-clean cluster-up cluster-configure cluster-mibs cluster-mocks cluster-mock-resources 
+	@echo "Cluster development environment has been reset."
 
 ##@ Build
 
@@ -253,6 +259,7 @@ GHCR_HELM_REPO ?= oci://ghcr.io/chantico-project/charts
 
 .PHONY: helm-package
 helm-package: sync-deployment-crds ## Package Helm chart.
+	helm dependency build $(HELM_CHART_DIR)
 	helm package $(HELM_CHART_DIR)
 
 .PHONY: helm-push
@@ -397,7 +404,7 @@ KUSTOMIZE_VERSION ?= v5.4.3
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.19
 GOLANGCI_LINT_VERSION ?= v2.14.0
-KIND_VERSION ?= v0.30.0
+KIND_VERSION ?= v0.31.0
 HUGO_VERSION ?= v0.163.3
 HTMLTEST_VERSION ?= v0.17.0
 DOC2GO_VERSION ?= v0.11.0

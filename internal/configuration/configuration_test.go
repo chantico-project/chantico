@@ -69,8 +69,8 @@ func TestAllVarsOkay(t *testing.T) {
 
 	_ = os.Setenv(ChanticoVolumeClaimEnv, goodClaim)
 	_ = os.Setenv(ChanticoVolumeLocationEnv, goodLocation)
-	_ = os.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
-	_ = os.Setenv(ChanticoPrometheusServicePortEnv, goodPort)
+	_ = os.Setenv(ChanticoSnmpExporterServiceHostEnv, goodUrl)
+	_ = os.Setenv(ChanticoSnmpExporterServicePortEnv, goodPort)
 	_ = os.Setenv(ChanticoNamespaceEnv, "chantico")
 	_ = os.Setenv(ChanticoWatchNamespaceEnv, AllNamespaces)
 
@@ -113,61 +113,57 @@ func TestVolumeIsDir(t *testing.T) {
 }
 
 func TestParseNetwork(t *testing.T) {
-	const goodUrl = "github.com"
-	t.Setenv(ChanticoPrometheusServicePortEnv, "443")
-	var testGoodUrl = func(env validatedEnv) bool { return env.PrometheusServiceHost == goodUrl }
-	testGoodEnv(t, ChanticoPrometheusServiceHostEnv, goodUrl, testGoodUrl)
+	const goodUrl = "chantico-snmp.chantico.svc.cluster.local"
+	t.Setenv(ChanticoSnmpExporterServicePortEnv, "443")
+	var testGoodUrl = func(env validatedEnv) bool { return env.SnmpExporterServiceHost == goodUrl }
+	testGoodEnv(t, ChanticoSnmpExporterServiceHostEnv, goodUrl, testGoodUrl)
 
-	const badUrl = "notavalid.website"
-	var testBadUrl = func(env validatedEnv) bool { return env.PrometheusServiceHost != badUrl }
-	testBadEnv(t, ChanticoPrometheusServiceHostEnv, badUrl, testBadUrl)
+	const badUrl = "not a valid host"
+	var testBadUrl = func(env validatedEnv) bool { return env.SnmpExporterServiceHost != badUrl }
+	testBadEnv(t, ChanticoSnmpExporterServiceHostEnv, badUrl, testBadUrl)
 
 	const goodPort = "8000"
-	var testGoodPort = func(env validatedEnv) bool { return env.PrometheusServicePort == goodPort }
-	testGoodEnv(t, ChanticoPrometheusServicePortEnv, goodPort, testGoodPort)
+	var testGoodPort = func(env validatedEnv) bool { return env.SnmpExporterServicePort == goodPort }
+	testGoodEnv(t, ChanticoSnmpExporterServicePortEnv, goodPort, testGoodPort)
 
 	const badPort = "123456789"
-	var testBadPort = func(env validatedEnv) bool { return env.PrometheusServicePort != badPort }
-	testBadEnv(t, ChanticoPrometheusServicePortEnv, badPort, testBadPort)
+	var testBadPort = func(env validatedEnv) bool { return env.SnmpExporterServicePort != badPort }
+	testBadEnv(t, ChanticoSnmpExporterServicePortEnv, badPort, testBadPort)
 }
 
-func TestBadHostPort(t *testing.T) {
-	const goodUrl = "localhost"
-	const reservedPort = "2" // Port 2 is reserved by the IANA (iana.org). Should be unused on all computer environments
-	t.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
-	t.Setenv(ChanticoPrometheusServicePortEnv, reservedPort)
+func TestUnresolvableHostIsAccepted(t *testing.T) {
+	const goodUrl = "chantico-snmp.nonexistent.svc.cluster.local"
+	const goodPort = "9116"
 
-	ValidatedEnv, errs := ValidateEnv()
-
-	var thisErrs []error
-	for _, err := range errs {
-		if errString := fmt.Sprintf("%s", err); strings.Contains(errString, "cannot connect") {
-			thisErrs = append(thisErrs, err)
-		}
-
-	}
-	if len(thisErrs) == 0 {
-		t.Errorf("Unacessable internet service '%s' generated no errors ('%s')", net.JoinHostPort(goodUrl, reservedPort), errs)
-	}
-	if ValidatedEnv.PrometheusServiceHost == goodUrl {
-		t.Errorf("Bad environment var '%s=%s' was accepted", ChanticoPrometheusServiceHostEnv, ValidatedEnv.PrometheusServiceHost)
-	}
-	if ValidatedEnv.PrometheusServicePort == reservedPort {
-		t.Errorf("Bad environment var '%s=%s' was accepted", ChanticoPrometheusServicePortEnv, ValidatedEnv.PrometheusServicePort)
-	}
-}
-
-func TestGoodHostPort(t *testing.T) {
-	const goodUrl = "github.com"
-	const goodPort = "443"
-
-	t.Setenv(ChanticoPrometheusServiceHostEnv, goodUrl)
-	t.Setenv(ChanticoPrometheusServicePortEnv, goodPort)
+	t.Setenv(ChanticoSnmpExporterServiceHostEnv, goodUrl)
+	t.Setenv(ChanticoSnmpExporterServicePortEnv, goodPort)
 
 	var testGoodHostPort = func(env validatedEnv) bool {
-		return env.PrometheusServiceHost == goodUrl && env.PrometheusServicePort == goodPort
+		return env.SnmpExporterServiceHost == goodUrl && env.SnmpExporterServicePort == goodPort
 	}
-	testGoodEnv(t, ChanticoPrometheusServiceHostEnv, goodUrl, testGoodHostPort)
+	testGoodEnv(t, ChanticoSnmpExporterServiceHostEnv, goodUrl, testGoodHostPort)
+}
+
+func TestValidateHostLookup(t *testing.T) {
+	if err := validateHostLookup(ChanticoSnmpExporterServiceHostEnv, "localhost"); err != nil {
+		t.Fatalf("localhost lookup failed: %v", err)
+	}
+}
+
+func TestValidateHostPort(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("could not start test listener: %v", err)
+	}
+	defer listener.Close()
+
+	host, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatalf("could not read test listener address: %v", err)
+	}
+	if err := validateHostPort([]string{ChanticoSnmpExporterServiceHostEnv, ChanticoSnmpExporterServicePortEnv}, host, port); err != nil {
+		t.Fatalf("reachable host and port failed validation: %v", err)
+	}
 }
 
 func TestPodNamespace(t *testing.T) {
