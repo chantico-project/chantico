@@ -1,5 +1,9 @@
 persistentVolumeClaimName: chantico-persistent-volume-claim
 prometheusRetention: 5h
+
+# These are overrides of the default kube prometheus stack values
+# Required to disable the default kube prometheus stack components that are not needed for Chantico
+# When updating the dependency, be sure to check the default values of the kube prometheus stack and adjust overrides accordingly
 kube-prometheus-stack:
   crds:
     upgradeJob:
