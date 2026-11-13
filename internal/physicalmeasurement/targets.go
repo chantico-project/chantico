@@ -39,7 +39,7 @@ func (targets *PrometheusTargetConfigurer) Reconcile(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      measurement.Name,
 			Namespace: measurement.Namespace,
-			Labels:    k8s.PrometheusResourceLabels,
+			Labels:    k8s.ManagedResourceLabels,
 		},
 		Spec: monitoringv1alpha1.ScrapeConfigSpec{
 			MetricsPath: &metricsPath,
