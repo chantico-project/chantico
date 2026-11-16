@@ -155,50 +155,16 @@ func (h *HTTPServerHandler) renderNode(w http.ResponseWriter, id string, dcr *v1
 		return
 	}
 
-	pms, err := h.Kubernetes.ListPhysicalMeasurements(dcr.GetNamespace())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	mds, err := h.Kubernetes.ListMeasurementDevices(dcr.GetNamespace())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	mdByName := make(map[string]v1alpha1.MeasurementDevice, len(mds))
-	for _, md := range mds {
-		mdByName[md.GetName()] = md
-	}
-
-	var physicalMeasurement *html.PhysicalMeasurementRow
-	for _, pm := range pms {
-		if len(dcr.Spec.PhysicalMeasurements) == 0 || pm.GetName() != dcr.Spec.PhysicalMeasurements[0] {
-			continue
-		}
-		row := html.PhysicalMeasurementRow{
-			Name:              pm.GetName(),
-			Type:              string(pm.Spec.Type),
-			MeasurementDevice: pm.Spec.MeasurementDevice,
-		}
-		if md, ok := mdByName[pm.Spec.MeasurementDevice]; ok {
-			row.Walks = md.Spec.Walks
-		}
-		physicalMeasurement = &row
-		break
-	}
-
 	parents := dcr.Spec.ParentNames()
 	data := html.NodePartialData{
-		ID:                  id,
-		Name:                dcr.GetName(),
-		Namespace:           dcr.GetNamespace(),
-		Type:                dcr.Spec.Type,
-		Parents:             parents,
-		EnergyMetric:        dcr.Spec.EnergyMetric,
-		Status:              kubernetes.NodeStatus(dcr.Status.Conditions),
-		PhysicalMeasurement: physicalMeasurement,
-		Manifest:            string(manifest),
+		ID:           id,
+		Name:         dcr.GetName(),
+		Namespace:    dcr.GetNamespace(),
+		Type:         dcr.Spec.Type,
+		Parents:      parents,
+		EnergyMetric: dcr.Spec.EnergyMetric,
+		Status:       kubernetes.NodeStatus(dcr.Status.Conditions),
+		Manifest:     string(manifest),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

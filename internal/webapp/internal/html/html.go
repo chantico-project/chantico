@@ -45,23 +45,15 @@ func (r *TemplateRenderer) RenderHomePage(w io.Writer, d HomePageData) {
 	_ = r.tmpl.ExecuteTemplate(w, "home.html", d)
 }
 
-type PhysicalMeasurementRow struct {
-	Name              string
-	Type              string
-	MeasurementDevice string
-	Walks             []string
-}
-
 type NodePartialData struct {
-	ID                  string
-	Name                string
-	Namespace           string
-	Type                string
-	Parents             []string
-	EnergyMetric        string
-	Status              string
-	PhysicalMeasurement *PhysicalMeasurementRow
-	Manifest            string
+	ID           string
+	Name         string
+	Namespace    string
+	Type         string
+	Parents      []string
+	EnergyMetric string
+	Status       string
+	Manifest     string
 }
 
 func (r *TemplateRenderer) RenderNodePartial(w io.Writer, d NodePartialData) error {
