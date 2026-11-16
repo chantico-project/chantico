@@ -65,6 +65,30 @@ type MeasurementDeviceReconciler struct {
 	Logs   md.JobLogReader
 }
 
+// EnsureMergedSNMPConfig creates the merged SNMP ConfigMap if it does not exist.
+func EnsureMergedSNMPConfig(ctx context.Context, reader client.Reader, writer client.Writer, namespace string) error {
+	key := client.ObjectKey{Name: md.MergedConfigMapName, Namespace: namespace}
+	configMap := &corev1.ConfigMap{}
+	if err := reader.Get(ctx, key, configMap); err == nil {
+		return nil
+	} else if !apierrors.IsNotFound(err) {
+		return fmt.Errorf("get merged SNMP ConfigMap %s: %w", key, err)
+	}
+
+	emptyConfig, err := snmp.MergeSortedSNMPConfigs(nil)
+	if err != nil {
+		return fmt.Errorf("build initial merged SNMP config: %w", err)
+	}
+	configMap = &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
+		Data:       map[string]string{md.SnmpConfigKey: string(emptyConfig)},
+	}
+	if err := writer.Create(ctx, configMap); err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("create merged SNMP ConfigMap %s: %w", key, err)
+	}
+	return nil
+}
+
 func (r *MeasurementDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chantico.MeasurementDevice{}).

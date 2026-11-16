@@ -190,6 +190,45 @@ func TestReconcileMergedSNMPFile(t *testing.T) {
 	}
 }
 
+func TestEnsureMergedSNMPConfig(t *testing.T) {
+	ctx := context.Background()
+	r := newReconciler(t)
+
+	if err := EnsureMergedSNMPConfig(ctx, r.Client, r.Client, ChanticoNamespace); err != nil {
+		t.Fatalf("EnsureMergedSNMPConfig: %v", err)
+	}
+
+	key := types.NamespacedName{Name: md.MergedConfigMapName, Namespace: ChanticoNamespace}
+	configMap := &corev1.ConfigMap{}
+	if err := r.Get(ctx, key, configMap); err != nil {
+		t.Fatalf("get initial merged ConfigMap: %v", err)
+	}
+	if configMap.Data[md.SnmpConfigKey] == "" {
+		t.Fatal("initial merged ConfigMap has no SNMP config")
+	}
+	var merged snmp.MergedConfig
+	if err := yaml.Unmarshal([]byte(configMap.Data[md.SnmpConfigKey]), &merged); err != nil {
+		t.Fatalf("unmarshal initial SNMP config: %v", err)
+	}
+	if len(merged.Auths) != 0 || len(merged.Modules) != 0 {
+		t.Fatalf("initial SNMP config should be empty, got %+v", merged)
+	}
+
+	configMap.Data[md.SnmpConfigKey] = "existing config"
+	if err := r.Update(ctx, configMap); err != nil {
+		t.Fatalf("set existing SNMP config: %v", err)
+	}
+	if err := EnsureMergedSNMPConfig(ctx, r.Client, r.Client, ChanticoNamespace); err != nil {
+		t.Fatalf("EnsureMergedSNMPConfig on existing ConfigMap: %v", err)
+	}
+	if err := r.Get(ctx, key, configMap); err != nil {
+		t.Fatalf("get existing merged ConfigMap: %v", err)
+	}
+	if got := configMap.Data[md.SnmpConfigKey]; got != "existing config" {
+		t.Fatalf("existing SNMP config was overwritten: %q", got)
+	}
+}
+
 type fakeJobLogs struct {
 	output string
 	err    error

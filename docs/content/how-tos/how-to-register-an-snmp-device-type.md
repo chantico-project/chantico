@@ -60,7 +60,7 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
         ```sh
         kubectl get jobs -n chantico | grep update-snmp
         ```
-    1. The operator reads the generated config from the log of the generator job and stores it in the ConfigMap `<device>-snmp`. It then merges all of these into the ConfigMap `chantico-snmp-config`, which the SNMP exporter mounts.
+    1. At startup, the operator creates the empty `chantico-snmp-config` ConfigMap if it does not already exist. It reads generated config from the generator job log, stores it in `<device>-snmp`, and merges device configs into `chantico-snmp-config`, which the SNMP exporter mounts. The operator owns this ConfigMap; it is not managed by the Helm chart.
         ```sh
         kubectl get configmap -n chantico chantico-snmp-config -o yaml
         ```
