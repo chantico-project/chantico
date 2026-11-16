@@ -49,6 +49,14 @@ func New() (*KubernetesClient, error) {
 	}, nil
 }
 
+func NewWithClient(k client.Client, currentContext, host string) *KubernetesClient {
+	return &KubernetesClient{
+		client:         k,
+		CurrentContext: currentContext,
+		Host:           host,
+	}
+}
+
 func currentContext() string {
 	rawConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(),
@@ -160,8 +168,6 @@ func NodeStatus(conditions []metav1.Condition) string {
 		return "pending"
 	case ready.Status == metav1.ConditionTrue:
 		return "ok"
-	case ready.Reason == string(v1alpha1.ReasonReconciling), ready.Reason == string(v1alpha1.ReasonGenerationPending):
-		return "pending"
 	default:
 		return "faulty"
 	}
@@ -192,20 +198,4 @@ func (k *KubernetesClient) GetDataCenterResources(namespace string) ([]*graph.No
 	}
 
 	return output, nil
-}
-
-func (k *KubernetesClient) ListPhysicalMeasurements(namespace string) ([]v1alpha1.PhysicalMeasurement, error) {
-	list := &v1alpha1.PhysicalMeasurementList{}
-	if err := k.client.List(context.Background(), list, client.InNamespace(namespace)); err != nil {
-		return nil, fmt.Errorf("failed to list PhysicalMeasurements: %w", err)
-	}
-	return list.Items, nil
-}
-
-func (k *KubernetesClient) ListMeasurementDevices(namespace string) ([]v1alpha1.MeasurementDevice, error) {
-	list := &v1alpha1.MeasurementDeviceList{}
-	if err := k.client.List(context.Background(), list, client.InNamespace(namespace)); err != nil {
-		return nil, fmt.Errorf("failed to list MeasurementDevices: %w", err)
-	}
-	return list.Items, nil
 }

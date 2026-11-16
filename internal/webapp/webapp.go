@@ -27,7 +27,11 @@ func newWithGetter(get envGetter) (App, error) {
 		return nil, err
 	}
 	return &app{
-		cfg: cfg,
+		cfg:            cfg,
+		newKubernetes:  kubernetes.New,
+		newRenderer:    html.New,
+		newHTTPServer:  http.New,
+		signalHandling: SignalHandling,
 	}, nil
 }
 
@@ -35,12 +39,12 @@ func (a *app) Run() error {
 	slog.Info("running startup checks")
 	var errs []error
 
-	k, err := kubernetes.New()
+	k, err := a.newKubernetes()
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	t, err := html.New()
+	t, err := a.newRenderer()
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -50,7 +54,7 @@ func (a *app) Run() error {
 	}
 	slog.Info("completed startup checks")
 
-	ctxInterrupt, stopInterrupt := SignalHandling()
+	ctxInterrupt, stopInterrupt := a.signalHandling()
 	defer stopInterrupt()
 
 	handler := &http.HTTPServerHandler{
@@ -61,7 +65,7 @@ func (a *app) Run() error {
 		Port:              a.cfg.Port,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	httpServer := http.New(handler, serverConfig)
+	httpServer := a.newHTTPServer(handler, serverConfig)
 	httpServerErrChannel := make(chan error, 1)
 	go httpServer.Run(httpServerErrChannel)
 
@@ -84,7 +88,11 @@ type App interface {
 }
 
 type app struct {
-	cfg config
+	cfg            config
+	newKubernetes  func() (*kubernetes.KubernetesClient, error)
+	newRenderer    func() (*html.TemplateRenderer, error)
+	newHTTPServer  func(*http.HTTPServerHandler, *http.HTTPServerConfig) *http.HTTPServer
+	signalHandling func() (context.Context, context.CancelFunc)
 }
 
 type config struct {
