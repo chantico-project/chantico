@@ -25,6 +25,9 @@ func (f *PrometheusRecordingRuleConfigurer) Reconcile(ctx context.Context, resou
 	if err != nil {
 		return err
 	}
+	if generatedRules == nil {
+		return f.Delete(ctx, resource)
+	}
 
 	promRuleSpec := convertPrometheusRuleSpec(generatedRules)
 

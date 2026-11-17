@@ -12,6 +12,14 @@ import (
 )
 
 func TestValidate(t *testing.T) {
+	site := chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1"},
+		Spec:       chantico.DataCenterResourceSpec{Type: DataCenterResourceTypeSite},
+	}
+	grid := chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "grid1"},
+		Spec:       chantico.DataCenterResourceSpec{Type: DataCenterResourceTypeGrid, EnergyMetric: "power_watts"},
+	}
 	testCases := map[string]struct {
 		Resource                 *chantico.DataCenterResource
 		Resources                []chantico.DataCenterResource
@@ -46,7 +54,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "bar"}},
+					Parents: []chantico.ParentRef{{Name: "bar", Coefficient: "1"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -85,7 +93,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "vm",
-					Parents: []chantico.ParentRef{{Name: "bm1"}, {Name: "bm2"}},
+					Parents: []chantico.ParentRef{{Name: "bm1", Coefficient: "0.5"}, {Name: "bm2", Coefficient: "0.5"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -248,6 +256,95 @@ func TestValidate(t *testing.T) {
 			ExpectedVisited:          []chantico.DataCenterResource{},
 			ExpectedError:            ErrorUnknownType{Type: "perpetuummobile"},
 			ExpectedInvolvedResource: "",
+		},
+		"gives error if parent type is not allowed": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "bar"}},
+				},
+			},
+			Resources: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: "vm",
+				},
+			}},
+			ExpectedVisited: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type: "vm",
+				},
+			}},
+			ExpectedError:            ErrorInvalidParentType{InvolvedResource: "bar", Type: "baremetal", ParentType: "vm"},
+			ExpectedInvolvedResource: "",
+		},
+		"gives error if resource has no energy source": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       chantico.DataCenterResourceSpec{Type: DataCenterResourceTypePDU, Parents: []chantico.ParentRef{{Name: "site1"}}},
+			},
+			Resources:       []chantico.DataCenterResource{site},
+			ExpectedVisited: []chantico.DataCenterResource{site},
+			ExpectedError:   ErrorMissingEnergySource{Type: DataCenterResourceTypePDU},
+		},
+		"gives error if site has energy metric": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       chantico.DataCenterResourceSpec{Type: DataCenterResourceTypeSite, EnergyMetric: "power_watts"},
+			},
+			Resources:       []chantico.DataCenterResource{},
+			ExpectedVisited: []chantico.DataCenterResource{},
+			ExpectedError:   ErrorUnexpectedEnergyMetric{Type: DataCenterResourceTypeSite},
+		},
+		"gives error if site parent has coefficient": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:         DataCenterResourceTypePDU,
+					Parents:      []chantico.ParentRef{{Name: "site1", Coefficient: "1"}},
+					EnergyMetric: "power_watts",
+				},
+			},
+			Resources:       []chantico.DataCenterResource{site},
+			ExpectedVisited: []chantico.DataCenterResource{site},
+			ExpectedError: ErrorParentCoefficient{
+				InvolvedResource: "site1", ParentType: DataCenterResourceTypeSite, Grouping: true,
+			},
+		},
+		"gives error if non-grouping parent has no coefficient": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:         DataCenterResourceTypePDU,
+					Parents:      []chantico.ParentRef{{Name: "grid1"}},
+					EnergyMetric: "power_watts",
+				},
+			},
+			Resources:       []chantico.DataCenterResource{grid},
+			ExpectedVisited: []chantico.DataCenterResource{grid},
+			ExpectedError: ErrorParentCoefficient{
+				InvolvedResource: "grid1", ParentType: DataCenterResourceTypeGrid, Grouping: false,
+			},
+		},
+		"creates measured resource below site": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:         DataCenterResourceTypePDU,
+					Parents:      []chantico.ParentRef{{Name: "site1"}},
+					EnergyMetric: "power_watts",
+				},
+			},
+			Resources:       []chantico.DataCenterResource{site},
+			ExpectedVisited: []chantico.DataCenterResource{site},
 		},
 	}
 

@@ -28,6 +28,7 @@ import (
 	"chantico/internal/testutil"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,9 +39,12 @@ import (
 func setupDataCenterResourceRuleTest(t *testing.T) (client.WithWatch, *DataCenterResourceReconciler) {
 	t.Helper()
 
-	kubeClient := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1.AddToScheme).
-		WithStatusSubresource(&chantico.DataCenterResource{}).
-		Build()
+	builder := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1.AddToScheme).
+		WithStatusSubresource(&chantico.DataCenterResource{})
+	for field, indexer := range dataCenterResourceIndexes {
+		builder = builder.WithIndex(&chantico.DataCenterResource{}, field, indexer)
+	}
+	kubeClient := builder.Build()
 
 	ruleConfigurer := dcr.PrometheusRecordingRuleConfigurer{
 		Client: kubeClient,
@@ -176,6 +180,43 @@ func TestReconcileWriteRule_RootNodeWithEnergyMetric(t *testing.T) {
 		t.Fatalf("expected existing PrometheusRule but got error: %v", err)
 	}
 	assertDataCenterResourceCondition(t, pdu, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
+}
+
+func TestReconcileWriteRule_SiteParentWithoutCoefficient(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
+
+	site := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1"},
+		Spec:       chantico.DataCenterResourceSpec{Type: dcr.DataCenterResourceTypeSite},
+	}
+	pdu := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
+		Spec: chantico.DataCenterResourceSpec{
+			Type:    dcr.DataCenterResourceTypePDU,
+			Parents: []chantico.ParentRef{{Name: "site1"}},
+			EnergyMetricFrom: &k8s.TemplateFrom{
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "snmp_pdu1_power_watts"},
+			},
+		},
+	}
+
+	for _, resource := range []*chantico.DataCenterResource{site, pdu} {
+		if res := reconciler.reconcileWriteRule(t.Context(), resource); res.Action == steps.ActionError {
+			t.Fatalf("reconcileWriteRule(%s) errored: %v", resource.Name, res.Err)
+		}
+	}
+
+	if _, err := fetchRuleResource(t, site, client); !apierrors.IsNotFound(err) {
+		t.Errorf("expected no PrometheusRule for site, got error %v", err)
+	}
+	prometheusRule, err := fetchRuleResource(t, pdu, client)
+	if err != nil {
+		t.Fatalf("fetching PrometheusRule: %v", err)
+	}
+	rules := prometheusRule.Spec.Groups[0].Rules
+	if len(rules) != 1 || rules[0].Expr.String() != "snmp_pdu1_power_watts" {
+		t.Errorf("expected only the energy alias rule, got %#v", rules)
+	}
 }
 
 func TestReconcileWriteRule_OverwritesExisting(t *testing.T) {
@@ -371,6 +412,78 @@ func TestReconcileWriteRule_FullThreeLayerHierarchy(t *testing.T) {
 	}
 	if len(bm1Rule.Spec.Groups[0].Rules) != 2 {
 		t.Errorf("BM1: expected 2 rules (1 coefficient + 1 energy), got %d", len(bm1Rule.Spec.Groups[0].Rules))
+	}
+}
+
+func TestReconcileValidation_PropagatesSiteToChildren(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
+
+	site := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1"},
+		Spec:       chantico.DataCenterResourceSpec{Type: dcr.DataCenterResourceTypeSite},
+	}
+	pdu := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
+		Spec: chantico.DataCenterResourceSpec{
+			Type:         dcr.DataCenterResourceTypePDU,
+			Parents:      []chantico.ParentRef{{Name: "site1"}},
+			EnergyMetric: "pdu_power_watts",
+		},
+	}
+	for _, resource := range []*chantico.DataCenterResource{site, pdu} {
+		if err := client.Create(t.Context(), resource); err != nil {
+			t.Fatalf("creating %s: %v", resource.Name, err)
+		}
+	}
+
+	if res := reconciler.reconcileValidation(t.Context(), pdu); res.Action != steps.ActionContinue {
+		t.Fatalf("expected Continue, got %v (%v)", res.Action, res.Err)
+	}
+	if want := map[string]string{"site": "site1"}; !reflect.DeepEqual(pdu.Status.PropagatedLabels, want) {
+		t.Errorf("PropagatedLabels = %#v, want %#v", pdu.Status.PropagatedLabels, want)
+	}
+
+	requests := reconciler.dataCenterResourcesForParent(t.Context(), site)
+	if len(requests) != 1 || requests[0].Name != "pdu1" {
+		t.Errorf("dataCenterResourcesForParent(site1) = %v, want [pdu1]", requests)
+	}
+}
+
+func TestReconcileValidation_ClearsInvolvedResourceReferences(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
+
+	pdu := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
+		Spec:       chantico.DataCenterResourceSpec{Type: dcr.DataCenterResourceTypePDU, EnergyMetric: "pdu_power_watts"},
+	}
+	// The VM is a grandchild of the PDU, so only the involvedResource lookup finds it.
+	vm := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "vm1"},
+		Spec: chantico.DataCenterResourceSpec{
+			Type:    dcr.DataCenterResourceTypeVM,
+			Parents: []chantico.ParentRef{{Name: "bm1", Coefficient: "1"}},
+		},
+	}
+	for _, resource := range []*chantico.DataCenterResource{pdu, vm} {
+		if err := client.Create(t.Context(), resource); err != nil {
+			t.Fatalf("creating %s: %v", resource.Name, err)
+		}
+	}
+	vm.Status.InvolvedResource = "pdu1"
+	vm.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionFalse, chantico.ReasonDependencyUnavailable, "missing")
+	if err := client.Status().Update(t.Context(), vm); err != nil {
+		t.Fatalf("updating status of vm1: %v", err)
+	}
+
+	if res := reconciler.reconcileValidation(t.Context(), pdu); res.Action != steps.ActionContinue {
+		t.Fatalf("expected Continue, got %v (%v)", res.Action, res.Err)
+	}
+
+	if err := client.Get(t.Context(), types.NamespacedName{Name: "vm1"}, vm); err != nil {
+		t.Fatalf("fetching vm1: %v", err)
+	}
+	if vm.Status.InvolvedResource != "" {
+		t.Errorf("InvolvedResource = %q, want it cleared", vm.Status.InvolvedResource)
 	}
 }
 

@@ -38,6 +38,10 @@ linters:
         linters:
           - dupl
           - lll
+      # Literal fixture values keep test cases self-describing.
+      - path: _test\.go
+        linters:
+          - goconst
 
 formatters:
   enable:

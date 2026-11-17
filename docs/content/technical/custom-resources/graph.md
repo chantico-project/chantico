@@ -28,7 +28,7 @@ consumption.
 | `metadata.name` | `string` | The name of the resource. This is used to reference the resource in `spec.parents` of other resources. |
 | `spec.type` | `string` | The resource category, listed under [Resource types](#resource-types). |
 | `spec.energyMetricFrom` | `TemplateFrom` | Prometheus expression source for a root resource, supplied by `value` or `valueFrom` |
-| `spec.parents` | list of `ParentRef` | Parent resources; each entry requires a coefficient expression in `coefficientFrom` |
+| `spec.parents` | list of `ParentRef` | Parent resources; each entry requires a coefficient expression in `coefficientFrom`, except for grouping parents |
 | `spec.additionalLabels` | map of `string` to `string` | Any additional fields to associate with the resource. This can be used to group resources together for energy accounting purposes. |
 
 These fields are validated by the API schema and controller to ensure that the
@@ -41,10 +41,13 @@ that there are no cycles or invalid flags on the resources:
   those resources must not (indirectly) refer to this resource. If a parent 
   resource does not exist, the controller will not use the resource in energy 
   usage calculations.
-- Each entry in `spec.parents` must include `coefficientFrom`. Root resources
-  (those without parents) must include `energyMetricFrom`. Both fields accept
-  either an inline `value` or a `valueFrom` reference; Go-template placeholders
-  can be supplied through `templateParameters`.
+- Each entry in `spec.parents` must include `coefficientFrom`, except an entry 
+  to a grouping parent such as a `site`, which must not include it. Resources 
+  must include `energyMetricFrom` or have at least one parent with a 
+  coefficient, while grouping resources must not include `energyMetricFrom`. 
+  Both fields 
+  accept either an inline `value` or a `valueFrom` reference; Go-template 
+  placeholders can be supplied through `templateParameters`.
 
 ## Resource types
 
@@ -80,9 +83,33 @@ nodes for distinguishing whole-server power from the power attributed to hosted
 workloads.
 
 The graph does not require all types to be present in the graph. As such, the 
-controller does not require exact parent-child relationships between types. For 
-example, a `baremetal` resource can have a `pdu` or `outlet` as a parent, and 
-a `vm` resource can have a `baremetal` or `hypervisor` as a parent.
+controller only restricts the parent types of a few resource types, and accepts 
+any parent type for the other types: 
+
+| Type | Allowed parent types |
+|---|---|
+| `outlet` | `pdu` |
+| `baremetal` | `pdu`, `outlet` |
+| `vm` | `baremetal`, `hypervisor` |
+| `kubernetes` | `baremetal`, `vm` |
+
+A resource with a parent of another type fails validation.
+
+## Site label
+
+A `site` resource is a grouping resource: it groups resources without having a 
+power timeseries of its own. Its children reference it in `spec.parents` 
+without a coefficient, so they keep their own energy metric or other parents 
+for energy accounting.
+
+A `site` resource propagates its name as the `site` label to the power 
+timeseries of itself and all of its descendants. A resource can have at most 
+one `site` ancestor; a resource below two different sites fails validation. 
+The controller records the derived label in the `status.propagatedLabels` 
+field of each resource, and reconciles the children of a resource again when 
+that field changes, for example when a resource is moved to another site. The 
+propagated label takes precedence over an `additionalLabels` entry with the 
+same name.
 
 ## Example graph
 

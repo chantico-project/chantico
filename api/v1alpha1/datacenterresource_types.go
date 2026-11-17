@@ -26,8 +26,9 @@ import (
 // ParentRef references a parent DataCenterResource and carries the energy
 // coefficient for the edge from that parent to this node.
 // The coefficient represents what fraction of the parent's energy is
-// attributable to this child.
-// +kubebuilder:validation:XValidation:rule="has(self.coefficient) != has(self.coefficientFrom)",message="Exactly one of coefficient or coefficientFrom must be set"
+// attributable to this child. Parents of grouping types, such as a site, have
+// no coefficient.
+// +kubebuilder:validation:XValidation:rule="!(has(self.coefficient) && has(self.coefficientFrom))",message="Coefficient and coefficientFrom cannot be set at the same time"
 type ParentRef struct {
 	// Name is the name of the parent DataCenterResource.
 	Name string `json:"name"`
@@ -44,7 +45,6 @@ type ParentRef struct {
 }
 
 // DataCenterResourceSpec defines the desired state of DataCenterResource
-// +kubebuilder:validation:XValidation:rule="(has(self.parents)&&size(self.parents)>0)||has(self.energyMetric)||has(self.energyMetricFrom)",message="Resource must have at least one parent, energyMetric or energyMetricFrom"
 // +kubebuilder:validation:XValidation:rule="!(has(self.energyMetric)&&has(self.energyMetricFrom))",message="EnergyMetric and EnergyMetricFrom cannot be set at the same time"
 type DataCenterResourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -84,6 +84,11 @@ type DataCenterResourceStatus struct {
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
 	InvolvedResource   string             `json:"involvedResource,omitempty"`
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
+
+	// PropagatedLabels are derived from the resource and its ancestors, such
+	// as the name of the site the resource belongs to.
+	// +optional
+	PropagatedLabels map[string]string `json:"propagatedLabels,omitempty"`
 }
 
 // +kubebuilder:object:root=true
