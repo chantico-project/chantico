@@ -33,6 +33,8 @@ export CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME="chantico-persistent-volume-claim"
 export CHANTICO_DATA_PATH=".chantico-persistent-volume"
 export CHANTICO_NAMESPACE="chantico"
 export CHANTICO_WATCH_NAMESPACE="chantico" # optional, default is same as namespace
+export CHANTICO_SNMP_EXPORTER_SERVICE_HOST="chantico-snmp.chantico.svc.cluster.local"
+export CHANTICO_SNMP_EXPORTER_SERVICE_PORT="9116"
 ```
 
 The controller will run locally on your computer. The controller will talk to a Kubernetes cluster (typically KinD) and other dependencies like a timeseries database. Everything will therefore run inside the Kubernetes cluster, except for the controller, when developing. A typical flow is:
