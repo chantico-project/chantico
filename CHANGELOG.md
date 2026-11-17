@@ -1,3 +1,15 @@
+## 0.27.0 (2026-11-17)
+
+#### Feature
+
+* Improve webapp visualizer to show more nodes and update automatically (#278) (4c44c876)
+
+## 0.26.0 (2026-11-17)
+
+#### Feature
+
+* Use Prometheus Operator (#279) (0f0a954d)
+
 ## 0.25.0 (2026-11-13)
 
 #### Feature

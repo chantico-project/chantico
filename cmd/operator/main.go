@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"net"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -40,8 +41,13 @@ import (
 	chanticov1alpha1 "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
 	"chantico/internal/controller"
+	"chantico/internal/datacenterresource"
 	"chantico/internal/filestore"
 	md "chantico/internal/measurementdevice"
+	"chantico/internal/physicalmeasurement"
+
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -54,6 +60,10 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(chanticov1alpha1.AddToScheme(scheme))
+
+	// Kube Prometheus Operator Schemas
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
+	utilruntime.Must(monitoringv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -196,16 +206,27 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)
 	}
+
+	targetConfigurer := &physicalmeasurement.PrometheusTargetConfigurer{
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		SNMPExporterAddress: net.JoinHostPort(config.ValidatedEnv.SnmpExporterServiceHost, config.ValidatedEnv.SnmpExporterServicePort),
+	}
 	if err = (&controller.PhysicalMeasurementReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:           mgr.GetClient(),
+		TargetConfigurer: targetConfigurer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PhysicalMeasurement")
 		os.Exit(1)
 	}
-	if err := (&controller.DataCenterResourceReconciler{
+
+	ruleConfigurer := &datacenterresource.PrometheusRecordingRuleConfigurer{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+	}
+	if err := (&controller.DataCenterResourceReconciler{
+		Client:         mgr.GetClient(),
+		RuleConfigurer: ruleConfigurer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DataCenterResource")
 		os.Exit(1)

@@ -32,6 +32,7 @@ import (
 
 	config "chantico/internal/configuration"
 	"chantico/internal/filestore"
+	"chantico/internal/k8s"
 	md "chantico/internal/measurementdevice"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
@@ -209,26 +210,23 @@ func (r *MeasurementDeviceReconciler) reconcileGeneratorConfigMap(ctx context.Co
 		return steps.Error(err)
 	}
 
-	configMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name:      md.GeneratorConfigMapName(measurementDevice.GetName()),
-		Namespace: measurementDevice.GetNamespace(),
-	}}
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      md.GeneratorConfigMapName(measurementDevice.GetName()),
+			Namespace: measurementDevice.GetNamespace(),
+		},
+		Data: map[string]string{md.GeneratorConfigKey: string(desired)},
+	}
 
-	result, err := util.CreateOrUpdate(ctx, r.Client, configMap, func() error {
-		configMap.Data = map[string]string{md.GeneratorConfigKey: string(desired)}
-		return util.SetControllerReference(measurementDevice, configMap, r.Scheme)
+	err = k8s.ApplyWithOwner(ctx, r.Client, r.Scheme, measurementDevice, configMap, func(existing, desired *corev1.ConfigMap) {
+		existing.Data = desired.Data
 	})
 	if err != nil {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to apply generator ConfigMap "+configMap.Name+": "+err.Error())
 		return steps.Error(err)
 	}
 
-	if result == util.OperationResultNone {
-		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionTrue, chantico.ReasonReconciled, "Generator ConfigMap is up to date")
-		return steps.Continue()
-	}
-
-	log.FromContext(ctx).Info("Generator ConfigMap has been applied successfully.", "configMap", configMap.Name, "result", result)
+	log.FromContext(ctx).Info("Generator ConfigMap has been applied successfully.", "configMap", configMap.Name)
 	measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionTrue, chantico.ReasonReconciled, "Generator ConfigMap has been applied successfully")
 	return steps.Continue()
 }

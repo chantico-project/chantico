@@ -6,7 +6,7 @@ menus:
     weight: 30
 ---
 
-`PhysicalMeasurement` does not parse MIBs. It links a concrete device IP to an existing `MeasurementDevice` (SNMP module/auth definition) and writes Prometheus scrape config, then reloads Prometheus.
+`PhysicalMeasurement` does not parse MIBs. It links a concrete device IP to an existing `MeasurementDevice` (SNMP module/auth definition) and creates a Prometheus Operator `ScrapeConfig` for it. Prometheus Operator applies the scrape config to Prometheus.
 In our First use-case (see `goal.md`) this corresponds to the `createPDU1` and `createPDU2` phases.
 
 1. Ensure a matching `MeasurementDevice` exists (see `how-to-register-an-snmp-device-type.md`).
@@ -31,14 +31,15 @@ In our First use-case (see `goal.md`) this corresponds to the `createPDU1` and `
   kubectl apply -f physical_measurement.yaml
   ```
 1. Verify the new device setting
+  1. Check that a `ScrapeConfig` was created with the same name as the `PhysicalMeasurement`
+  ```sh
+  kubectl get scrapeconfig -n chantico physicalmeasurement-pdu1-out
+  ```
   1. Port-forward Prometheus
   ```sh
-  kubectl port-forward -n chantico deployment/chantico-prometheus 9090:9090
+  kubectl port-forward -n chantico svc/chantico-prometheus 9090:9090
   ```
-  1. Check that the config (http://localhost:9090/targets)
-  1. If you are using `./dev/port-forward.sh`, Prometheus is forwarded to `localhost:19090` instead.
-  1. If running the controller locally, ensure the port-forward and env vars are set so the operator can call the reload endpoint:
-  ```sh
-  export CHANTICO_PROMETHEUS_SERVICE_HOST="localhost"
-  export CHANTICO_PROMETHEUS_SERVICE_PORT="19090"
-  ```
+  1. Check the targets at http://localhost:9090/targets. It can take a few seconds for Prometheus Operator to apply the new scrape config.
+  1. If you are using the local development setup with kind, Prometheus is forwarded to `localhost:19090` instead.
+
+Deleting the `PhysicalMeasurement` also deletes its `ScrapeConfig`.

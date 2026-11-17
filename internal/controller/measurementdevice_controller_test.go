@@ -29,6 +29,7 @@ import (
 	ch "chantico/internal/k8s"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
+	"chantico/internal/testutil"
 
 	config "chantico/internal/configuration"
 	md "chantico/internal/measurementdevice"
@@ -56,21 +57,8 @@ const (
 
 func newReconciler(t *testing.T, objs ...runtime.Object) *MeasurementDeviceReconciler {
 	t.Helper()
-	scheme := runtime.NewScheme()
-	if err := chantico.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := batchv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := appsv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := corev1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	c := fake.NewClientBuilder().
-		WithScheme(scheme).
+
+	c := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, corev1.AddToScheme, appsv1.AddToScheme, batchv1.AddToScheme).
 		WithRuntimeObjects(objs...).
 		Build()
 
@@ -81,7 +69,7 @@ func newReconciler(t *testing.T, objs ...runtime.Object) *MeasurementDeviceRecon
 
 	return &MeasurementDeviceReconciler{
 		Client: c,
-		Scheme: scheme,
+		Scheme: c.Scheme(),
 		Jobs:   md.SNMPGeneratorJobBuilder{},
 		Files:  filestore.VolumeFileStore{Root: t.TempDir()},
 	}
@@ -119,6 +107,10 @@ func TestReconcileGeneratorConfigMap(t *testing.T) {
 	if !metav1.IsControlledBy(first, measurementDevice) {
 		t.Fatalf("ConfigMap is not controlled by the measurement device: %+v", first.OwnerReferences)
 	}
+	first.Labels = map[string]string{"external-label": "preserved"}
+	if err := r.Update(context.Background(), first); err != nil {
+		t.Fatal(err)
+	}
 
 	// Second run should not change anything.
 	res = r.reconcileGeneratorConfigMap(context.Background(), measurementDevice)
@@ -132,6 +124,9 @@ func TestReconcileGeneratorConfigMap(t *testing.T) {
 	if first.ResourceVersion != second.ResourceVersion {
 		t.Fatalf("ConfigMap changed on idempotent run: %q -> %q", first.ResourceVersion, second.ResourceVersion)
 	}
+	if second.Labels["external-label"] != "preserved" {
+		t.Fatal("ConfigMap application must preserve external labels")
+	}
 
 	// A changed spec updates the ConfigMap.
 	measurementDevice.Spec.Walks = []string{"1.3.6.1", "1.3.6.2"}
@@ -144,6 +139,15 @@ func TestReconcileGeneratorConfigMap(t *testing.T) {
 	}
 	if third.Data[md.GeneratorConfigKey] == second.Data[md.GeneratorConfigKey] {
 		t.Fatalf("ConfigMap not updated after spec change: %q", third.Data[md.GeneratorConfigKey])
+	}
+	third.OwnerReferences[0].Name = "another-device"
+	third.OwnerReferences[0].UID = "another-device"
+	if err := r.Update(context.Background(), third); err != nil {
+		t.Fatal(err)
+	}
+	var ownerError *controllerutil.AlreadyOwnedError
+	if res = r.reconcileGeneratorConfigMap(context.Background(), measurementDevice); res.Action != steps.ActionError || !errors.As(res.Err, &ownerError) {
+		t.Fatalf("expected ConfigMap ownership conflict: %+v", res)
 	}
 }
 
