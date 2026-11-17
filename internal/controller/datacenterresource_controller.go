@@ -55,13 +55,7 @@ func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		// Watch config maps for updates. Only trigger reconciliation if the configmap is referenced in either coefficient or energyMetric template
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.dataCenterResourcesForConfigMap)).
 		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 1}). // Race conditions might occur when multiple generator jobs run simultaneously, so only allow one at a time.
-		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
-			log := mgr.GetLogger().WithName("DataCenterResourceController")
-			if req != nil {
-				log = log.WithValues("resource", req.Name)
-			}
-			return log
-		}).
+		WithLogConstructor(controllerLogConstructor(mgr, "DataCenterResourceController")).
 		Complete(r)
 }
 
@@ -124,16 +118,11 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	normalizeDataCenterResource(dataCenterResource)
 
-	// Patches the changes to the DataCenterResource at the end of reconciliation. This updates the observedGeneration and conditions in the status.
-	patcher, err := patch.NewHelper(dataCenterResource, r.Client)
+	patchStatus, err := newStatusPatcher(ctx, r.Client, dataCenterResource)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	defer func() {
-		if err := patcher.Patch(ctx, dataCenterResource, patch.WithStatusObservedGeneration{}); err != nil {
-			reterr = errors.Join(reterr, err)
-		}
-	}()
+	defer func() { reterr = patchStatus(reterr) }()
 
 	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
 	return steps.Run(ctx, dataCenterResource,
