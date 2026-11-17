@@ -58,9 +58,10 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
 1. Verify the new device setting
     1. Wait for the SNMP generator job to complete
         ```sh
-        kubectl get jobs -n chantico | grep update-snmp
+        kubectl wait -n chantico --for=condition=complete --timeout=5m job/example-measurement-device
         ```
-    1. At startup, the operator creates the empty `chantico-snmp-config` ConfigMap if it does not already exist. It reads generated config from the generator job log, stores it in `<device>-snmp`, and merges device configs into `chantico-snmp-config`, which the SNMP exporter mounts. The operator owns this ConfigMap; it is not managed by the Helm chart.
+    1. The Job runs an upstream SNMP generator container. It reads MIBs and the generator ConfigMap and writes `snmp/output/<device-uid>/<generation>.yml` on the PVC.
+    1. On start, the operator creates the empty `chantico-snmp-config` ConfigMap if it does not already exist. After the Job completes, it reads the file for that device UID and generation, validates the YAML, and reconciles `<device>-snmp`. Missing or invalid output leaves the previous fragment unchanged. Generated files are removed only after the fragment is persisted, or when the device is deleted after its Jobs have terminated. Device fragments are merged into `chantico-snmp-config`, which the SNMP exporter mounts. The operator owns this ConfigMap.
         ```sh
         kubectl get configmap -n chantico chantico-snmp-config -o yaml
         ```

@@ -7,6 +7,7 @@ import (
 
 	chantico "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
+	img "chantico/internal/images"
 	vol "chantico/internal/volumes"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,13 +29,20 @@ func TestBuildGeneratorJob(t *testing.T) {
 		},
 	}
 
-	job, err := BuildGeneratorJob(dev)
+	var builder GeneratorJobBuilder = SNMPGeneratorJobBuilder{}
+	job, err := builder.BuildJob(dev)
 	if err != nil {
 		t.Fatalf("BuildGeneratorJob: %v", err)
+	}
+	if len(job.OwnerReferences) != 0 || job.ResourceVersion != "" {
+		t.Fatal("builder must leave application and ownership to the controller")
 	}
 
 	if job.Name != "tno" || job.Namespace != "chantico" {
 		t.Errorf("unexpected name/ns: %s/%s", job.Name, job.Namespace)
+	}
+	if len(job.Labels) != 0 {
+		t.Errorf("builder must not add Job labels: %v", job.Labels)
 	}
 
 	gen := job.Annotations[GenerationAnnotation]
@@ -42,8 +50,8 @@ func TestBuildGeneratorJob(t *testing.T) {
 		t.Errorf("missing/wrong generation annotation: %q", gen)
 	}
 
-	if got := *job.Spec.BackoffLimit; got != 0 {
-		t.Errorf("BackoffLimit = %d, want 0", got)
+	if got := *job.Spec.BackoffLimit; got != 3 {
+		t.Errorf("BackoffLimit = %d, want 3", got)
 	}
 
 	containers := job.Spec.Template.Spec.Containers
@@ -52,7 +60,7 @@ func TestBuildGeneratorJob(t *testing.T) {
 	}
 	args := containers[0].Args
 	wantContains := []string{
-		"--output-path", "/tmp/snmp.yml",
+		"--output-path", "/data/snmp/output/a-random-uid/7.yml",
 		"--generator-path", "/data/snmp/generators/" + GeneratorConfigKey,
 		"--mibs-dir", "/data/snmp/mibs",
 	}
@@ -81,10 +89,10 @@ func TestBuildGeneratorJob(t *testing.T) {
 		t.Errorf("topology key = %q, want %q", terms[0].TopologyKey, corev1.LabelHostname)
 	}
 
-	// The data volume is only read, the output goes to the pod log.
 	wantMounts := map[string]bool{
 		"/data/snmp/mibs":       true,
 		"/data/snmp/generators": true,
+		"/data/snmp/output":     false,
 	}
 	mounts := containers[0].VolumeMounts
 	if len(mounts) != len(wantMounts) {
@@ -109,5 +117,20 @@ func TestBuildGeneratorJob(t *testing.T) {
 	volumes := pod.Spec.Volumes
 	if len(volumes) != 2 || volumes[1].ConfigMap == nil || volumes[1].ConfigMap.Name != "tno-generator" {
 		t.Errorf("expected generator ConfigMap volume %q, got %+v", "tno-generator", volumes)
+	}
+	if pod.Spec.AutomountServiceAccountToken == nil || *pod.Spec.AutomountServiceAccountToken {
+		t.Fatal("automatic API token mounting must be disabled")
+	}
+	if pod.Spec.ServiceAccountName != "" || job.Annotations[GeneratorOutputAnnotation] != GeneratorOutputPath(dev) {
+		t.Fatal("job must use generation-scoped output without a dedicated service account")
+	}
+	if pod.Spec.SecurityContext.FSGroup == nil {
+		t.Fatal("shared output needs group write access for non-root generator")
+	}
+	if len(pod.Spec.InitContainers) != 0 || containers[0].Image != img.SnmpGenerator {
+		t.Fatal("job must contain only the upstream SNMP generator")
+	}
+	if args[0] != "/data/snmp/output/a-random-uid" {
+		t.Fatalf("unexpected output directory: %q", args[0])
 	}
 }

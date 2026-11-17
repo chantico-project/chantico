@@ -28,7 +28,6 @@ import (
 	uzap "go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -156,9 +155,15 @@ func main() {
 	}
 
 	// MIB uploads and the generator Jobs expect this directory on the data volume.
-	mibsDir := filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation}.Resolve(md.MibsSubDir)
+	fileStore := filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation}
+	mibsDir := fileStore.Resolve(md.MibsSubDir)
 	if err := os.MkdirAll(mibsDir, 0777); err != nil {
 		setupLog.Error(err, "unable to create MIB directory", "path", mibsDir)
+		os.Exit(1)
+	}
+	outputDir := fileStore.Resolve(md.GeneratorOutputSubDir)
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
+		setupLog.Error(err, "unable to create generator output directory", "path", outputDir)
 		os.Exit(1)
 	}
 
@@ -176,13 +181,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// ClientSet is needed because  controller-runtime client does not provide direct access to pod logs.
-	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		setupLog.Error(err, "unable to create clientset")
-		os.Exit(1)
-	}
-
 	ctx := ctrl.SetupSignalHandler()
 	if err := controller.EnsureMergedSNMPConfig(ctx, mgr.GetAPIReader(), mgr.GetClient(), config.ValidatedEnv.PodNamespace); err != nil {
 		setupLog.Error(err, "unable to create initial SNMP ConfigMap")
@@ -192,8 +190,8 @@ func main() {
 	if err = (&controller.MeasurementDeviceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Logs:   md.ClientsetJobLogReader{Clientset: clientset},
-		Jobs:   md.ClientGeneratorJobBuilder{Client: mgr.GetClient(), Scheme: mgr.GetScheme()},
+		Jobs:   md.SNMPGeneratorJobBuilder{},
+		Files:  fileStore,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)

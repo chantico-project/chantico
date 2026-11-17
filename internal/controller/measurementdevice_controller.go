@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 
 	chantico "chantico/api/v1alpha1"
@@ -30,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	config "chantico/internal/configuration"
+	"chantico/internal/filestore"
 	md "chantico/internal/measurementdevice"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
@@ -55,15 +57,13 @@ import (
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups="",resources=pods,verbs=list
-// +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
 
 // MeasurementDeviceReconciler reconciles a MeasurementDevice
 type MeasurementDeviceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	Logs   md.JobLogReader
 	Jobs   md.GeneratorJobBuilder
+	Files  filestore.FileStore
 }
 
 // EnsureMergedSNMPConfig creates the merged SNMP ConfigMap if it does not exist.
@@ -161,10 +161,17 @@ func (r *MeasurementDeviceReconciler) reconcileDeletion(ctx context.Context, mea
 	}
 	for i := range jobs {
 		job := &jobs[i]
-		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
+		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationForeground)); client.IgnoreNotFound(err) != nil {
 			measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Failed to delete owned job: "+err.Error())
 			return steps.Error(err)
 		}
+	}
+	if len(jobs) > 0 {
+		return steps.Stop()
+	}
+	if err := r.cleanupGeneratorOutput(ctx, measurementDevice); err != nil {
+		measurementDevice.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Failed to remove generated files: "+err.Error())
+		return steps.Error(err)
 	}
 
 	fragment := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
@@ -269,23 +276,35 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 func (r *MeasurementDeviceReconciler) createGeneratorJob(
 	ctx context.Context, measurementDevice *chantico.MeasurementDevice,
 ) steps.StepResult {
-	job, err := r.Jobs.CreateJob(ctx, measurementDevice)
+	desired, err := r.Jobs.BuildJob(measurementDevice)
 	if err != nil {
-		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to create SNMP Generator job: "+err.Error())
+		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to build SNMP Generator job: "+err.Error())
 		return steps.Error(err)
 	}
 
-	log.FromContext(ctx).Info("Created SNMP Generator job", "job", job.Name)
-	measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionUnknown, chantico.ReasonGenerationPending, "SNMP Generator Job created")
+	job := desired.DeepCopy()
+	result, err := util.CreateOrUpdate(ctx, r.Client, job, func() error {
+		if job.ResourceVersion == "" {
+			job.Spec = desired.Spec
+		}
+		return util.SetControllerReference(measurementDevice, job, r.Scheme)
+	})
+	if err != nil {
+		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to apply SNMP Generator job: "+err.Error())
+		return steps.Error(err)
+	}
+
+	log.FromContext(ctx).Info("Applied SNMP Generator job", "job", job.Name, "result", result)
+	measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionUnknown, chantico.ReasonGenerationPending, "SNMP Generator Job applied")
 	return steps.Stop()
 }
 
 func (r *MeasurementDeviceReconciler) evaluateGeneratorJob(ctx context.Context, measurementDevice *chantico.MeasurementDevice, job *batchv1.Job) steps.StepResult {
 	l := log.FromContext(ctx)
 
-	if jobGeneration(job) != measurementDevice.GetGeneration() {
+	if jobGeneration(job) != measurementDevice.GetGeneration() || job.Annotations[md.GeneratorOutputAnnotation] != md.GeneratorOutputPath(measurementDevice) {
 		l.Info("Stale SNMP Generator job, deleting...", "job", job.Name)
-		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
+		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationForeground)); client.IgnoreNotFound(err) != nil {
 			measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to delete stale SNMP Generator job "+job.Name+": "+err.Error())
 			return steps.Error(err)
 		}
@@ -309,7 +328,7 @@ func (r *MeasurementDeviceReconciler) evaluateGeneratorJob(ctx context.Context, 
 }
 
 // reconcileSNMPFragment stores the config generated by the Job in the fragment ConfigMap of the device.
-// The log of the Job is only read when the fragment does not hold the config of this generation yet.
+// The file is only read when the fragment does not hold the config of this generation yet.
 func (r *MeasurementDeviceReconciler) reconcileSNMPFragment(ctx context.Context, measurementDevice *chantico.MeasurementDevice) steps.StepResult {
 	generation := strconv.FormatInt(measurementDevice.GetGeneration(), 10)
 	fragment := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
@@ -344,6 +363,11 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPFragment(ctx context.Context,
 		content = string(output)
 	}
 
+	if err := r.cleanupGeneratorOutput(ctx, measurementDevice); err != nil {
+		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Failed to remove generated files: "+err.Error())
+		return steps.Error(err)
+	}
+
 	configHash := snmp.Hash([]byte(content))
 
 	if measurementDevice.Status.ConfigHash == configHash {
@@ -356,29 +380,44 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPFragment(ctx context.Context,
 	return steps.Continue()
 }
 
-// generatedSNMPConfig returns the SNMP config that the generator Job of the device printed to its log.
+// generatedSNMPConfig validates shared-volume output before it can replace the active fragment.
 func (r *MeasurementDeviceReconciler) generatedSNMPConfig(ctx context.Context, measurementDevice *chantico.MeasurementDevice) ([]byte, error) {
-	jobs, err := r.getOwnedJobs(ctx, measurementDevice)
+	output, err := r.Files.ReadAll(ctx, md.GeneratorOutputPath(measurementDevice))
 	if err != nil {
-		return nil, err
-	}
-	if len(jobs) != 1 {
-		return nil, fmt.Errorf("expected 1 owned job, found %d", len(jobs))
-	}
-
-	output, err := r.Logs.GetJobLogs(ctx, &jobs[0])
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read generated SNMP config: %w", err)
 	}
 
 	// A broken config would break the merged config of all devices.
 	if len(bytes.TrimSpace(output)) == 0 {
-		return nil, errors.New("the generator job log is empty")
+		return nil, errors.New("the generator result is empty")
 	}
 	if err := yaml.Unmarshal(output, &snmp.MergedConfig{}); err != nil {
-		return nil, fmt.Errorf("the generator job log is not a valid SNMP config: %w", err)
+		return nil, fmt.Errorf("the generator result is not a valid SNMP config: %w", err)
 	}
 	return output, nil
+}
+
+func (r *MeasurementDeviceReconciler) cleanupGeneratorOutput(ctx context.Context, device *chantico.MeasurementDevice) error {
+	if device.UID == "" {
+		return errors.New("measurement device UID is required for generator output cleanup")
+	}
+	directory := md.GeneratorOutputDir(device)
+	files, err := r.Files.CollectSubFiles(ctx, directory)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if err := r.Files.Remove(ctx, file); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if err := r.Files.Remove(ctx, directory); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // mergedSNMPConfig merges the SNMP fragments of all devices. When the given device is being

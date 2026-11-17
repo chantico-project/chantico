@@ -19,10 +19,13 @@ package controller
 import (
 	"context"
 	"errors"
+	"os"
+	"reflect"
 	"strings"
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
+	"chantico/internal/filestore"
 	ch "chantico/internal/k8s"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
@@ -40,6 +43,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	yaml "go.yaml.in/yaml/v2"
@@ -71,11 +75,15 @@ func newReconciler(t *testing.T, objs ...runtime.Object) *MeasurementDeviceRecon
 		Build()
 
 	t.Setenv(config.ChanticoNamespaceEnv, ChanticoNamespace)
+	previousEnv := config.ValidatedEnv
+	config.ValidatedEnv.PodNamespace = ChanticoNamespace
+	t.Cleanup(func() { config.ValidatedEnv = previousEnv })
 
 	return &MeasurementDeviceReconciler{
 		Client: c,
 		Scheme: scheme,
-		Jobs:   md.ClientGeneratorJobBuilder{Client: c, Scheme: scheme},
+		Jobs:   md.SNMPGeneratorJobBuilder{},
+		Files:  filestore.VolumeFileStore{Root: t.TempDir()},
 	}
 }
 
@@ -104,6 +112,9 @@ func TestReconcileGeneratorConfigMap(t *testing.T) {
 	}
 	if first.Data[md.GeneratorConfigKey] == "" {
 		t.Fatalf("ConfigMap has no %q entry: %+v", md.GeneratorConfigKey, first.Data)
+	}
+	if len(first.Data) != 1 {
+		t.Fatal("generator ConfigMap must contain only the generator configuration")
 	}
 	if !metav1.IsControlledBy(first, measurementDevice) {
 		t.Fatalf("ConfigMap is not controlled by the measurement device: %+v", first.OwnerReferences)
@@ -230,15 +241,122 @@ func TestEnsureMergedSNMPConfig(t *testing.T) {
 	}
 }
 
-type fakeJobLogs struct {
-	output string
-	err    error
-	calls  int
+func TestCreateGeneratorJob(t *testing.T) {
+	ctx := context.Background()
+	device := &chantico.MeasurementDevice{ObjectMeta: metav1.ObjectMeta{
+		Name: TestMeasurementDeviceName, Namespace: ChanticoNamespace, UID: "device-1", Generation: 7,
+	}}
+	reconciler := newReconciler(t)
+	if result := reconciler.createGeneratorJob(ctx, device); result.Err != nil || result.Action != steps.ActionStop {
+		t.Fatalf("create job: %+v", result)
+	}
+	stored := &batchv1.Job{}
+	if err := reconciler.Get(ctx, client.ObjectKeyFromObject(device), stored); err != nil {
+		t.Fatal(err)
+	}
+	if !metav1.IsControlledBy(stored, device) || stored.Annotations[md.GeneratorOutputAnnotation] != md.GeneratorOutputPath(device) {
+		t.Fatalf("unexpected stored job: %+v", stored.ObjectMeta)
+	}
+	if len(stored.Labels) != 0 {
+		t.Fatalf("unexpected Job labels: %v", stored.Labels)
+	}
+	stored.Labels = map[string]string{"external-label": "preserved"}
+	stored.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{batchv1.ControllerUidLabel: "job-uid"}}
+	stored.Spec.Template.Labels[batchv1.ControllerUidLabel] = "job-uid"
+	if err := reconciler.Update(ctx, stored); err != nil {
+		t.Fatal(err)
+	}
+	if result := reconciler.createGeneratorJob(ctx, device); result.Err != nil || result.Action != steps.ActionStop {
+		t.Fatalf("repeated application must succeed: %+v", result)
+	}
+	job := &batchv1.Job{}
+	if err := reconciler.Get(ctx, client.ObjectKeyFromObject(device), job); err != nil {
+		t.Fatal(err)
+	}
+	if job.ResourceVersion != stored.ResourceVersion || !reflect.DeepEqual(job.Spec, stored.Spec) {
+		t.Fatal("repeated application must preserve existing Job spec and avoid an update")
+	}
+	if job.Labels["external-label"] != "preserved" || !metav1.IsControlledBy(job, device) {
+		t.Fatal("repeated application must retain external labels and ownership")
+	}
+	device.Generation++
+	if result := reconciler.createGeneratorJob(ctx, device); result.Err != nil || result.Action != steps.ActionStop {
+		t.Fatalf("apply existing job: %+v", result)
+	}
+	if err := reconciler.Get(ctx, client.ObjectKeyFromObject(device), job); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(job.Spec, stored.Spec) || !reflect.DeepEqual(job.Annotations, stored.Annotations) {
+		t.Fatal("existing Jobs must not be rewritten or relabeled as a newer generation")
+	}
+
+	stored.OwnerReferences[0].Name = "another-device"
+	stored.OwnerReferences[0].UID = "another-device"
+	if err := reconciler.Update(ctx, stored); err != nil {
+		t.Fatal(err)
+	}
+	var ownerError *controllerutil.AlreadyOwnedError
+	if result := reconciler.createGeneratorJob(ctx, device); result.Action != steps.ActionError || !errors.As(result.Err, &ownerError) {
+		t.Fatalf("expected ownership conflict: %+v", result)
+	}
 }
 
-func (f *fakeJobLogs) GetJobLogs(_ context.Context, _ *batchv1.Job) ([]byte, error) {
-	f.calls++
-	return []byte(f.output), f.err
+func TestCreateGeneratorJobErrors(t *testing.T) {
+	failure := errors.New("job API unavailable")
+	for _, test := range []struct {
+		name  string
+		uid   types.UID
+		funcs interceptor.Funcs
+	}{
+		{
+			name: "build error",
+		},
+		{
+			name: "read error",
+			uid:  "device-1",
+			funcs: interceptor.Funcs{Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
+				return failure
+			}},
+		},
+		{
+			name: "create error",
+			uid:  "device-1",
+			funcs: interceptor.Funcs{Create: func(context.Context, client.WithWatch, client.Object, ...client.CreateOption) error {
+				return failure
+			}},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			reconciler := newReconciler(t)
+			reconciler.Client = fake.NewClientBuilder().WithScheme(reconciler.Scheme).WithInterceptorFuncs(test.funcs).Build()
+			device := &chantico.MeasurementDevice{ObjectMeta: metav1.ObjectMeta{
+				Name: TestMeasurementDeviceName, Namespace: ChanticoNamespace, UID: test.uid, Generation: 1,
+			}}
+			result := reconciler.createGeneratorJob(context.Background(), device)
+			if result.Action != steps.ActionError || result.Err == nil {
+				t.Fatalf("expected reconciliation error: %+v", result)
+			}
+			if test.uid != "" && !errors.Is(result.Err, failure) {
+				t.Fatalf("must preserve API error: %v", result.Err)
+			}
+			if len(device.Status.Conditions) != 1 {
+				t.Fatalf("expected generation failure condition: %+v", device.Status.Conditions)
+			}
+			condition := device.Status.Conditions[0]
+			if condition.Type != string(chantico.ConditionGenerated) || condition.Status != metav1.ConditionFalse || condition.Reason != string(chantico.ReasonGenerationFailed) {
+				t.Fatalf("unexpected failure condition: %+v", condition)
+			}
+		})
+	}
+}
+
+func writeGeneratorOutput(t *testing.T, reconciler *MeasurementDeviceReconciler, device *chantico.MeasurementDevice, content string) string {
+	t.Helper()
+	outputPath := md.GeneratorOutputPath(device)
+	if err := reconciler.Files.Write(context.Background(), outputPath, strings.NewReader(content)); err != nil {
+		t.Fatal(err)
+	}
+	return outputPath
 }
 
 func TestReconcileSNMPFragment(t *testing.T) {
@@ -248,29 +366,16 @@ func TestReconcileSNMPFragment(t *testing.T) {
 			UID: types.UID("dev-1"), Generation: 1,
 		},
 	}
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tno-generator",
-			Namespace: ChanticoNamespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: chantico.GroupVersion.String(),
-					Kind:       "MeasurementDevice",
-					Name:       measurementDevice.Name,
-					UID:        measurementDevice.UID,
-					Controller: ptr.To(true),
-				},
-			},
-		},
-	}
+	content := "auths: {foo: {version: 3}}\n"
 	key := types.NamespacedName{Name: md.SnmpFragmentConfigMapName(measurementDevice.Name), Namespace: ChanticoNamespace}
 	ctx := context.Background()
 
-	r := newReconciler(t, job)
-	logs := &fakeJobLogs{output: "auths: {foo: {version: 3}}\n"}
-	r.Logs = logs
+	r := newReconciler(t)
+	outputPath := writeGeneratorOutput(t, r, measurementDevice, content)
+	stale := measurementDevice.DeepCopy()
+	stale.Generation = 0
+	stalePath := writeGeneratorOutput(t, r, stale, "partial previous output")
 
-	// First run: the fragment is created from the Job log.
 	if res := r.reconcileSNMPFragment(ctx, measurementDevice); res.Action == steps.ActionError {
 		t.Fatalf("first reconcileSNMPFragment errored: %v", res.Err)
 	}
@@ -278,8 +383,8 @@ func TestReconcileSNMPFragment(t *testing.T) {
 	if err := r.Get(ctx, key, fragment); err != nil {
 		t.Fatalf("expected fragment %s: %v", key, err)
 	}
-	if fragment.Data[md.SnmpConfigKey] != logs.output {
-		t.Fatalf("fragment content = %q, want %q", fragment.Data[md.SnmpConfigKey], logs.output)
+	if fragment.Data[md.SnmpConfigKey] != content {
+		t.Fatalf("fragment content = %q, want %q", fragment.Data[md.SnmpConfigKey], content)
 	}
 	if fragment.Labels[md.SnmpFragmentLabel] != "true" {
 		t.Fatalf("fragment misses label %s: %v", md.SnmpFragmentLabel, fragment.Labels)
@@ -290,32 +395,31 @@ func TestReconcileSNMPFragment(t *testing.T) {
 	if !metav1.IsControlledBy(fragment, measurementDevice) {
 		t.Fatalf("fragment is not controlled by the measurement device: %+v", fragment.OwnerReferences)
 	}
-	if want := snmp.Hash([]byte(logs.output)); measurementDevice.Status.ConfigHash != want {
+	if want := snmp.Hash([]byte(content)); measurementDevice.Status.ConfigHash != want {
 		t.Fatalf("ConfigHash = %q, want %q", measurementDevice.Status.ConfigHash, want)
 	}
 
-	// Same generation: the log is not read again.
+	for _, filename := range []string{outputPath, stalePath} {
+		if _, err := r.Files.ReadAll(ctx, filename); !os.IsNotExist(err) {
+			t.Fatalf("generated file %s was not cleaned up: %v", filename, err)
+		}
+	}
 	if res := r.reconcileSNMPFragment(ctx, measurementDevice); res.Action == steps.ActionError {
 		t.Fatalf("second reconcileSNMPFragment errored: %v", res.Err)
-	}
-	if logs.calls != 1 {
-		t.Fatalf("job log read %d times, want 1", logs.calls)
 	}
 
 	// New generation: the fragment is updated.
 	measurementDevice.Generation = 2
-	logs.output = "auths: {bar: {version: 3}}\n"
+	content = "auths: {bar: {version: 3}}\n"
+	writeGeneratorOutput(t, r, measurementDevice, content)
 	if res := r.reconcileSNMPFragment(ctx, measurementDevice); res.Action == steps.ActionError {
 		t.Fatalf("third reconcileSNMPFragment errored: %v", res.Err)
 	}
 	if err := r.Get(ctx, key, fragment); err != nil {
 		t.Fatal(err)
 	}
-	if fragment.Data[md.SnmpConfigKey] != logs.output || fragment.Annotations[md.GenerationAnnotation] != "2" {
+	if fragment.Data[md.SnmpConfigKey] != content || fragment.Annotations[md.GenerationAnnotation] != "2" {
 		t.Fatalf("fragment not updated: %v %v", fragment.Data, fragment.Annotations)
-	}
-	if logs.calls != 2 {
-		t.Fatalf("job log read %d times, want 2", logs.calls)
 	}
 }
 
@@ -326,46 +430,77 @@ func TestReconcileSNMPFragmentFailures(t *testing.T) {
 			UID: types.UID("dev-1"), Generation: 1,
 		},
 	}
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tno-generator",
-			Namespace: ChanticoNamespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: chantico.GroupVersion.String(),
-					Kind:       "MeasurementDevice",
-					Name:       measurementDevice.Name,
-					UID:        measurementDevice.UID,
-					Controller: ptr.To(true),
-				},
-			},
-		},
-	}
-
 	tests := []struct {
-		name string
-		objs []runtime.Object
-		logs *fakeJobLogs
+		name       string
+		content    string
+		uid        types.UID
+		generation int64
 	}{
-		{"no job", nil, &fakeJobLogs{output: "auths: {}\n"}},
-		{"log unavailable", []runtime.Object{job}, &fakeJobLogs{err: errors.New("no pod")}},
-		{"empty log", []runtime.Object{job}, &fakeJobLogs{output: " \n"}},
-		{"invalid yaml", []runtime.Object{job}, &fakeJobLogs{output: "auths: [\n"}},
+		{"missing file", "", "", 0},
+		{"empty file", " \n", "dev-1", 1},
+		{"invalid yaml", "auths: [\n", "dev-1", 1},
+		{"stale generation", "auths: {}\n", "dev-1", 0},
+		{"foreign device", "auths: {}\n", "another-device", 1},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := newReconciler(t, tt.objs...)
-			r.Logs = tt.logs
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			device := measurementDevice.DeepCopy()
+			previous := snmpFragment(device.Name, device.Namespace, "auths: {previous: {version: 3}}\n")
+			previous.Annotations = map[string]string{md.GenerationAnnotation: "0"}
+			reconciler := newReconciler(t, previous)
+			if test.uid != "" {
+				source := device.DeepCopy()
+				source.UID = test.uid
+				source.Generation = test.generation
+				writeGeneratorOutput(t, reconciler, source, test.content)
+			}
 
-			if res := r.reconcileSNMPFragment(context.Background(), device); res.Action != steps.ActionError {
+			if res := reconciler.reconcileSNMPFragment(context.Background(), device); res.Action != steps.ActionError {
 				t.Fatalf("expected error, got %v", res.Action)
 			}
-			key := types.NamespacedName{Name: md.SnmpFragmentConfigMapName(device.Name), Namespace: ChanticoNamespace}
-			if err := r.Get(context.Background(), key, &corev1.ConfigMap{}); !apierrors.IsNotFound(err) {
-				t.Fatalf("expected no fragment, got err=%v", err)
+			stored := &corev1.ConfigMap{}
+			if err := reconciler.Get(context.Background(), client.ObjectKeyFromObject(previous), stored); err != nil {
+				t.Fatal(err)
+			}
+			if stored.Data[md.SnmpConfigKey] != previous.Data[md.SnmpConfigKey] || stored.Annotations[md.GenerationAnnotation] != "0" {
+				t.Fatal("failed generation must preserve previous active fragment")
 			}
 		})
+	}
+}
+
+type configMapCreateErrorClient struct {
+	client.Client
+	failure error
+}
+
+func (failing configMapCreateErrorClient) Create(context.Context, client.Object, ...client.CreateOption) error {
+	return failing.failure
+}
+
+func TestReconcileSNMPFragmentRetry(t *testing.T) {
+	ctx := context.Background()
+	device := &chantico.MeasurementDevice{ObjectMeta: metav1.ObjectMeta{
+		Name: TestMeasurementDeviceName, Namespace: ChanticoNamespace, UID: "device-1", Generation: 1,
+	}}
+	reconciler := newReconciler(t)
+	content := "auths: {tno: {version: 3}}\n"
+	outputPath := writeGeneratorOutput(t, reconciler, device, content)
+	kubeClient := reconciler.Client
+	failure := errors.New("ConfigMap write unavailable")
+	reconciler.Client = configMapCreateErrorClient{Client: kubeClient, failure: failure}
+	if result := reconciler.reconcileSNMPFragment(ctx, device); !errors.Is(result.Err, failure) {
+		t.Fatalf("expected persistence error, got %+v", result)
+	}
+	if output, err := reconciler.Files.ReadAll(ctx, outputPath); err != nil || string(output) != content {
+		t.Fatalf("failed persistence must retain generated output: %q, %v", output, err)
+	}
+	reconciler.Client = kubeClient
+	if result := reconciler.reconcileSNMPFragment(ctx, device); result.Err != nil {
+		t.Fatalf("retry after API recovery: %v", result.Err)
+	}
+	if _, err := reconciler.Files.ReadAll(ctx, outputPath); !os.IsNotExist(err) {
+		t.Fatalf("successful persistence must clean generated output: %v", err)
 	}
 }
 
@@ -410,6 +545,10 @@ func TestReconcileDeletion(t *testing.T) {
 	fragment.OwnerReferences = job.OwnerReferences
 	other := snmpFragment("other", ChanticoNamespace, "auths: {kept: {version: 3}}\n")
 	r := newReconciler(t, measurementDevice, job, exporter, fragment, other)
+	outputPath := writeGeneratorOutput(t, r, measurementDevice, "unfinished output")
+	otherDevice := measurementDevice.DeepCopy()
+	otherDevice.UID = "other-device"
+	otherPath := writeGeneratorOutput(t, r, otherDevice, "other output")
 
 	// Start deletion of measurementDevice.
 	res := r.reconcileDeletion(context.Background(), measurementDevice)
@@ -418,6 +557,21 @@ func TestReconcileDeletion(t *testing.T) {
 	}
 	if res.Action != steps.ActionStop {
 		t.Fatalf("expected Stop, got %v", res.Action)
+	}
+	if !controllerutil.ContainsFinalizer(measurementDevice, chantico.SNMPUpdateFinalizer) {
+		t.Fatal("finalizer must remain until job deletion completes")
+	}
+	if _, err := r.Files.ReadAll(context.Background(), outputPath); err != nil {
+		t.Fatalf("output removed before job deletion completes: %v", err)
+	}
+	if res = r.reconcileDeletion(context.Background(), measurementDevice); res.Action == steps.ActionError {
+		t.Fatalf("finish deletion: %v", res.Err)
+	}
+	if _, err := r.Files.ReadAll(context.Background(), outputPath); !os.IsNotExist(err) {
+		t.Fatalf("deleted device output remains: %v", err)
+	}
+	if _, err := r.Files.ReadAll(context.Background(), otherPath); err != nil {
+		t.Fatalf("other device output was removed: %v", err)
 	}
 
 	// Fragment must be removed and left out of the merged config.

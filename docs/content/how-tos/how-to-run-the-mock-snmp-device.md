@@ -82,6 +82,7 @@ actor User
 participant "Kubernetes API" as K8s
 participant "MeasurementDevice Operator" as MDO
 participant "SNMP Generator Job" as SNMPJob
+participant "Shared PVC" as PVC
 participant "chantico-snmp Exporter" as SNMP
 participant "PhysicalMeasurement Operator" as PMO
 participant "Prometheus" as Prom
@@ -89,10 +90,12 @@ participant "Prometheus" as Prom
 User -> K8s: Apply MeasurementDevice CR
 K8s --> MDO: Reconcile MeasurementDevice
 MDO -> MDO: Write ConfigMap <device>-generator
-MDO -> SNMPJob: Create Job (mounts snmp/mibs + generator ConfigMap)
-SNMPJob -> SNMPJob: Resolve OIDs from MIBs\nand print the generated SNMP config to its log
+MDO -> SNMPJob: Create Job (mounts MIBs, generator ConfigMap, output directory)
+SNMPJob -> PVC: Write snmp/results/<device-uid>/<generation>.yml
 SNMPJob --> MDO: Job Succeeded
-MDO -> K8s: Read Job log and write ConfigMap <device>-snmp
+MDO -> PVC: Read and validate generated file
+MDO -> K8s: Reconcile ConfigMap <device>-snmp
+MDO -> PVC: Remove persisted device output files
 MDO -> MDO: Merge <device>-snmp ConfigMaps -> chantico-snmp-config
 MDO -> SNMP: Trigger rollout/reload
 SNMP --> MDO: New module/auth config active
@@ -118,7 +121,8 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
     ```
 1. Wait for the SNMP generator job:
     ```bash
-    kubectl get jobs -n chantico -o wide | grep snmp-generator
+    kubectl get jobs -n chantico -o wide
+    ```
 1. Create a `PhysicalMeasurement` pointing at the mock target:
     ```bash
     kubectl apply -n chantico -f ./config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
