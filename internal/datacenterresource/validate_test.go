@@ -253,7 +253,7 @@ func TestValidate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			visited, involvedResource, err := Validate(tc.Resource, tc.Resources, []chantico.PhysicalMeasurement{})
+			visited, involvedResource, err := Validate(tc.Resource, tc.Resources)
 			if !reflect.DeepEqual(visited, tc.ExpectedVisited) || !errors.Is(err, tc.ExpectedError) || involvedResource != tc.ExpectedInvolvedResource {
 				t.Errorf("Validate(%#v, %#v) = %#v, %#v, want %#v, %#v\n)", tc.Resource, FormatResources(tc.Resources), FormatResources(visited), err, FormatResources(tc.ExpectedVisited), tc.ExpectedError)
 			}

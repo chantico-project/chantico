@@ -1,3 +1,13 @@
+## 0.25.0 (2026-11-13)
+
+#### Feature
+
+* Drop unused PhysicalMeasurements field from DataCenterResource (#284) (ec96b625)
+
+#### Chores
+
+* **docs:** Support generation of diagrams in documentation (#269) (0173d76a)
+
 ## 0.24.0 (2026-11-05)
 
 #### Feature

@@ -86,7 +86,6 @@ func FormatResources(resources []chantico.DataCenterResource) string {
 func validateGraph(
 	dataCenterResource *chantico.DataCenterResource,
 	dataCenterResources []chantico.DataCenterResource,
-	physicalMeasurements []chantico.PhysicalMeasurement,
 ) ([]chantico.DataCenterResource, string, error) {
 	resourcesMap := make(map[string]chantico.DataCenterResource)
 	visitedSet := make(map[string]bool)
@@ -146,16 +145,11 @@ var validators = []func(*chantico.DataCenterResource) error{
 func Validate(
 	dataCenterResource *chantico.DataCenterResource,
 	dataCenterResources []chantico.DataCenterResource,
-	physicalMeasurements []chantico.PhysicalMeasurement,
 ) ([]chantico.DataCenterResource, string, error) {
-	involvedResources, involvedResourceName, err := validateGraph(dataCenterResource, dataCenterResources, physicalMeasurements)
+	involvedResources, involvedResourceName, err := validateGraph(dataCenterResource, dataCenterResources)
 	if err != nil {
 		return involvedResources, involvedResourceName, err
 	}
-
-	// Check if physical measurements exist
-	// TODO(user): For now this validation is skipped because we do not know which
-	// order the resources are created
 
 	for _, validate := range validators {
 		if err := validate(dataCenterResource); err != nil {

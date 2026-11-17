@@ -16,9 +16,6 @@ metadata:
   namespace: chantico-example-namespace-1
 spec:
   type: pdu
-  physicalMeasurements:
-  - random1
-  - random2
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -27,9 +24,6 @@ metadata:
   namespace: chantico-example-namespace-1
 spec:
   type: pdu
-  physicalMeasurements:
-  - random1
-  - random2
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -38,12 +32,9 @@ metadata:
   namespace: chantico-example-namespace-1
 spec:
   type: server
-  physicalMeasurements:
-  - random1
-  - random2
   parents:
-  - pdu1
-  - pdu2
+    - pdu1
+    - pdu2
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -52,13 +43,10 @@ metadata:
   namespace: chantico-example-namespace-1
 spec:
   type: server
-  physicalMeasurements:
-  - random1
-  - random2
   parents:
-  - pdu1
-  - pdu2
-  - pdu3
+    - pdu1
+    - pdu2
+    - pdu3
 ---
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
@@ -67,12 +55,7 @@ metadata:
   namespace: chantico-example-namespace-2
 spec:
   type: server
-  physicalMeasurements:
-  - random1
-  - random2
   parents:
-  - pdu1
-  - pdu2
-  - pdu3
-
-  
+    - pdu1
+    - pdu2
+    - pdu3

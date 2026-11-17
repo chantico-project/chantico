@@ -9,9 +9,9 @@ menus:
 In Chantico, one of the custom resources that can be provided is the data 
 center resource. This resource defines which equipment and customer-facing 
 services live in your cloud, such as PDUs, bare metals and VMs. The resource 
-has relations to physical measurements, which define where the device can be 
-monitored, such as IP address to scrape, and has a further reference to the 
-measurement device, which describes how to monitor the type/brand of resource.
+defines metrics that are usable to monitor the resource, and coefficients that 
+can be used to calculate the resource's share in energy consumption measured by 
+other metrics.
 
 The data center resource also defines relationships with parent devices. A bare 
 metal server can be connected to one or more PDUs, for example, and PDUs may 
@@ -43,8 +43,6 @@ spec:
   parents:
     - name: datacenterresource-misd-gbm-01
       coefficient: "1"
-  physicalMeasurements:
-    - physicalMeasurement-pdu2-out
 ```
 1. Apply the file again:
   ```sh
