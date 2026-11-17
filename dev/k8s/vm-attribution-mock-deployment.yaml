@@ -24,6 +24,9 @@ spec:
         env:
         - name: MOCK_VM_ATTR_HOST_NAME
           value: "prometheus-mock-bm-1"
+          # Uses `metricz` to demonstrate the custom metrics path for the Prometheus exporter.
+        - name: MOCK_VM_ATTR_METRICS_PATH
+          value: "/metricz"
         - name: MOCK_VM_ATTR_VM_IDS
           value: "120,121"
         - name: MOCK_VM_ATTR_PORT
