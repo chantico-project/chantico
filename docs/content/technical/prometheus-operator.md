@@ -38,10 +38,21 @@ For every `PhysicalMeasurement` the controller reconciles a `ScrapeConfig`
 (`internal/physicalmeasurement/targets.go`). The `spec.type` of the measurement
 determines its content:
 
-| `spec.type` | Metrics path | Target |
+| `spec.type` | Default metrics path | Target |
 |---|---|---|
 | `snmp` | `/snmp` | `spec.ip` is passed as the `target` parameter to the SNMP exporter, set with `--snmp-exporter-address` |
 | `prometheus-exporter` | `/metrics` | `spec.ip` is scraped directly |
+
+Set the optional `spec.metricsPath` field on a `PhysicalMeasurement` to override
+its default path. For example, a Prometheus exporter served at `/metricz` can be
+configured with:
+
+```yaml
+spec:
+  type: prometheus-exporter
+  ip: exporter:9090
+  metricsPath: /metricz
+```
 
 For SNMP, relabelling moves the device address to `__param_target` and
 `instance`, and replaces `__address__` with the SNMP exporter address. The
