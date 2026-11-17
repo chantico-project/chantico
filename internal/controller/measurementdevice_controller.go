@@ -26,7 +26,7 @@ import (
 
 	chantico "chantico/api/v1alpha1"
 
-	"github.com/go-logr/logr"
+	"go.yaml.in/yaml/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
@@ -40,14 +40,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	util "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	yaml "go.yaml.in/yaml/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -97,13 +94,7 @@ func (r *MeasurementDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.ConfigMap{}).
 		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 1}). // Race conditions might occur when multiple generator jobs run simultaneously, so only allow one at a time.
-		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
-			log := mgr.GetLogger().WithName("MeasurementDeviceController")
-			if req != nil {
-				log = log.WithValues("resource", req.Name)
-			}
-			return log
-		}).
+		WithLogConstructor(controllerLogConstructor(mgr, "MeasurementDeviceController")).
 		Complete(r)
 }
 
@@ -121,16 +112,11 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	l = l.WithValues("generation", measurementDevice.GetGeneration())
 	ctx = log.IntoContext(ctx, l)
 
-	// Patches the changes to the MeasurementDevice at the end of reconciliation. This updates the observedGeneration and conditions in the status.
-	patcher, err := patch.NewHelper(measurementDevice, r.Client)
+	patchStatus, err := newStatusPatcher(ctx, r.Client, measurementDevice)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	defer func() {
-		if err := patcher.Patch(ctx, measurementDevice, patch.WithStatusObservedGeneration{}); err != nil {
-			reterr = errors.Join(reterr, err)
-		}
-	}()
+	defer func() { reterr = patchStatus(reterr) }()
 
 	measurementDevice.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
 	return steps.Run(ctx, measurementDevice,
