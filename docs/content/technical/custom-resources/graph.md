@@ -26,7 +26,7 @@ consumption.
 | Field | Type | Description |
 |---|---|---|
 | `metadata.name` | `string` | The name of the resource. This is used to reference the resource in `spec.parents` of other resources. |
-| `spec.type` | `string` | The resource category, listed under [Resource types](#resource-types). |
+| `spec.type` | `string` | The type of the resource (see below). |
 | `spec.energyMetricFrom` | `TemplateFrom` | Prometheus expression source for a root resource, supplied by `value` or `valueFrom` |
 | `spec.parents` | list of `ParentRef` | Parent resources; each entry requires a coefficient expression in `coefficientFrom`, except for grouping parents |
 | `spec.additionalLabels` | map of `string` to `string` | Any additional fields to associate with the resource. This can be used to group resources together for energy accounting purposes. |
