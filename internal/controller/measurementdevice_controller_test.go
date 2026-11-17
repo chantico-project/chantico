@@ -75,6 +75,7 @@ func newReconciler(t *testing.T, objs ...runtime.Object) *MeasurementDeviceRecon
 	return &MeasurementDeviceReconciler{
 		Client: c,
 		Scheme: scheme,
+		Jobs:   md.ClientGeneratorJobBuilder{Client: c, Scheme: scheme},
 	}
 }
 

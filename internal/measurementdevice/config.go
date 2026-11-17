@@ -8,13 +8,43 @@ import (
 	"chantico/internal/filestore"
 	img "chantico/internal/images"
 	vol "chantico/internal/volumes"
+	"context"
+	"fmt"
 	"os"
 	"path"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+// GeneratorJobCreator creates the SNMP generator Job owned by a measurement device.
+type GeneratorJobBuilder interface {
+	CreateJob(ctx context.Context, device *chantico.MeasurementDevice) (*batchv1.Job, error)
+}
+
+// ClientGeneratorJobBuilder builds and creates generator Jobs through the Kubernetes API.
+type ClientGeneratorJobBuilder struct {
+	Client client.Client
+	Scheme *runtime.Scheme
+}
+
+func (builder ClientGeneratorJobBuilder) CreateJob(ctx context.Context, device *chantico.MeasurementDevice) (*batchv1.Job, error) {
+	job, err := BuildGeneratorJob(device)
+	if err != nil {
+		return nil, fmt.Errorf("build SNMP Generator job: %w", err)
+	}
+	if err := controllerutil.SetControllerReference(device, job, builder.Scheme); err != nil {
+		return nil, fmt.Errorf("set controller reference for SNMP Generator job: %w", err)
+	}
+	if err := builder.Client.Create(ctx, job); err != nil {
+		return nil, fmt.Errorf("create SNMP Generator job: %w", err)
+	}
+	return job, nil
+}
 
 // BuildGeneratorJob builds the Job that generates the SNMP configuration of a device. The
 // controller reads the configuration from the log of the Job's pod.

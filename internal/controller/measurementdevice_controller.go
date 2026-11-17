@@ -63,6 +63,7 @@ type MeasurementDeviceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Logs   md.JobLogReader
+	Jobs   md.GeneratorJobBuilder
 }
 
 // EnsureMergedSNMPConfig creates the merged SNMP ConfigMap if it does not exist.
@@ -268,16 +269,8 @@ func (r *MeasurementDeviceReconciler) reconcileSNMPGeneratorJob(ctx context.Cont
 func (r *MeasurementDeviceReconciler) createGeneratorJob(
 	ctx context.Context, measurementDevice *chantico.MeasurementDevice,
 ) steps.StepResult {
-	job, err := md.BuildGeneratorJob(measurementDevice)
+	job, err := r.Jobs.CreateJob(ctx, measurementDevice)
 	if err != nil {
-		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to build SNMP Generator job: "+err.Error())
-		return steps.Error(err)
-	}
-	if err := util.SetControllerReference(measurementDevice, job, r.Scheme); err != nil {
-		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to set controller reference for SNMP Generator job: "+err.Error())
-		return steps.Error(err)
-	}
-	if err := r.Create(ctx, job); err != nil {
 		measurementDevice.UpdateStatusCondition(chantico.ConditionGenerated, metav1.ConditionFalse, chantico.ReasonGenerationFailed, "Failed to create SNMP Generator job: "+err.Error())
 		return steps.Error(err)
 	}

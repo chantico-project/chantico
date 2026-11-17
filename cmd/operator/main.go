@@ -193,6 +193,7 @@ func main() {
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		Logs:   md.ClientsetJobLogReader{Clientset: clientset},
+		Jobs:   md.ClientGeneratorJobBuilder{Client: mgr.GetClient(), Scheme: mgr.GetScheme()},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)
