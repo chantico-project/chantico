@@ -1,3 +1,9 @@
+## 0.26.0 (2026-11-17)
+
+#### Feature
+
+* Use Prometheus Operator (#279) (0f0a954d)
+
 ## 0.25.0 (2026-11-13)
 
 #### Feature
