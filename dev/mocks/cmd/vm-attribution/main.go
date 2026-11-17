@@ -14,9 +14,10 @@ const vmAttributionBase = `# HELP vm_attribution_coefficient Fraction of total s
 `
 
 var (
-	hostName = simulation.EnvString("MOCK_VM_ATTR_HOST_NAME", "prometheus-mock-bm-1")
-	vmIDs    = simulation.EnvInts("MOCK_VM_ATTR_VM_IDS", []int{120, 121})
-	port     = simulation.EnvString("MOCK_VM_ATTR_PORT", "9090")
+	hostName    = simulation.EnvString("MOCK_VM_ATTR_HOST_NAME", "prometheus-mock-bm-1")
+	vmIDs       = simulation.EnvInts("MOCK_VM_ATTR_VM_IDS", []int{120, 121})
+	port        = simulation.EnvString("MOCK_VM_ATTR_PORT", "9090")
+	metricsPath = simulation.EnvString("MOCK_VM_ATTR_METRICS_PATH", "/metrics")
 
 	weights = simulation.NewWalk(simulation.BoundsFromEnv("MOCK_VM_ATTR_WEIGHT", simulation.Bounds{
 		Min:      0.2,
@@ -50,7 +51,7 @@ func metrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/metrics", metrics)
+	http.HandleFunc(metricsPath, metrics)
 
 	log.Println("Starting mock Prometheus exporter.")
 	log.Println("\tHostname: " + hostName)

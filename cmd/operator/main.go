@@ -85,6 +85,44 @@ func configureWatchNamespace() cache.Options {
 	return cacheOpts
 }
 
+func setupDatacenterResourceController(mgr ctrl.Manager) error {
+	ruleConfigurer := &datacenterresource.PrometheusRecordingRuleConfigurer{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}
+	return (&controller.DataCenterResourceReconciler{
+		Client:         mgr.GetClient(),
+		RuleConfigurer: ruleConfigurer,
+	}).SetupWithManager(mgr)
+}
+
+func setupMeasurementDeviceController(mgr ctrl.Manager) error {
+	return (&controller.MeasurementDeviceReconciler{
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Filestore: filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation},
+	}).SetupWithManager(mgr)
+}
+
+func setupPhysicalMeasurementController(mgr ctrl.Manager) error {
+	targetConfigurer := &physicalmeasurement.PrometheusTargetConfigurer{
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		SNMPExporterAddress: net.JoinHostPort(config.ValidatedEnv.SnmpExporterServiceHost, config.ValidatedEnv.SnmpExporterServicePort),
+	}
+
+	return (&controller.PhysicalMeasurementReconciler{
+		Client:           mgr.GetClient(),
+		TargetConfigurer: targetConfigurer,
+	}).SetupWithManager(mgr)
+}
+
+var controllerSetupFuncs = map[string]func(ctrl.Manager) error{
+	"DataCenterResource":  setupDatacenterResourceController,
+	"MeasurementDevice":   setupMeasurementDeviceController,
+	"PhysicalMeasurement": setupPhysicalMeasurementController,
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -177,39 +215,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.MeasurementDeviceReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Filestore: filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
-		os.Exit(1)
+	for name, setupFunc := range controllerSetupFuncs {
+		if err := setupFunc(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", name)
+			os.Exit(1)
+		}
 	}
 
-	targetConfigurer := &physicalmeasurement.PrometheusTargetConfigurer{
-		Client:              mgr.GetClient(),
-		Scheme:              mgr.GetScheme(),
-		SNMPExporterAddress: net.JoinHostPort(config.ValidatedEnv.SnmpExporterServiceHost, config.ValidatedEnv.SnmpExporterServicePort),
-	}
-	if err = (&controller.PhysicalMeasurementReconciler{
-		Client:           mgr.GetClient(),
-		TargetConfigurer: targetConfigurer,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PhysicalMeasurement")
-		os.Exit(1)
-	}
-
-	ruleConfigurer := &datacenterresource.PrometheusRecordingRuleConfigurer{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}
-	if err := (&controller.DataCenterResourceReconciler{
-		Client:         mgr.GetClient(),
-		RuleConfigurer: ruleConfigurer,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DataCenterResource")
-		os.Exit(1)
-	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

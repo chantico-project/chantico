@@ -64,6 +64,9 @@ spec:
                 type: string
               measurementDevice:
                 type: string
+              metricsPath:
+                description: MetricsPath is the HTTP path scraped for this measurement.
+                type: string
               type:
                 default: snmp
                 enum:
