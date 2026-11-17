@@ -363,7 +363,6 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 sync-deployment-crds:
 	mkdir -p chart/crds
 	cp config/crds/bases/*.yaml chart/crds/
-	sed -i'' -e '/^\s*format: int64$$/d' chart/crds/*.yaml
 
 ##@ Dependencies
 
