@@ -27,6 +27,7 @@ import (
 	ch "chantico/internal/k8s"
 	"chantico/internal/snmp"
 	"chantico/internal/steps"
+	"chantico/internal/testutil"
 
 	config "chantico/internal/configuration"
 	md "chantico/internal/measurementdevice"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -49,26 +49,19 @@ const (
 
 func newReconciler(t *testing.T, root string, objs ...runtime.Object) *MeasurementDeviceReconciler {
 	t.Helper()
-	scheme := runtime.NewScheme()
-	if err := chantico.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := batchv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := appsv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	c := fake.NewClientBuilder().
-		WithScheme(scheme).
+
+	c := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, appsv1.AddToScheme, batchv1.AddToScheme).
 		WithRuntimeObjects(objs...).
 		Build()
 
 	t.Setenv(config.ChanticoNamespaceEnv, ChanticoNamespace)
+	previousEnv := config.ValidatedEnv
+	config.ValidatedEnv.PodNamespace = ChanticoNamespace
+	t.Cleanup(func() { config.ValidatedEnv = previousEnv })
 
 	return &MeasurementDeviceReconciler{
 		Client:    c,
-		Scheme:    scheme,
+		Scheme:    c.Scheme(),
 		Filestore: filestore.VolumeFileStore{Root: root},
 	}
 }

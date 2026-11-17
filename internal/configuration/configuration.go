@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	ChanticoVolumeLocationEnv        = "CHANTICO_DATA_PATH"
-	ChanticoVolumeClaimEnv           = "CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME"
-	ChanticoPrometheusServiceHostEnv = "CHANTICO_PROMETHEUS_SERVICE_HOST"
-	ChanticoPrometheusServicePortEnv = "CHANTICO_PROMETHEUS_SERVICE_PORT"
-	ChanticoNamespaceEnv             = "CHANTICO_NAMESPACE"
-	ChanticoWatchNamespaceEnv        = "CHANTICO_WATCH_NAMESPACE"
-	ValidateHostPortTimeout          = 5 * time.Second
+	ChanticoVolumeLocationEnv          = "CHANTICO_DATA_PATH"
+	ChanticoVolumeClaimEnv             = "CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME"
+	ChanticoSnmpExporterServiceHostEnv = "CHANTICO_SNMP_EXPORTER_SERVICE_HOST"
+	ChanticoSnmpExporterServicePortEnv = "CHANTICO_SNMP_EXPORTER_SERVICE_PORT"
+	ChanticoNamespaceEnv               = "CHANTICO_NAMESPACE"
+	ChanticoWatchNamespaceEnv          = "CHANTICO_WATCH_NAMESPACE"
+	ValidateHostPortTimeout            = 5 * time.Second
 
 	// AllNamespaces is the sentinel value for ChanticoWatchNamespaceEnv that makes the operator
 	// watch resources in every namespace instead of a single one.
@@ -66,7 +66,6 @@ type ConnectErrorType string
 
 const (
 	ConnectErrorTypeHost    ConnectErrorType = "host"
-	ConnectErrorTypePort    ConnectErrorType = "port"
 	ConnectErrorTypeAddress ConnectErrorType = "address"
 )
 
@@ -87,10 +86,10 @@ func (e ConnectError) Unwrap() error {
 }
 
 type validatedEnv struct {
-	VolumeLocation        string
-	VolumeClaim           string
-	PrometheusServiceHost string
-	PrometheusServicePort string
+	VolumeLocation          string
+	VolumeClaim             string
+	SnmpExporterServiceHost string
+	SnmpExporterServicePort string
 	// PodNamespace is the namespace the operator is deployed in.
 	PodNamespace string
 	// WatchNamespace is either a single namespace name to restrict watches to,
@@ -121,8 +120,8 @@ func ValidateEnv() (validatedEnv, []error) {
 	}{
 		{ChanticoVolumeClaimEnv, validateClaim, &ret.VolumeClaim},
 		{ChanticoVolumeLocationEnv, validateLocation, &ret.VolumeLocation},
-		{ChanticoPrometheusServiceHostEnv, validateHost, &ret.PrometheusServiceHost},
-		{ChanticoPrometheusServicePortEnv, validatePort, &ret.PrometheusServicePort},
+		{ChanticoSnmpExporterServiceHostEnv, validateHost, &ret.SnmpExporterServiceHost},
+		{ChanticoSnmpExporterServicePortEnv, validatePort, &ret.SnmpExporterServicePort},
 	}
 
 	for _, v := range varsToValidate {
@@ -134,14 +133,6 @@ func ValidateEnv() (validatedEnv, []error) {
 		}
 	}
 
-	if ret.PrometheusServiceHost != "" && ret.PrometheusServicePort != "" {
-		err := validateHostPort([]string{ChanticoPrometheusServiceHostEnv, ChanticoPrometheusServicePortEnv}, ret.PrometheusServiceHost, ret.PrometheusServicePort)
-		if err != nil {
-			errs = append(errs, err)
-			ret.PrometheusServiceHost = ""
-			ret.PrometheusServicePort = ""
-		}
-	}
 	if len(errs) > 0 {
 		return ret, errs
 	}
@@ -161,6 +152,17 @@ func validateHostPort(varNames []string, host, port string) error {
 		}
 		return nil
 	}
+}
+
+func validateHostLookup(varName, value string) error {
+	addrs, err := net.LookupHost(value)
+	if err != nil {
+		return ConnectError{Type: ConnectErrorTypeHost, VarNames: []string{varName}, Value: value, Reason: "error looking up host (is it a valid address?)", Err: err}
+	}
+	if len(addrs) == 0 {
+		return ConnectError{Type: ConnectErrorTypeHost, VarNames: []string{varName}, Value: value, Reason: "lookup for host returned empty, is it a valid address?"}
+	}
+	return nil
 }
 
 func validateVar(varName string, extraTest func(string, string) error) (string, error) {
@@ -199,14 +201,10 @@ func validateLocation(varName string, value string) error {
 }
 
 func validateHost(varName string, value string) error {
-	addrs, err := net.LookupHost(value)
-	if err != nil {
-		return ConnectError{Type: ConnectErrorTypeHost, VarNames: []string{varName}, Value: value, Reason: "error looking up host (is it a valid address?)", Err: err}
+	if net.ParseIP(value) != nil || len(validation.IsDNS1123Subdomain(value)) == 0 {
+		return nil
 	}
-	if len(addrs) == 0 {
-		return ConnectError{Type: ConnectErrorTypeHost, VarNames: []string{varName}, Value: value, Reason: "lookup for host returned empty, is it a valid address?"}
-	}
-	return nil
+	return InvalidError{VarName: varName, Value: value, Reason: "must be a valid IP address or DNS name"}
 }
 
 func validatePort(varName string, value string) error {

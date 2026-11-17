@@ -26,6 +26,18 @@ To upgrade an existing chantico deployment to a new version, run `helm upgrade` 
 helm upgrade chantico oci://ghcr.io/chantico-project/charts/chantico --version <version> -n chantico
 ```
 
+## Prometheus Operator dependency
+
+Chantico configures Prometheus through [Prometheus Operator](https://prometheus-operator.dev/). The Chantico chart depends on the [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) chart, which installs the operator, its CRDs and Grafana. Only these components are enabled; Alertmanager, node exporter, kube-state-metrics and the default rules are disabled. Chantico then creates a `Prometheus` resource that the operator turns into a running Prometheus instance.
+
+Grafana is configured under the `kube-prometheus-stack.grafana` key in the chart values, for example:
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set kube-prometheus-stack.grafana.adminPassword=<password>
+```
+
+See [Prometheus Operator integration](/technical/prometheus-operator.md) for details.
+
 ## Using an alternative storage class
 
 The Chantico chart create a persistent volume claim to store Prometheus data.
