@@ -1,0 +1,24 @@
+<h2>{{ .Name }}</h2>
+<form class="panel-form">
+  <p class="panel-status">
+    <span>Status</span>
+    <strong>{{ .Status }}</strong>
+  </p>
+  <label>
+    <span>Manifest</span>
+    <textarea name="manifest" rows="20">{{ .Manifest }}</textarea>
+  </label>
+  <div class="panel-actions">
+    <button type="button"
+            hx-put="/api/nodes/{{ .ID }}"
+            hx-include="closest form"
+            hx-target="#panel-content"
+            hx-swap="innerHTML">Update</button>
+    <button type="button"
+            class="danger"
+            hx-delete="/api/nodes/{{ .ID }}"
+            hx-confirm="Delete {{ .Name }}?"
+            hx-target="#panel-content"
+            hx-swap="innerHTML">Delete</button>
+  </div>
+</form>
