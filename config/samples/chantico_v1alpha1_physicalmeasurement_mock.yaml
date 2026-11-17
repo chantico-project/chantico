@@ -36,3 +36,5 @@ metadata:
 spec:
   type: prometheus-exporter
   ip: chantico-vm-attribution-mock:30909
+  # Uses `metricz` to demonstrate the custom metrics path for the Prometheus exporter.
+  metricsPath: /metricz
