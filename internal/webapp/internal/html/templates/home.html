@@ -23,6 +23,15 @@
             {{ range .Namespaces }}<option value="{{ . }}">{{ . }}</option>{{ end }}
           </select>
         </dd>
+        <dt><label for="node-search-input">Search</label></dt>
+        <dd>
+          <form id="node-search" role="search">
+            <input id="node-search-input" type="search" placeholder="Node name" autocomplete="off">
+            <button type="submit">Show neighbours</button>
+            <button type="button" id="node-search-clear">Clear</button>
+          </form>
+          <span id="node-search-status" role="status"></span>
+        </dd>
       </dl>
     </header>
 

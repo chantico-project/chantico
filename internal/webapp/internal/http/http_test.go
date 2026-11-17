@@ -104,6 +104,27 @@ func TestGraphAPI(t *testing.T) {
 	if len(elements.Edges) != 1 || elements.Edges[0].Data["source"] != "ns1-child" || elements.Edges[0].Data["target"] != "ns1-root" {
 		t.Errorf("edges = %+v, want one edge ns1-child -> ns1-root", elements.Edges)
 	}
+
+	t.Run("neighbourhood", func(t *testing.T) {
+		rec := serve(t, h, http.MethodGet, "/api/graph?namespace=ns1&node=child", nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		var sub graph.Elements
+		if err := json.Unmarshal(rec.Body.Bytes(), &sub); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if len(sub.Nodes) != 2 || len(sub.Edges) != 1 {
+			t.Errorf("nodes = %d, edges = %d, want 2 and 1", len(sub.Nodes), len(sub.Edges))
+		}
+	})
+
+	t.Run("neighbourhood unknown node", func(t *testing.T) {
+		rec := serve(t, h, http.MethodGet, "/api/graph?namespace=ns1&node=other", nil)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", rec.Code)
+		}
+	})
 }
 
 func TestNamespacesAPI(t *testing.T) {

@@ -6,9 +6,24 @@ const API = {
 };
 
 const namespaceSelect = document.getElementById("namespace");
+const searchForm = document.getElementById("node-search");
+const searchInput = document.getElementById("node-search-input");
+const searchClear = document.getElementById("node-search-clear");
+const searchStatus = document.getElementById("node-search-status");
 
-function graphURL() {
-  return `${API.graph}?namespace=${encodeURIComponent(namespaceSelect.value)}`;
+let searchedNode = "";
+
+function graphURL(node) {
+  const params = new URLSearchParams({ namespace: namespaceSelect.value });
+  if (node !== "") {
+    params.set("node", node);
+  }
+  return `${API.graph}?${params}`;
+}
+
+function setSearchStatus(message) {
+  searchStatus.textContent = message;
+  searchInput.setAttribute("aria-invalid", message === "" ? "false" : "true");
 }
 
 async function refreshNamespaces() {
@@ -181,11 +196,25 @@ function updateLabelSize() {
 cy.on("zoom", updateLabelSize);
 
 // Graph logic
-async function refreshGraph() {
-  const response = await window.fetch(graphURL());
-  if (!response.ok) {
-    return;
+async function refreshGraph(node = searchedNode, isSearch = false) {
+  const response = await window.fetch(graphURL(node));
+  if (response.status === 404 && node !== "") {
+    if (isSearch) {
+      setSearchStatus(`No node named "${node}" in ${namespaceSelect.value}`);
+    } else if (node === searchedNode) {
+      setSearchStatus(`Node "${node}" no longer exists in ${namespaceSelect.value}`);
+      searchedNode = "";
+      searchInput.value = "";
+    }
+    return false;
   }
+  if (!response.ok) {
+    return false;
+  }
+  if (isSearch) {
+    searchedNode = node;
+  }
+  setSearchStatus("");
   const { nodes = [], edges = [] } = await response.json();
 
   const incomingIds = new Set([
@@ -227,9 +256,32 @@ async function refreshGraph() {
     cy.layout(LAYOUT.tree).run();
     updateLabelSize();
   }
+  return true;
 }
 
-namespaceSelect.addEventListener("change", refreshGraph);
-refreshNamespaces().then(refreshGraph);
+async function runSearch(name) {
+  const ok = await refreshGraph(name, true);
+  if (ok) {
+    cy.fit(undefined, 20);
+  }
+}
+
+searchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  runSearch(searchInput.value.trim());
+});
+
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  runSearch("");
+});
+
+namespaceSelect.addEventListener("change", () => {
+  searchedNode = "";
+  searchInput.value = "";
+  setSearchStatus("");
+  refreshGraph();
+});
+refreshNamespaces().then(() => refreshGraph());
 window.setInterval(refreshNamespaces, REFRESH_INTERVAL_MS);
-window.setInterval(refreshGraph, REFRESH_INTERVAL_MS);
+window.setInterval(() => refreshGraph(), REFRESH_INTERVAL_MS);

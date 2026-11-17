@@ -102,7 +102,48 @@ func TestBuildElements(t *testing.T) {
 	}
 }
 
+func TestNeighbourhood(t *testing.T) {
+	root := &Node{Name: "ns-root", Label: "root"}
+	middle := &Node{Name: "ns-middle", Label: "middle", Parents: []*Node{{Name: "ns-root"}}}
+	leaf := &Node{Name: "ns-leaf", Label: "leaf", Parents: []*Node{{Name: "ns-middle"}}}
+	isolated := &Node{Name: "ns-isolated", Label: "isolated"}
+	nodes := []*Node{root, middle, leaf, isolated}
+
+	tests := []struct {
+		name string
+		id   string
+		want []string
+	}{
+		{name: "middle node keeps parent and child", id: "ns-middle", want: []string{"ns-root", "ns-middle", "ns-leaf"}},
+		{name: "root keeps only its child", id: "ns-root", want: []string{"ns-root", "ns-middle"}},
+		{name: "leaf keeps only its parent", id: "ns-leaf", want: []string{"ns-middle", "ns-leaf"}},
+		{name: "isolated node stands alone", id: "ns-isolated", want: []string{"ns-isolated"}},
+		{name: "unknown node", id: "ns-missing", want: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Neighbourhood(nodes, tt.id)
+			if tt.want == nil {
+				if got != nil {
+					t.Fatalf("got %d nodes, want nil", len(got))
+				}
+				return
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d nodes, want %d", len(got), len(tt.want))
+			}
+			for i, node := range got {
+				if node.Name != tt.want[i] {
+					t.Errorf("node %d = %q, want %q", i, node.Name, tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func assertData(t *testing.T, kind string, index int, got, want map[string]string) {
+
 	t.Helper()
 	if len(got) != len(want) {
 		t.Fatalf("%s %d: got data %v, want %v", kind, index, got, want)

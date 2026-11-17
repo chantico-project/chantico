@@ -67,10 +67,19 @@ func (s HTTPServer) Stop(ctx context.Context) error {
 }
 
 func (h *HTTPServerHandler) GraphAPI(w http.ResponseWriter, r *http.Request) {
-	nodes, err := h.Kubernetes.GetDataCenterResources(r.URL.Query().Get("namespace"))
+	namespace := r.URL.Query().Get("namespace")
+	nodes, err := h.Kubernetes.GetDataCenterResources(namespace)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if name := r.URL.Query().Get("node"); name != "" {
+		nodes = graph.Neighbourhood(nodes, namespace+"-"+name)
+		if nodes == nil {
+			http.Error(w, "node not found", http.StatusNotFound)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
