@@ -38,7 +38,7 @@ func TestBuildElements(t *testing.T) {
 			name:  "single node without parents",
 			nodes: []*Node{{Name: "ns-child", Label: "child", Status: "Ready"}},
 			wantNodes: []map[string]string{
-				{"id": "ns-child", "label": "child", "status": "Ready"},
+				{"id": "ns-child", "label": "child", "type": "", "status": "Ready"},
 			},
 			wantEdges: []map[string]string{},
 		},
@@ -51,7 +51,7 @@ func TestBuildElements(t *testing.T) {
 				Parents: []*Node{parentA, parentB},
 			}},
 			wantNodes: []map[string]string{
-				{"id": "ns-child", "label": "child", "status": "Pending"},
+				{"id": "ns-child", "label": "child", "type": "", "status": "Pending"},
 			},
 			wantEdges: []map[string]string{
 				{"id": "ns-child->ns-a", "source": "ns-child", "target": "ns-a"},
@@ -70,8 +70,8 @@ func TestBuildElements(t *testing.T) {
 				},
 			},
 			wantNodes: []map[string]string{
-				{"id": "ns-a", "label": "a", "status": "Ready"},
-				{"id": "ns-c", "label": "c", "status": "Faulty"},
+				{"id": "ns-a", "label": "a", "type": "", "status": "Ready"},
+				{"id": "ns-c", "label": "c", "type": "", "status": "Faulty"},
 			},
 			wantEdges: []map[string]string{
 				{"id": "ns-c->ns-missing", "source": "ns-c", "target": "ns-missing"},

@@ -109,8 +109,8 @@ func TestGetDataCenterResources(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing node ns1-root in %+v", got)
 	}
-	if root.Label != "root" || root.Status != "ok" || len(root.Parents) != 0 {
-		t.Errorf("ns1-root = %+v, want label root, status ok, no parents", root)
+	if root.Label != "root" || root.Type != "pdu" || root.Status != "ok" || len(root.Parents) != 0 {
+		t.Errorf("ns1-root = %+v, want label root, type pdu, status ok, no parents", root)
 	}
 
 	child, ok := byName["ns1-child"]

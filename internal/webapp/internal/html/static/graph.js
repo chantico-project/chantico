@@ -82,6 +82,26 @@ const cy = window.cytoscape({
       },
     },
     {
+      selector: "node[type = 'pdu']",
+      style: { "shape": "rectangle" },
+    },
+    {
+      selector: "node[type = 'baremetal']",
+      style: { "shape": "star" },
+    },
+    {
+      selector: "node[type = 'vm']",
+      style: { "shape": "hexagon" },
+    },
+    {
+      selector: "node[type = 'kubernetes']",
+      style: { "shape": "diamond" },
+    },
+    {
+      selector: "node[type = 'heat']",
+      style: { "shape": "triangle" },
+    },
+    {
       selector: "node[status = 'faulty']",
       style: { "background-color": STYLE.faulty.color },
     },
