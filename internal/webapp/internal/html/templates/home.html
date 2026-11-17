@@ -28,7 +28,16 @@
 
     <main>
       <div class="layout">
-        <div id="graph" class="graph"></div>
+        <div id="graph" class="graph">
+          <ul class="graph-legend" aria-label="Node shapes">
+            <li><img class="legend-swatch" src="/static/shapes/rectangle.svg" alt="">PDU</li>
+            <li><img class="legend-swatch" src="/static/shapes/roundrectangle.svg" alt="">Bare metal</li>
+            <li><img class="legend-swatch" src="/static/shapes/hexagon.svg" alt="">VM</li>
+            <li><img class="legend-swatch" src="/static/shapes/diamond.svg" alt="">Kubernetes</li>
+            <li><img class="legend-swatch" src="/static/shapes/triangle.svg" alt="">Heat</li>
+            <li><img class="legend-swatch" src="/static/shapes/ellipse.svg" alt="">Other</li>
+          </ul>
+        </div>
         <div id="divider" class="divider" role="separator" aria-orientation="vertical"></div>
         <aside class="panel">
           <div id="panel-content"

@@ -150,6 +150,38 @@ main {
   border-left: var(--border-width-accent) solid var(--color-accent);
 }
 
+.graph-legend {
+  position: absolute;
+  bottom: var(--space-sm);
+  left: var(--space-sm);
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  max-width: calc(100% - var(--space-md));
+  margin: var(--zero);
+  padding: var(--space-xs) var(--space-sm);
+  list-style: none;
+  pointer-events: none;
+  font-size: var(--font-size-badge);
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.graph-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: var(--graph-node-size);
+  height: var(--graph-node-size);
+}
+
 .divider {
   flex: 0 0 var(--divider-width);
   cursor: col-resize;
