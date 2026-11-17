@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"time"
 
+	"sigs.k8s.io/yaml"
+
+	"chantico/api/v1alpha1"
 	"chantico/internal/webapp/internal/graph"
 	"chantico/internal/webapp/internal/html"
 	"chantico/internal/webapp/internal/kubernetes"
@@ -34,6 +37,8 @@ func New(h *HTTPServerHandler, config *HTTPServerConfig) *HTTPServer {
 	mux.HandleFunc("GET /", h.HomePage)
 	mux.HandleFunc("GET /api/graph", h.GraphAPI)
 	mux.HandleFunc("GET /api/nodes/{id}", h.NodeAPI)
+	mux.HandleFunc("PUT /api/nodes/{id}", h.UpdateNodeAPI)
+	mux.HandleFunc("DELETE /api/nodes/{id}", h.DeleteNodeAPI)
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(html.StaticFS()))))
 
 	server := &http.Server{
@@ -84,6 +89,60 @@ func (h *HTTPServerHandler) NodeAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.renderNode(w, id, dcr)
+}
+
+func (h *HTTPServerHandler) UpdateNodeAPI(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	dcr, err := h.Kubernetes.UpdateDataCenterResource(id, []byte(r.PostFormValue("manifest")))
+	if errors.Is(err, kubernetes.ErrNotFound) {
+		http.Error(w, "node not found", http.StatusNotFound)
+		return
+	}
+	if errors.Is(err, kubernetes.ErrInvalidManifest) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	h.renderNode(w, id, dcr)
+}
+
+func (h *HTTPServerHandler) DeleteNodeAPI(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	err := h.Kubernetes.DeleteDataCenterResource(id)
+	if errors.Is(err, kubernetes.ErrNotFound) {
+		http.Error(w, "node not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", "node-deleted")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(`<h2>Selected node</h2><p>None</p>`))
+
+}
+
+func (h *HTTPServerHandler) renderNode(w http.ResponseWriter, id string, dcr *v1alpha1.DataCenterResource) {
+	manifest, err := yaml.Marshal(dcr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	parents := dcr.Spec.ParentNames()
 	data := html.NodePartialData{
 		ID:                   id,
@@ -93,6 +152,7 @@ func (h *HTTPServerHandler) NodeAPI(w http.ResponseWriter, r *http.Request) {
 		Parents:              parents,
 		EnergyMetric:         dcr.Spec.EnergyMetric,
 		PhysicalMeasurements: dcr.Spec.PhysicalMeasurements,
+		Manifest:             string(manifest),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

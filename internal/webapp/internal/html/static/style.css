@@ -150,3 +150,37 @@ main {
   word-break: break-all;
   color: var(--color-foreground);
 }
+
+.panel-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.panel-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.panel-form span {
+  color: var(--color-label);
+  font-weight: var(--font-weight-bold);
+}
+
+.panel-form input,
+.panel-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  font-family: var(--font-family-mono);
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.panel-form textarea {
+  resize: vertical;
+}

@@ -52,6 +52,7 @@ type NodePartialData struct {
 	Parents              []string
 	EnergyMetric         string
 	PhysicalMeasurements []string
+	Manifest             string
 }
 
 func (r *TemplateRenderer) RenderNodePartial(w io.Writer, d NodePartialData) error {
