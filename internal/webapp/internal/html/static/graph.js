@@ -40,6 +40,7 @@ const STYLE = {
   selected: { color: cssToken("--graph-node-selected-color") },
   faulty: { color: cssToken("--graph-node-faulty-color") },
   pending: { color: cssToken("--graph-node-pending-color") },
+  ok: { color: cssToken("--graph-node-ok-color") },
   edge: {
     width: cssNumber("--graph-edge-width"),
     color: cssToken("--graph-edge-color"),
@@ -100,6 +101,10 @@ const cy = window.cytoscape({
     {
       selector: "node[type = 'heat']",
       style: { "shape": "triangle" },
+    },
+    {
+      selector: "node[status = 'ok']",
+      style: { "background-color": STYLE.ok.color },
     },
     {
       selector: "node[status = 'faulty']",

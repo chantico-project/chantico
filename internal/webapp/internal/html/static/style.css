@@ -41,6 +41,7 @@
   --graph-node-selected-color: var(--color-selected);
   --graph-node-faulty-color: var(--color-faulty);
   --graph-node-pending-color: var(--color-pending);
+  --graph-node-ok-color: var(--color-accent);
   --graph-node-label-color: var(--color-foreground);
   --graph-edge-color: var(--color-border);
   --graph-node-size: 18;
