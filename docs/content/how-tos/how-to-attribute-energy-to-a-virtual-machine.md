@@ -59,8 +59,9 @@ hypervisor -> vm1
 hypervisor -> vm2
 ```
 
-This example uses three `PhysicalMeasurement` resources and five
-`DataCenterResource` resources.
+In the diagram, the two PDU sockets and the Alumet exporter are the three
+`PhysicalMeasurement` resources. The two socket resources, bare-metal host, and
+two VMs are the five `DataCenterResource` resources.
 
 ## 1. Install Alumet on the hypervisor
 
@@ -154,10 +155,11 @@ Create a `PhysicalMeasurement` that points to the hypervisor's Alumet exporter.
 Set `spec.ip` to an address and port reachable from Prometheus:
 
 ```yaml
+# physicalmeasurement-bm-01.yaml
 apiVersion: chantico-project.github.io/v1alpha1
 kind: PhysicalMeasurement
 metadata:
-  name: physicalmeasurement-hypervisor-01
+  name: physicalmeasurement-bm-01
   namespace: chantico
 spec:
   type: prometheus-exporter
@@ -167,14 +169,14 @@ spec:
 Apply the manifest:
 
 ```sh
-kubectl apply -f physicalmeasurement-hypervisor-01.yaml
+kubectl apply -f physicalmeasurement-bm-01.yaml
 ```
 
 Chantico adds this target to Prometheus's exporter scrape configuration. Check
 that it is ready and that Prometheus can scrape it:
 
 ```sh
-kubectl describe -n chantico physicalmeasurement physicalmeasurement-hypervisor-01
+kubectl describe -n chantico physicalmeasurement physicalmeasurement-bm-01
 ```
 
 In Prometheus, open **Status > Targets** and confirm the target is `UP`. You
@@ -190,8 +192,8 @@ returns its share of the host's energy.
 The repository includes a basic Proxmox 9 Alumet template in
 [proxmox_alumet_vm_attribution_basic.yaml](https://github.com/chantico-project/chantico/blob/main/config/samples/attribution-templates/proxmox_alumet_vm_attribution_basic.yaml).
 It uses `cpu_percent_alumet_ratio` and expects `resourceName` to match the
-hypervisor's `PhysicalMeasurement` name and `vmid` to match the VM's ID in Proxmox. Apply
-it from the repository root:
+bare-metal host's `PhysicalMeasurement` name and `vmid` to match the VM's 
+ID in Proxmox. Apply it from the repository root:
 
 ```sh
 kubectl apply -n chantico -f config/samples/attribution-templates/proxmox_alumet_vm_attribution_basic.yaml
@@ -204,15 +206,16 @@ attributable to the VM. Change the ConfigMap name in the VM resource to match
 your own:
 
 ```yaml
+# datacenterresource-bm-01-vm-120.yaml
 apiVersion: chantico-project.github.io/v1alpha1
 kind: DataCenterResource
 metadata:
-  name: datacenterresource-hypervisor-01-vm-120
+  name: datacenterresource-bm-01-vm-120
   namespace: chantico
 spec:
   type: vm
   parents:
-    - name: datacenterresource-hypervisor-01
+    - name: datacenterresource-bm-01
       coefficientFrom:
         valueFrom:
           configMapKeyRef:
@@ -220,25 +223,27 @@ spec:
             key: template
         templateParameters:
           - name: resourceName
-            value: physicalmeasurement-hypervisor-01
+            value: physicalmeasurement-bm-01
           - name: vmid
             value: "120"
 ```
 
-Replace `datacenterresource-hypervisor-01` with the name of the existing
+Replace `datacenterresource-bm-01` with the name of the existing
 bare-metal `DataCenterResource`, and set the VM identifier to match the
-hypervisor's cgroup. Repeat the VM resource with the appropriate cgroup for
-each VM. The ConfigMap and resources must be in the same namespace.
+ID assigned to that VM by your hypervisor. Under the hood, the Proxmox
+template uses this ID to select Alumet metrics for the VM's cgroup, where
+Linux accounts for the VM's resource usage. Repeat the VM resource with each
+VM's ID. The ConfigMap and resources must be in the same namespace.
 
 Apply the manifest and check the resource status:
 
 ```sh
-kubectl apply -f vm-attribution.yaml
-kubectl describe -n chantico datacenterresource datacenterresource-hypervisor-01-vm-120
+kubectl apply -f datacenterresource-bm-01-vm-120.yaml
+kubectl describe -n chantico datacenterresource datacenterresource-bm-01-vm-120
 ```
 
 Confirm the coefficient expression returns the intended series in Prometheus.
-If it returns no series, check the metric name, cgroup identifier, labels, and
-that the Alumet exporter is being scraped. A coefficient is evaluated for the
-VM's edge to its parent, so ensure the parent resource is the host whose energy
-is being apportioned.
+If it returns no series, check the metric name, VM ID and corresponding cgroup
+selector, labels, and that the Alumet exporter is being scraped. A coefficient
+is evaluated for the VM's edge to its parent, so ensure the parent resource is
+the host whose energy is being apportioned.
