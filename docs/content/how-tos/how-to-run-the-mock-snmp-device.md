@@ -73,7 +73,7 @@ snmpget -v2c -c public -M +./dev -m +TNO-PDU-MIB localhost:31161 tnoPduEnergyVal
 
 ### Full demo
 
-The demo connects the mock to Prometheus in three steps. The numbers in the diagram match the steps below. For what happens inside the controller, see the [system architecture]({{% relref "technical/controller-architecture.md" %}}) and its [SNMP configuration lifecycle]({{% relref "technical/controller-architecture.md#snmp-configuration-lifecycle" %}}).
+The demo connects the mock to Prometheus in three steps. The numbers in the diagram match the steps below. For what happens inside the controller, see the [system architecture]({{% relref "technical/controller-architecture.md" %}}).
 
 ```kroki {_type=plantuml}
 actor User
