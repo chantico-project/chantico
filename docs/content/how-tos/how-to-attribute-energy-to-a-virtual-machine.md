@@ -35,11 +35,18 @@ direction: right
 socket1: "PDU Socket 1"
 socket2: "PDU Socket 2"
 
-hypervisor: {
-  label: "Hypervisor"
+baremetal: {
+  label: "Bare Metal"
   style: {
     fill: "#FFF3E0"
     stroke: "#E69B00"
+  }
+
+  hypervisor: "Hypervisor" {
+    style: {
+      fill: "#FFE082"
+      stroke: "#8D6E00"
+    }
   }
 
   alumet: "Alumet Agent" {
@@ -53,15 +60,13 @@ hypervisor: {
 vm1: "Virtual Machine 1"
 vm2: "Virtual Machine 2"
 
-socket1 -> hypervisor
-socket2 -> hypervisor
-hypervisor -> vm1
-hypervisor -> vm2
+socket1 -> baremetal
+socket2 -> baremetal
+baremetal -> vm1
+baremetal -> vm2
 ```
 
-In the diagram, the two PDU sockets and the Alumet exporter are the three
-`PhysicalMeasurement` resources. The two socket resources, bare-metal host, and
-two VMs are the five `DataCenterResource` resources.
+In the diagram, the two PDU sockets and Alumet running on the bare metal alongside the Hypervisor. The metrics gathered by the Alumet instance running on the baremetal are used to attribute energy to the VMs running on the baremetal.
 
 ## 1. Install Alumet on the hypervisor
 
