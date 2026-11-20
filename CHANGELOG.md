@@ -2,13 +2,8 @@
 
 #### Feature
 
-* Improve webapp visualizer to show more nodes and update automatically (#278) (4c44c876)
-
-## 0.27.0 (2026-11-17)
-
-#### Feature
-
-* Improve webapp visualizer to show more nodes and update automatically (#278) (4c44c876)
+* Improve webapp visualizer to show more nodes and update automatically (#278) 
+* Pod affinity, seperate VictoriaMetrics pvc, MIB to SNMP config in ConfigMaps (#283) (195c2964)
 
 ## 0.26.0 (2026-11-17)
 
