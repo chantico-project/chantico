@@ -9,8 +9,11 @@ rules:
   resources:
   - configmaps
   verbs:
+  - create
+  - delete
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - ""
@@ -19,6 +22,7 @@ rules:
   verbs:
   - get
   - list
+  - watch
 - apiGroups:
   - apps
   resources:
@@ -80,3 +84,16 @@ rules:
   - create
   - patch
   - update
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - prometheusrules
+  - scrapeconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

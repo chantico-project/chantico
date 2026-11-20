@@ -1,3 +1,85 @@
+## 0.27.0 (2026-11-20)
+
+#### Feature
+
+* Improve webapp visualizer to show more nodes and update automatically (#278) 
+* Pod affinity, seperate VictoriaMetrics pvc, MIB to SNMP config in ConfigMaps (#283) (195c2964)
+
+## 0.26.0 (2026-11-17)
+
+#### Feature
+
+* Use Prometheus Operator (#279) (0f0a954d)
+
+## 0.25.0 (2026-11-13)
+
+#### Feature
+
+* Drop unused PhysicalMeasurements field from DataCenterResource (#284) (ec96b625)
+
+#### Chores
+
+* **docs:** Support generation of diagrams in documentation (#269) (0173d76a)
+
+## 0.24.0 (2026-11-05)
+
+#### Feature
+
+* Create a stress test to find the limit of custom resources deployed (#268) (6b64b838)
+
+## 0.23.1 (2026-11-04)
+
+#### Bug Fixes
+
+* **deploy:** Merge resource rules (#277) (ba6fe416)
+* **deploy:** Watch release namespace as default and add missing permission (#277) (1a7010ec)
+
+## 0.23.0 (2026-11-03)
+
+#### Feature
+
+* Replace resourceIds with additionalLabels on PhysicalMeasurement (#272) (51deb68b)
+
+## 0.22.0 (2026-11-02)
+
+#### Feature
+
+* Delete measurementdevice from different namespace, configure watch namespace (#232) (36d2adb7)
+
+#### Chores
+
+* **ci:** Upload coverage report to GitHub code coverage action bot (#204) (5dee2a8e)
+
+## 0.21.0 (2026-10-30)
+
+#### Feature
+
+* Drop serviceId from data center resource, favor additionalLabel instead (#265) (202c3631)
+
+## 0.20.0 (2026-10-27)
+
+#### Feature
+
+* Refactor template params use secret config map selector (#258) (4a2d04dc)
+
+## 0.19.0 (2026-10-26)
+
+#### Feature
+
+* Physical measurement type prometheus exporter (#240) (68e08403)
+
+## 0.18.2 (2026-10-16)
+
+#### Bug Fixes
+
+* Deployment for dcr graph visualisation webapp (#254) (385a2354)
+
+## 0.18.1 (2026-10-15)
+
+#### Bug Fixes
+
+* Remove patch helper, use external patch package for referenced DCR (#262) (fd56a8cb)
+
 ## 0.18.0 (2026-10-09)
 
 #### Feature

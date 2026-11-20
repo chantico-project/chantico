@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"net"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -30,6 +31,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -39,7 +41,13 @@ import (
 	chanticov1alpha1 "chantico/api/v1alpha1"
 	config "chantico/internal/configuration"
 	"chantico/internal/controller"
+	"chantico/internal/datacenterresource"
 	"chantico/internal/filestore"
+	md "chantico/internal/measurementdevice"
+	"chantico/internal/physicalmeasurement"
+
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -52,7 +60,30 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(chanticov1alpha1.AddToScheme(scheme))
+
+	// Kube Prometheus Operator Schemas
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
+	utilruntime.Must(monitoringv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
+}
+
+func configureWatchNamespace() cache.Options {
+	cacheOpts := cache.Options{}
+	if config.ValidatedEnv.WatchNamespace != config.AllNamespaces {
+		setupLog.Info("restricting watches to a single namespace", "namespace", config.ValidatedEnv.WatchNamespace)
+		cacheOpts.DefaultNamespaces = map[string]cache.Config{
+			config.ValidatedEnv.WatchNamespace: {},
+		}
+		// The SNMP exporter Deployment always lives in the operator's own namespace,
+		// regardless of which namespace is being watched for custom resources, so
+		// include operator namespace when it differs from the watch namespace.
+		if config.ValidatedEnv.PodNamespace != config.ValidatedEnv.WatchNamespace {
+			cacheOpts.DefaultNamespaces[config.ValidatedEnv.PodNamespace] = cache.Config{}
+		}
+	} else {
+		setupLog.Info("watching resources in all namespaces")
+	}
+	return cacheOpts
 }
 
 func main() {
@@ -124,19 +155,6 @@ func main() {
 		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		Metrics:                metricsServerOptions,
-		WebhookServer:          webhookServer,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "c8b0fb2f.chantico-project.github.io",
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
 	var errs []error
 	config.ValidatedEnv, errs = config.ValidateEnv()
 	if errs != nil {
@@ -146,24 +164,69 @@ func main() {
 		os.Exit(1)
 	}
 
+	// MIB uploads and the generator Jobs expect this directory on the data volume.
+	fileStore := filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation}
+	mibsDir := fileStore.Resolve(md.MibsSubDir)
+	if err := os.MkdirAll(mibsDir, 0777); err != nil {
+		setupLog.Error(err, "unable to create MIB directory", "path", mibsDir)
+		os.Exit(1)
+	}
+	outputDir := fileStore.Resolve(md.GeneratorOutputSubDir)
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
+		setupLog.Error(err, "unable to create generator output directory", "path", outputDir)
+		os.Exit(1)
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:                 scheme,
+		Metrics:                metricsServerOptions,
+		WebhookServer:          webhookServer,
+		HealthProbeBindAddress: probeAddr,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "c8b0fb2f.chantico-project.github.io",
+		Cache:                  configureWatchNamespace(),
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	ctx := ctrl.SetupSignalHandler()
+	if err := controller.EnsureMergedSNMPConfig(ctx, mgr.GetAPIReader(), mgr.GetClient(), config.ValidatedEnv.PodNamespace); err != nil {
+		setupLog.Error(err, "unable to create initial SNMP ConfigMap")
+		os.Exit(1)
+	}
+
 	if err = (&controller.MeasurementDeviceReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Filestore: filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation},
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Jobs:   md.SNMPGeneratorJobBuilder{},
+		Files:  fileStore,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)
 	}
+
+	targetConfigurer := &physicalmeasurement.PrometheusTargetConfigurer{
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		SNMPExporterAddress: net.JoinHostPort(config.ValidatedEnv.SnmpExporterServiceHost, config.ValidatedEnv.SnmpExporterServicePort),
+	}
 	if err = (&controller.PhysicalMeasurementReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:           mgr.GetClient(),
+		TargetConfigurer: targetConfigurer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PhysicalMeasurement")
 		os.Exit(1)
 	}
-	if err := (&controller.DataCenterResourceReconciler{
+
+	ruleConfigurer := &datacenterresource.PrometheusRecordingRuleConfigurer{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+	}
+	if err := (&controller.DataCenterResourceReconciler{
+		Client:         mgr.GetClient(),
+		RuleConfigurer: ruleConfigurer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DataCenterResource")
 		os.Exit(1)
@@ -180,7 +243,7 @@ func main() {
 	}
 
 	setupLog.Info("Starting Chantico manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

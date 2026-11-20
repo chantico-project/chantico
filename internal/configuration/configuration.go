@@ -1,27 +1,101 @@
 package configuration
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
-	ChanticoVolumeLocationEnv        = "CHANTICO_DATA_PATH"
-	ChanticoVolumeClaimEnv           = "CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME"
-	ChanticoPrometheusServiceHostEnv = "CHANTICO_PROMETHEUS_SERVICE_HOST"
-	ChanticoPrometheusServicePortEnv = "CHANTICO_PROMETHEUS_SERVICE_PORT"
-	ValidateHostPortTimeout          = 5 * time.Second
+	ChanticoVolumeLocationEnv          = "CHANTICO_DATA_PATH"
+	ChanticoVolumeClaimEnv             = "CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME"
+	ChanticoSnmpExporterServiceHostEnv = "CHANTICO_SNMP_EXPORTER_SERVICE_HOST"
+	ChanticoSnmpExporterServicePortEnv = "CHANTICO_SNMP_EXPORTER_SERVICE_PORT"
+	ChanticoNamespaceEnv               = "CHANTICO_NAMESPACE"
+	ChanticoWatchNamespaceEnv          = "CHANTICO_WATCH_NAMESPACE"
+	ValidateHostPortTimeout            = 5 * time.Second
+
+	// AllNamespaces is the sentinel value for ChanticoWatchNamespaceEnv that makes the operator
+	// watch resources in every namespace instead of a single one.
+	AllNamespaces = "*"
 )
 
+type UnsetError struct {
+	VarName string
+}
+
+func (e UnsetError) Error() string {
+	return fmt.Sprintf("environment variable %s is not set", e.VarName)
+}
+
+type EmptyError struct {
+	VarName string
+}
+
+func (e EmptyError) Error() string {
+	return fmt.Sprintf("environment variable %s is an empty string", e.VarName)
+}
+
+type InvalidError struct {
+	VarName string
+	Value   string
+	Reason  string
+	Err     error
+}
+
+func (e InvalidError) Error() string {
+	msg := fmt.Sprintf("environment variable %s ('%s') is not valid: %s", e.VarName, e.Value, e.Reason)
+	if e.Err != nil {
+		msg = fmt.Sprintf("%s. %v", msg, e.Err)
+	}
+	return msg
+}
+
+func (e InvalidError) Unwrap() error {
+	return e.Err
+}
+
+type ConnectErrorType string
+
+const (
+	ConnectErrorTypeHost    ConnectErrorType = "host"
+	ConnectErrorTypeAddress ConnectErrorType = "address"
+)
+
+type ConnectError struct {
+	Type     ConnectErrorType
+	VarNames []string
+	Value    string
+	Reason   string
+	Err      error
+}
+
+func (e ConnectError) Error() string {
+	return fmt.Sprintf("cannot connect to %s %s (from environment variable %v): %s. %v", e.Type, e.Value, e.VarNames, e.Err, e.Reason)
+}
+
+func (e ConnectError) Unwrap() error {
+	return e.Err
+}
+
 type validatedEnv struct {
-	VolumeLocation        string
-	VolumeClaim           string
-	PrometheusServiceHost string
-	PrometheusServicePort string
+	VolumeLocation          string
+	VolumeClaim             string
+	SnmpExporterServiceHost string
+	SnmpExporterServicePort string
+	// PodNamespace is the namespace the operator is deployed in.
+	PodNamespace string
+	// WatchNamespace is either a single namespace name to restrict watches to,
+	// or `config.AllNamespaces` to watch every namespace. It defaults to the
+	// namespace the operator is deployed in.
+	WatchNamespace string
 }
 
 var ValidatedEnv validatedEnv
@@ -29,42 +103,36 @@ var ValidatedEnv validatedEnv
 func ValidateEnv() (validatedEnv, []error) {
 	var errs []error
 	var ret validatedEnv
-	volumeClaim, err := validateVar(ChanticoVolumeClaimEnv, validateClaim)
-	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.VolumeClaim = volumeClaim
+
+	podNamespace, watchNamespace, nsErrs := validateNamespaces()
+	ret.PodNamespace = podNamespace
+	ret.WatchNamespace = watchNamespace
+	if nsErrs != nil {
+		errs = append(errs, nsErrs...)
 	}
 
-	volumeLocation, err := validateVar(ChanticoVolumeLocationEnv, validateLocation)
-	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.VolumeLocation = volumeLocation
+	// List of environment variables to validate, the callback to validate them,
+	// and the field in the validatedEnv struct to store the validated value in.
+	varsToValidate := []struct {
+		VarName   string
+		Validator func(string, string) error
+		Field     *string
+	}{
+		{ChanticoVolumeClaimEnv, validateClaim, &ret.VolumeClaim},
+		{ChanticoVolumeLocationEnv, validateLocation, &ret.VolumeLocation},
+		{ChanticoSnmpExporterServiceHostEnv, validateHost, &ret.SnmpExporterServiceHost},
+		{ChanticoSnmpExporterServicePortEnv, validatePort, &ret.SnmpExporterServicePort},
 	}
 
-	prometheusServiceHost, err := validateVar(ChanticoPrometheusServiceHostEnv, validateHost)
-	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.PrometheusServiceHost = prometheusServiceHost
-	}
-
-	prometheusServicePort, err := validateVar(ChanticoPrometheusServicePortEnv, validatePort)
-	if err != nil {
-		errs = append(errs, err)
-	} else {
-		ret.PrometheusServicePort = prometheusServicePort
-	}
-
-	if ret.PrometheusServiceHost != "" && ret.PrometheusServicePort != "" {
-		err = validateHostPort(prometheusServiceHost, prometheusServicePort)
+	for _, v := range varsToValidate {
+		value, err := validateVar(v.VarName, v.Validator)
 		if err != nil {
 			errs = append(errs, err)
-			ret.PrometheusServiceHost = ""
-			ret.PrometheusServicePort = ""
+		} else {
+			*v.Field = value
 		}
 	}
+
 	if len(errs) > 0 {
 		return ret, errs
 	}
@@ -72,29 +140,40 @@ func ValidateEnv() (validatedEnv, []error) {
 	return ret, nil
 }
 
-func validateHostPort(host, port string) error {
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), ValidateHostPortTimeout)
+func validateHostPort(varNames []string, host, port string) error {
+	addr := net.JoinHostPort(host, port)
+	conn, err := net.DialTimeout("tcp", addr, ValidateHostPortTimeout)
 	if err != nil {
-		return fmt.Errorf("cannot connect to host '%s': %w. If this is a development environment, make sure port forwarding has started", net.JoinHostPort(host, port), err)
+		return ConnectError{Type: ConnectErrorTypeAddress, VarNames: varNames, Value: addr, Reason: "If this is a development environment, make sure port forwarding has started", Err: err}
 	} else {
 		err = conn.Close()
 		if err != nil {
-			return fmt.Errorf("error closing connection to host '%s': %w", net.JoinHostPort(host, port), err)
+			return ConnectError{Type: ConnectErrorTypeAddress, VarNames: varNames, Value: addr, Reason: "error closing connection to host", Err: err}
 		}
 		return nil
 	}
 }
 
-func validateVar(varName string, extraTest func(string) error) (string, error) {
+func validateHostLookup(varName, value string) error {
+	addrs, err := net.LookupHost(value)
+	if err != nil {
+		return ConnectError{Type: ConnectErrorTypeHost, VarNames: []string{varName}, Value: value, Reason: "error looking up host (is it a valid address?)", Err: err}
+	}
+	if len(addrs) == 0 {
+		return ConnectError{Type: ConnectErrorTypeHost, VarNames: []string{varName}, Value: value, Reason: "lookup for host returned empty, is it a valid address?"}
+	}
+	return nil
+}
+
+func validateVar(varName string, extraTest func(string, string) error) (string, error) {
 	value, ok := os.LookupEnv(varName)
 	if !ok {
-		return value, fmt.Errorf("environment variable %s must be set", varName)
-
+		return value, UnsetError{VarName: varName}
 	}
 	if value == "" {
-		return value, fmt.Errorf("environment variable %s is an empty string", varName)
+		return value, EmptyError{VarName: varName}
 	}
-	if err := extraTest(value); err != nil {
+	if err := extraTest(varName, value); err != nil {
 		fmt.Println(err)
 		return value, err
 	}
@@ -102,40 +181,70 @@ func validateVar(varName string, extraTest func(string) error) (string, error) {
 
 }
 
-func validateClaim(value string) error {
+func validateClaim(varName string, value string) error {
 	if matched, _ := regexp.Match("^([[:alpha:]]*-)+([[:alpha:]]*)$", []byte(value)); !matched {
-		return fmt.Errorf("environment variable %s ('%s') is not a valid PVC name, should look like 'chantico-snmp-prometheus-volume-claim'", ChanticoVolumeClaimEnv, value)
+		return InvalidError{VarName: varName, Value: value, Reason: "PVC name should look like 'chantico-snmp-prometheus-volume-claim'"}
 	}
 	return nil
 
 }
 
-func validateLocation(value string) error {
+func validateLocation(varName string, value string) error {
 	fileInfo, err := os.Stat(value)
 	if err != nil {
-		return fmt.Errorf("cannot find directory specified by environment variable %s (directory '%s') (error: '%w'), should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeLocationEnv, value, err)
+		return InvalidError{VarName: varName, Value: value, Reason: "cannot find directory, should look like '.chantico-persistent-volume' or an absolute path", Err: err}
 	}
 	if !fileInfo.IsDir() {
-		return fmt.Errorf("environment variable %s ('%s') is not a directory, should look like '/tmp/chantico-local-path-data/pvc-e95a75f9-46fc-450c-9ef8-ba959560d515_chantico_chantico-snmp-prometheus-volume-claim'", ChanticoVolumeLocationEnv, value)
+		return InvalidError{VarName: varName, Value: value, Reason: "must be a directory, should look like '.chantico-persistent-volume' or an absolute path"}
 	}
 	return nil
 }
 
-func validateHost(value string) error {
-	addrs, err := net.LookupHost(value)
-	if err != nil {
-		return fmt.Errorf("error looking up prometheus host %s ('%s'), is it a valid address?", ChanticoPrometheusServiceHostEnv, value)
+func validateHost(varName string, value string) error {
+	if net.ParseIP(value) != nil || len(validation.IsDNS1123Subdomain(value)) == 0 {
+		return nil
 	}
-	if len(addrs) == 0 {
-		return fmt.Errorf("lookup for prometheus host %s ('%s') returned empty, is it a valid address?", ChanticoPrometheusServiceHostEnv, value)
-	}
-	return nil
+	return InvalidError{VarName: varName, Value: value, Reason: "must be a valid IP address or DNS name"}
 }
 
-func validatePort(value string) error {
+func validatePort(varName string, value string) error {
 	_, err := strconv.ParseUint(value, 10, 16)
 	if err != nil {
-		return fmt.Errorf("error converting prometheus port %s ('%s') to a 16-bit integer, is it a valid port?", ChanticoPrometheusServicePortEnv, value)
+		return InvalidError{VarName: varName, Value: value, Reason: "error converting to a 16-bit integer, is it a valid port?", Err: err}
 	}
 	return nil
+}
+
+func lookupNamespace(envName string, allNamespacesAllowed bool) (string, error) {
+	namespace, ok := os.LookupEnv(envName)
+	if !ok {
+		return namespace, UnsetError{VarName: envName}
+	}
+	if namespace == "" {
+		return namespace, EmptyError{VarName: envName}
+	}
+	if allNamespacesAllowed && namespace == AllNamespaces {
+		return namespace, nil
+	}
+	if errMsgs := validation.IsDNS1123Label(namespace); len(errMsgs) > 0 {
+		return namespace, InvalidError{VarName: envName, Value: namespace, Reason: strings.Join(errMsgs, "; ")}
+	}
+	return namespace, nil
+}
+
+func validateNamespaces() (string, string, []error) {
+	podNamespace, podErr := lookupNamespace(ChanticoNamespaceEnv, false)
+	watchNamespace, watchErr := lookupNamespace(ChanticoWatchNamespaceEnv, true)
+	if podErr != nil {
+		return "", "", []error{podErr, watchErr}
+	}
+	if watchErr != nil {
+		if errors.Is(watchErr, UnsetError{VarName: ChanticoWatchNamespaceEnv}) {
+			return podNamespace, podNamespace, nil
+		} else {
+			return "", "", []error{watchErr}
+		}
+	}
+
+	return podNamespace, watchNamespace, nil
 }

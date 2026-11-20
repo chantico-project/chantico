@@ -1,9 +1,6 @@
 package snmp
 
 import (
-	"chantico/internal/filestore"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -79,20 +76,14 @@ func TestSortedConfigsIsDeterministic(t *testing.T) {
 	}
 }
 
-func TestGetMergedSortedSNMPConfig(t *testing.T) {
-	dir := t.TempDir()
-
-	// per-device files (only snmp-*.yaml are picked up)
-	writeFile(t, filepath.Join(dir, "snmp-a.yaml"), []byte(yamlSNMPConfigFoo))
-	writeFile(t, filepath.Join(dir, "snmp-b.yaml"), []byte(yamlSNMPConfigBar))
-	// must be excluded
-	writeFile(t, filepath.Join(dir, "snmp.yml"), []byte("ignored: true\n"))
-	writeFile(t, filepath.Join(dir, "snmp-empty.yaml"), []byte(""))
-	writeFile(t, filepath.Join(dir, "other.txt"), []byte("ignored"))
-
-	merged, err := GetMergedSortedSNMPConfig(filestore.VolumeFileStore{Root: dir}, "")
+func TestMergeSortedSNMPConfigs(t *testing.T) {
+	merged, err := MergeSortedSNMPConfigs(map[string][]byte{
+		"a":     []byte(yamlSNMPConfigFoo),
+		"b":     []byte(yamlSNMPConfigBar),
+		"empty": []byte(""),
+	})
 	if err != nil {
-		t.Fatalf("GetMergedSortedSNMPConfig: %v", err)
+		t.Fatalf("MergeSortedSNMPConfigs: %v", err)
 	}
 
 	var out MergedConfig
@@ -105,16 +96,12 @@ func TestGetMergedSortedSNMPConfig(t *testing.T) {
 	if _, ok := out.Auths["bar"]; !ok {
 		t.Errorf("missing bar auth in merged output")
 	}
-	if _, ok := out.Auths["ignored"]; ok {
-		t.Errorf("snmp.yml content leaked into merged output")
-	}
 }
 
-func TestGetMergedSortedSNMPConfigMissingDir(t *testing.T) {
-	dir := t.TempDir()
-	merged, err := GetMergedSortedSNMPConfig(filestore.VolumeFileStore{Root: ""}, filepath.Join(dir, "does-not-exist"))
+func TestMergeSortedSNMPConfigsNothing(t *testing.T) {
+	merged, err := MergeSortedSNMPConfigs(nil)
 	if err != nil {
-		t.Fatalf("expected nil error for missing dir, got %v", err)
+		t.Fatalf("expected nil error, got %v", err)
 	}
 	// merge of nothing should be a valid empty MergedConfig
 	var out MergedConfig
@@ -135,12 +122,5 @@ func TestHashStable(t *testing.T) {
 	}
 	if a == c {
 		t.Errorf("Hash collision foo==bar")
-	}
-}
-
-func writeFile(t *testing.T, path string, b []byte) {
-	t.Helper()
-	if err := os.WriteFile(path, b, 0777); err != nil {
-		t.Fatalf("write %s: %v", path, err)
 	}
 }

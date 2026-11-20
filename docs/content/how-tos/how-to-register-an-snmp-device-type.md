@@ -19,10 +19,9 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
     1. Login with (user: admin, password: admin)
     1. Upload your MIBS files in `snmp/mibs`
 1. Create the MeasurementDevice matching the required type of MeasurementDevice
-    1. Create a `measurement_device.yaml` file. The SNMP authentication is 
-       provided through `spec.authFrom`, which reads it from a `Secret` (see 
-       [Providing SNMP authentication](#providing-snmp-authentication) for 
-       other options):
+     1. Create a `measurement_device.yaml` file. The SNMP authentication is 
+        provided through `spec.authFrom`, which reads it from a `Secret` (see 
+        [Providing SNMP authentication]({{< relref "#providing-snmp-authentication" >}}) section for other options):
 
         ```yaml
           apiVersion: v1
@@ -59,9 +58,13 @@ In our First use-case (see `goal.md`) this corresponds to the `registerPDU` phas
 1. Verify the new device setting
     1. Wait for the SNMP generator job to complete
         ```sh
-        kubectl get jobs -n chantico | grep update-snmp
+        kubectl wait -n chantico --for=condition=complete --timeout=5m job/example-measurement-device
         ```
-    1. The generated config is stored on the shared volume at `snmp/yml/snmp.yml`.
+    1. The Job runs an upstream SNMP generator container. It reads MIBs and the generator ConfigMap and writes `snmp/output/<device-uid>/<generation>.yml` on the PVC.
+    1. On start, the operator creates the empty `chantico-snmp-config` ConfigMap if it does not already exist. After the Job completes, it reads the file for that device UID and generation, validates the YAML, and reconciles `<device>-snmp`. Missing or invalid output leaves the previous fragment unchanged. Generated files are removed only after the fragment is persisted, or when the device is deleted after its Jobs have terminated. Device fragments are merged into `chantico-snmp-config`, which the SNMP exporter mounts. The operator owns this ConfigMap.
+        ```sh
+        kubectl get configmap -n chantico chantico-snmp-config -o yaml
+        ```
     1. Port-forward the SNMP exporter
         ```sh
         kubectl port-forward -n chantico deployment/chantico-snmp 9116:9116
@@ -139,4 +142,3 @@ If two metrics have the same name, there are two methods to disambiguate. Let's 
 
 1. the user can fully qualify the "path" within the MIB tree via human readable language `TNO-PDU-MIB::tnoPduEnergyValue`
 1. the user can fully qualify the "path" within the MIB tree via the OID `1.3.6.1.4.99999.1`
-

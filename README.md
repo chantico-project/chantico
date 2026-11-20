@@ -1,4 +1,8 @@
-<img src="docs/assets/logo/chantico.png" width="400">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo/chantico-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo/chantico.png">
+  <img src="docs/assets/logo/chantico.png" alt="Chantico" width="400">
+</picture>
 
 ## Description
 

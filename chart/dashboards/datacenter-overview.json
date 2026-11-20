@@ -17,9 +17,22 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "id": 2,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [
+        "chantico"
+      ],
+      "targetBlank": false,
+      "title": "Chantico dashboards",
+      "type": "dashboards"
+    }
+  ],
   "panels": [
     {
       "datasource": {
@@ -36,9 +49,9 @@
       },
       "gridPos": {
         "h": 5,
-        "w": 13,
+        "w": 24,
         "x": 0,
-        "y": 0
+        "y": 4
       },
       "id": 1,
       "options": {
@@ -85,15 +98,15 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 13,
+        "h": 4,
+        "w": 5,
+        "x": 0,
         "y": 0
       },
       "id": 2,
       "options": {
         "colorMode": "none",
-        "graphMode": "none",
+        "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
@@ -115,6 +128,7 @@
           "expr": "sum(chantico_power_watts{type=\"pdu\"})",
           "instant": true,
           "legendFormat": "total",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -123,8 +137,10 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "chantico-prometheus"
       },
+      "description": "99th percentile of the actual Prometheus scrape interval (target: 10s).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -152,7 +168,7 @@
                   "index": 1,
                   "text": "OK"
                 },
-                "to": 10.08
+                "to": 10.5
               },
               "type": "range"
             },
@@ -194,9 +210,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 3,
-        "x": 21,
+        "h": 4,
+        "w": 4,
+        "x": 20,
         "y": 0
       },
       "id": 5,
@@ -232,6 +248,157 @@
         }
       ],
       "title": "Scraping interval",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "chantico-victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "mappings": [],
+          "unit": "watt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 5,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(chantico_power_watts{type=\"baremetal\"})",
+          "legendFormat": "total",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Total power (all baremetal)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "chantico-victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "mappings": [],
+          "unit": "watt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 10,
+        "y": 0
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(chantico_power_watts{type=\"vm\"})",
+          "legendFormat": "total",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Total power (all VMs)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "chantico-victoriametrics"
+      },
+      "description": "Energy drawn through all PDUs over the dashboard time range.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "mappings": [],
+          "unit": "watth"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 15,
+        "y": 0
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(avg_over_time(chantico_power_watts{type=\"pdu\"}[$__range])) * $__range_s / 3600",
+          "instant": true,
+          "legendFormat": "energy",
+          "refId": "A"
+        }
+      ],
+      "title": "PDU energy over range",
       "type": "stat"
     },
     {
@@ -275,6 +442,7 @@
             }
           },
           "mappings": [],
+          "min": 0,
           "unit": "watt"
         },
         "overrides": []
@@ -283,7 +451,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 9
       },
       "id": 3,
       "options": {
@@ -355,7 +523,14 @@
               "mode": "normal"
             }
           },
+          "links": [
+            {
+              "title": "Show VMs on ${__field.labels.resource}",
+              "url": "/d/chantico-baremetal-vms/baremetal-vm-overview?var-baremetal=${__field.labels.resource}&${__url_time_range}"
+            }
+          ],
           "mappings": [],
+          "min": 0,
           "unit": "watt"
         },
         "overrides": []
@@ -364,7 +539,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 21
       },
       "id": 4,
       "options": {
@@ -399,6 +574,198 @@
       ],
       "title": "Baremetal power consumption over time",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "chantico-victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 25,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "unit": "watt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "chantico_power_watts{type=\"vm\"}",
+          "legendFormat": "{{resource}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "VM power consumption over time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "chantico-victoriametrics"
+      },
+      "description": "All data center resources with their current power.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Power"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "id": 10,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Type"
+          }
+        ]
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "chantico_power_watts",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Resources",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "resource",
+                "type",
+                "parents",
+                "serviceId",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "resource": 0,
+              "type": 1,
+              "parents": 2,
+              "serviceId": 3,
+              "Value": 4
+            },
+            "renameByName": {
+              "Value": "Power",
+              "parents": "Parents",
+              "resource": "Resource",
+              "serviceId": "Service ID",
+              "type": "Type"
+            }
+          }
+        }
+      ],
+      "type": "table"
     }
   ],
   "preload": false,

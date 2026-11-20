@@ -7,7 +7,7 @@ menus:
     name: "Chantico"
 ---
 
-{{< figure src="logo/chantico.png" alt="Chantico" width="400" link="https://github.com/chantico-project/chantico" >}}
+{{< figure-darklight light-src="logo/chantico.png" dark-src="logo/chantico-dark.png" alt="Chantico" width="400" link="https://github.com/chantico-project/chantico" >}}
 
 Streamlining Energy Management for Cloud Operators.
 

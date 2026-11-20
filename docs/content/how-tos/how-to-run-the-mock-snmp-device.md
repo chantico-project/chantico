@@ -14,7 +14,7 @@ The SNMP mock is an UDP server mocking a device using SNMP with a mock MIB file
 following metrics: `tnoPduEnergyValue` and `tnoPduPowerValue`. This file details 
 how to set up the mock device, and how to subsequently run a demo with it 
 including both the `PhysicalMeasurement` and `MeasurementDevice` custom 
-resources.
+resources. The development setup deploys two SNMP mock devices.
 
 ### Simulated values
 
@@ -62,27 +62,40 @@ Attribution mock](how-to-run-the-mock-prometheus-exporter.md)).
 
 ## Running the demo with the mock SNMP device
 
-### Querying the chantico-snmp-mock running in the development setup
+### Querying the mock directly
 
-If the development kind cluster is running the `chantico-snmp-mock` service, there is a Node Port that is visible on port `31161`.
-
-It can be queried as follow:
+In the kind development cluster, the `chantico-snmp-mock` service is exposed on
+NodePort `31161`. Query it with:
 
 ```bash
 snmpget -v2c -c public -M +./dev -m +TNO-PDU-MIB localhost:31161 tnoPduEnergyValue
 ```
 
-### Chantico workflow with the snmp-mock as snmp device (full demo)
+### Full demo
 
-For an overview of the workflow that is run in the background in this demo please see the below image.
+The demo connects the mock to Prometheus in three steps. The numbers in the diagram match the steps below. For what happens inside the controller, see the [system architecture]({{% relref "technical/controller-architecture.md" %}}).
 
-![](../puml/PhysicalMeasurement-and-MeasurementDevice-sequence.png)
+```kroki {_type=plantuml}
+actor User
+participant "Chantico controller" as Controller
+participant "SNMP exporter" as SNMP
+participant "Prometheus" as Prom
+participant "SNMP mock" as Mock
 
-This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `PhysicalMeasurement` → Prometheus targets.
+User -> Controller: 1. Upload TNO-PDU-MIB (used to generate)
+User -> Controller: 2. Apply MeasurementDevice
+Controller -> SNMP: SNMP module + auth
+User -> Controller: 3. Apply PhysicalMeasurement
+Controller -> Prom: ScrapeConfig
+Prom -> SNMP: Scrape /snmp
+SNMP -> Mock: SNMP GET
+```
+
+`make cluster-mock-resources` applies the samples of steps 2 and 3 and the `DataCenterResource` sample from the next section in one go.
 
 1. Upload the MIB file `./dev/mibs/TNO-PDU-MIB.txt` to the cluster:
     ```bash
-    make cluster-mib
+    make cluster-mibs
     ```
 1. Create a `MeasurementDevice` for the mock MIB:
     ```bash
@@ -91,7 +104,8 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
     ```
 1. Wait for the SNMP generator job:
     ```bash
-    kubectl get jobs -n chantico -o wide | grep snmp-generator
+    kubectl get jobs -n chantico -o wide
+    ```
 1. Create a `PhysicalMeasurement` pointing at the mock target:
     ```bash
     kubectl apply -n chantico -f ./config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
@@ -103,44 +117,7 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
     ```
     Open http://localhost:19090/targets and verify the target is `UP`.
 
-### Adding another mock snmp device
-
-The same mock SNMP image can be deployed multiple times to simulate additional devices. Each additional device needs its own Deployment, Service, `MeasurementDevice`, and `PhysicalMeasurement`. Example manifests for a second mock device are provided in the repository.
-
-1. Deploy the second mock SNMP agent:
-    ```bash
-    kubectl apply -n chantico -f dev/k8s/snmp-mock-2-deployment.yaml
-    kubectl apply -n chantico -f dev/k8s/snmp-mock-2-service.yaml
-    ```
-1. Create a second `MeasurementDevice` (can reuse the same MIB/walks, or use 
-   different ones):
-    ```bash
-    kubectl apply -n chantico -f ./config/samples/chantico_v1alpha1_measurementdevice_mock2.yaml
-    ```
-1. Wait for the SNMP generator job for the new device:
-    ```bash
-    kubectl get jobs -n chantico | grep update-snmp
-    ```
-1. Create a second `PhysicalMeasurement` pointing at the new mock target:
-    ```bash
-    kubectl apply -n chantico -f ./config/samples/chantico_v1alpha1_physicalmeasurement_mock2.yaml
-    ```
-1. Verify both targets appear in Prometheus, port-forwarding if not already done 
-   by the local development environment:
-    ```bash
-    kubectl port-forward -n chantico deployment/chantico-prometheus 19090:9090
-    ```
-
-    Open http://localhost:19090/targets — both the original and the new target 
-    should show as `UP`.
-
-The second mock is exposed on NodePort `31162`, so you can also query it directly:
-
-```bash
-snmpget -v2c -c public -M +./dev -m +TNO-PDU-MIB localhost:31162 tnoPduEnergyValue
-```
-
-> **Tip:** To add more devices beyond the second, copy the mock-2 manifests, update the names (e.g. `chantico-snmp-mock-3`), pick a free NodePort, and create corresponding `MeasurementDevice` / `PhysicalMeasurement` resources. Prometheus will automatically pick up new targets via `file_sd_configs` — no restart required.
+> **Tip:** To add more devices beyond the second, copy the mock manifests, update the names (e.g. `chantico-snmp-mock-3`), pick a free NodePort, and create corresponding  `MeasurementDevice` / `PhysicalMeasurement` resources. Prometheus will automatically pick up new targets via `file_sd_configs` — no restart required.
 
 ### Adding baremetal resources and linking them to the mock SNMP device
 

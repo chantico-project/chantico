@@ -41,14 +41,6 @@ func (e ErrorUnknownType) Error() string {
 	return fmt.Sprintf("unknown type: %s", e.Type)
 }
 
-type ErrorMissingEnergyMetric struct {
-	InvolvedResource string
-}
-
-func (e ErrorMissingEnergyMetric) Error() string {
-	return fmt.Sprintf("root node (no parents) %s must have energyMetric set", e.InvolvedResource)
-}
-
 type ErrorServiceDefinedOnParent struct {
 	InvolvedResource string
 }
@@ -94,16 +86,12 @@ func FormatResources(resources []chantico.DataCenterResource) string {
 func validateGraph(
 	dataCenterResource *chantico.DataCenterResource,
 	dataCenterResources []chantico.DataCenterResource,
-	physicalMeasurements []chantico.PhysicalMeasurement,
 ) ([]chantico.DataCenterResource, string, error) {
 	resourcesMap := make(map[string]chantico.DataCenterResource)
 	visitedSet := make(map[string]bool)
 	for _, resource := range dataCenterResources {
 		if resource.DeletionTimestamp == nil {
 			resourcesMap[resource.ObjectMeta.Name] = resource
-		}
-		if dataCenterResource.Spec.ServiceId != "" && slices.Contains(resource.Spec.ParentNames(), dataCenterResource.Name) {
-			return []chantico.DataCenterResource{}, dataCenterResource.Name, ErrorServiceDefinedOnParent{InvolvedResource: dataCenterResource.Name}
 		}
 	}
 	queue := make([]string, 0)
@@ -117,9 +105,6 @@ func validateGraph(
 		current, ok := resourcesMap[queue[visited]]
 		if !ok {
 			return GetFromMap(resourcesMap, queue[0:visited]), queue[visited], ErrorResourceNotFound{InvolvedResource: queue[visited]}
-		}
-		if current.Spec.ServiceId != "" {
-			return GetFromMap(resourcesMap, queue[0:visited]), queue[visited], ErrorServiceDefinedOnParent{InvolvedResource: queue[visited]}
 		}
 		if slices.Contains(current.Spec.ParentNames(), dataCenterResource.ObjectMeta.Name) {
 			return GetFromMap(resourcesMap, queue[0:visited]), queue[visited], ErrorCycleDetected{InvolvedResource: queue[visited]}
@@ -142,14 +127,6 @@ func validateResourceType(dataCenterResource *chantico.DataCenterResource) error
 	}
 }
 
-// Root nodes (no parents) must have energyMetric set so Prometheus can source their energy timeseries.
-func validateEnergyMetric(dataCenterResource *chantico.DataCenterResource) error {
-	if len(dataCenterResource.Spec.Parents) == 0 && dataCenterResource.Spec.EnergyMetric == "" && dataCenterResource.Spec.EnergyMetricFrom == nil {
-		return ErrorMissingEnergyMetric{InvolvedResource: dataCenterResource.Name}
-	}
-	return nil
-}
-
 // ValidateAdditionalLabelNames rejects additional labels that are not valid Prometheus label names.
 func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResource) error {
 	for labelName := range dataCenterResource.Spec.AdditionalLabels {
@@ -162,23 +139,17 @@ func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResourc
 
 var validators = []func(*chantico.DataCenterResource) error{
 	validateResourceType,
-	validateEnergyMetric,
 	validateAdditionalLabelNames,
 }
 
 func Validate(
 	dataCenterResource *chantico.DataCenterResource,
 	dataCenterResources []chantico.DataCenterResource,
-	physicalMeasurements []chantico.PhysicalMeasurement,
 ) ([]chantico.DataCenterResource, string, error) {
-	involvedResources, involvedResourceName, err := validateGraph(dataCenterResource, dataCenterResources, physicalMeasurements)
+	involvedResources, involvedResourceName, err := validateGraph(dataCenterResource, dataCenterResources)
 	if err != nil {
 		return involvedResources, involvedResourceName, err
 	}
-
-	// Check if physical measurements exist
-	// TODO(user): For now this validation is skipped because we do not know which
-	// order the resources are created
 
 	for _, validate := range validators {
 		if err := validate(dataCenterResource); err != nil {

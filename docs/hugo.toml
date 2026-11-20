@@ -7,6 +7,10 @@ copyright = 'Copyright 2025-2026 TNO. Chantico is licensed under the <a href="ht
 [security]
 allowContent = ['.*']
 
+  [security.http]
+    # Hugo blocks localhost by default; allow the kroki server (kroki.io or a local container)
+    urls = ['^https://kroki\.io/', '^http://localhost:8000/']
+
 [markup]
   [markup.highlight]
     noClasses = false   # generates <span class="keyword"> for styling
@@ -14,7 +18,10 @@ allowContent = ['.*']
 
 [params]
 disableInlineCopyToClipBoard = true
-themeVariant = ['relearn-dark', 'relearn-light']
+themeVariant = [
+  { identifier = 'relearn-light' },
+  { identifier = 'relearn-dark' }
+]
 linkTitle = " " # only show logo in sidebar
 
 [params.sidebar]
@@ -28,4 +35,8 @@ linkTitle = " " # only show logo in sidebar
 
 [params.logo]
   direction = 'column'
-  src = 'logo/chantico.png'
+  src = 'logo/chantico-dark.png'
+
+[module]
+  [[module.imports]]
+    path = 'github.com/hugomods/kroki'

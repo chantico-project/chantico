@@ -26,21 +26,67 @@ To upgrade an existing chantico deployment to a new version, run `helm upgrade` 
 helm upgrade chantico oci://ghcr.io/chantico-project/charts/chantico --version <version> -n chantico
 ```
 
-## Using an alternative storage class
+## Prometheus Operator dependency
 
-The Chantico chart create a persistent volume claim to store Prometheus data.
-By default, the Chantico chart uses the `csi-rbd` storage class.
-As a user, you might want to use a different storage class.
-This can be done by overriding the `pvc.storageClassName` value when installing or upgrading Chantico.
+Chantico configures Prometheus through [Prometheus Operator](https://prometheus-operator.dev/). The Chantico chart depends on the [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) chart, which installs the operator, its CRDs and Grafana. Only these components are enabled; Alertmanager, node exporter, kube-state-metrics and the default rules are disabled. Chantico then creates a `Prometheus` resource that the operator turns into a running Prometheus instance.
+
+Grafana is configured under the `kube-prometheus-stack.grafana` key in the chart values, for example:
 
 ```bash
-helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set pvc.storageClassName="STORAGE_CLASS_NAME"
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set kube-prometheus-stack.grafana.adminPassword=<password>
 ```
+
+See [Prometheus Operator integration](/technical/prometheus-operator.md) for details.
+
+## Using an alternative storage class
+
+The Chantico chart creates two persistent volumes:
+
+- `pvc`: claim with data shared by the controller, SNMP generator jobs, filebrowser and Prometheus.
+- `victoriaMetrics.pvc`: settings of the claim template of the VictoriaMetrics StatefulSet.
+
+By default, both claims use the default storage class of the cluster. Override `storageClassName` when installing or upgrading Chantico. Each block also accepts `storage`, `accessModes` and `volumeName`.
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace \
+  --set pvc.storageClassName="STORAGE_CLASS_NAME"
+```
+
+The shared claim name is configured with `persistentVolumeClaimName`. To use an existing claim, set its name and disable creation with `pvc.include=false`. Disabling creation does not disable the volume mount.
+
+### VictoriaMetrics storage
+
+VictoriaMetrics runs as a StatefulSet that creates its own claim, `chantico-volume-mount-chantico-victoriametrics-0`, from a claim template. Set a different storage class or size with `victoriaMetrics.pvc`.
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace \
+  --set victoriaMetrics.pvc.storageClassName="STORAGE_CLASS_NAME" \
+  --set victoriaMetrics.pvc.storage="10Gi"
+```
+
+To bind the claim to a specific existing volume, set `victoriaMetrics.pvc.volumeName`. The claim is not removed when the StatefulSet or release is deleted, so VictoriaMetrics data is kept. VictoriaMetrics stores its data in the `victoria-metrics/` directory of its claim.
 
 You can list the storage classes available on your cluster with kubectl.
 
 ```bash
 kubectl get storageclass
+```
+
+### Multi-node clusters
+
+With the default `ReadWriteOnce` access mode, the shared volume can only be attached to one node. The chart and the controller therefore schedule all pods that use it, including SNMP generator jobs and Prometheus, on the same node. Required pod affinity selects pods using the same claim in the same namespace and uses `kubernetes.io/hostname` as the topology key.
+
+VictoriaMetrics has its own claim and no affinity to the shared volume, so it can run on a different node.
+
+Use a CSI storage class for multi-node deployments. The chart's optional `hostPath` PV remains intended for single-node development.
+
+## Watching resources in different namespaces
+
+By default, the Chantico controller manages resources in the namespace it is deployed in.
+If you want it to watch resources in a different namespace, you can override the `controller.watchNamespace` value when installing or upgrading Chantico. You can set this value to a single namespace or to an asterisk to give access to the managed resources in all namespaces.
+
+```bash
+helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace --set controller.watchNamespace="*"
 ```
 
 ## Getting started with the deployed Chantico

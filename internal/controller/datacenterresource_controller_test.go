@@ -17,229 +17,234 @@ limitations under the License.
 package controller
 
 import (
-	"net"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync/atomic"
+	"fmt"
+	"reflect"
 	"testing"
 
 	chantico "chantico/api/v1alpha1"
-	config "chantico/internal/configuration"
 	dcr "chantico/internal/datacenterresource"
+	"chantico/internal/k8s"
 	"chantico/internal/steps"
+	"chantico/internal/testutil"
 
-	"go.yaml.in/yaml/v2"
-	corev1 "k8s.io/api/core/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func setupDataCenterResourceRuleTest(t *testing.T) (string, *DataCenterResourceReconciler, *atomic.Int32) {
+func setupDataCenterResourceRuleTest(t *testing.T) (client.WithWatch, *DataCenterResourceReconciler) {
 	t.Helper()
 
-	tmpDir := t.TempDir()
-	reloads := &atomic.Int32{}
-	server := newReloadServer(t, reloads)
-	t.Cleanup(server.Close)
-
-	host, port := serverHostPort(t, server)
-	t.Setenv(config.ChanticoVolumeLocationEnv, tmpDir)
-	t.Setenv(config.ChanticoVolumeClaimEnv, "chantico-snmp-prometheus-volume-claim")
-	t.Setenv(config.ChanticoPrometheusServiceHostEnv, host)
-	t.Setenv(config.ChanticoPrometheusServicePortEnv, port)
-
-	var errs []error
-	config.ValidatedEnv, errs = config.ValidateEnv()
-	if len(errs) > 0 {
-		t.Fatalf("validating test environment: %v", errs)
-	}
-
-	rulesDir := filepath.Join(tmpDir, prometheusRulesDir)
-	if err := os.MkdirAll(rulesDir, 0755); err != nil {
-		t.Fatalf("create rules directory %s: %v", rulesDir, err)
-	}
-
-	reconciler := newDataCenterResourceReconciler(t)
-
-	return tmpDir, reconciler, reloads
-}
-
-func newDataCenterResourceReconciler(t *testing.T, objs ...runtime.Object) *DataCenterResourceReconciler {
-	t.Helper()
-
-	scheme := runtime.NewScheme()
-	if err := chantico.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := corev1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-
-	client := fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithRuntimeObjects(objs...).
+	kubeClient := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1.AddToScheme).
+		WithStatusSubresource(&chantico.DataCenterResource{}).
 		Build()
 
-	return &DataCenterResourceReconciler{
-		Client: client,
-		Scheme: scheme,
+	ruleConfigurer := dcr.PrometheusRecordingRuleConfigurer{
+		Client: kubeClient,
+		Scheme: kubeClient.Scheme(),
+	}
+
+	return kubeClient, &DataCenterResourceReconciler{
+		Client:         kubeClient,
+		RuleConfigurer: &ruleConfigurer,
 	}
 }
 
-func newReloadServer(t *testing.T, reloads *atomic.Int32) *httptest.Server {
-	t.Helper()
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen for mock Prometheus: %v", err)
+func fetchRuleResource(t *testing.T, r *chantico.DataCenterResource, client client.WithWatch) (*monitoringv1.PrometheusRule, error) {
+	rule := &monitoringv1.PrometheusRule{}
+	key := types.NamespacedName{Namespace: r.Namespace, Name: r.Name}
+	if err := client.Get(t.Context(), key, rule); err != nil {
+		return nil, fmt.Errorf("fetching PrometheusRule: %w", err)
 	}
+	return rule, nil
+}
 
-	server := &httptest.Server{
-		Listener: listener,
-		Config: &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-				return
+func TestNormalizeDataCenterResource(t *testing.T) {
+	explicit := &k8s.TemplateFrom{
+		SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: "existing_expression"},
+	}
+	tests := []struct {
+		name string
+		spec chantico.DataCenterResourceSpec
+	}{
+		{name: "energy metric", spec: chantico.DataCenterResourceSpec{EnergyMetric: "pdu_power_watts"}},
+		{name: "coefficients", spec: chantico.DataCenterResourceSpec{Parents: []chantico.ParentRef{
+			{Name: "pdu1", Coefficient: "0.5"},
+			{Name: "pdu2", Coefficient: "0"},
+			{Name: "pdu3", CoefficientFrom: explicit},
+		}}},
+		{name: "explicit template", spec: chantico.DataCenterResourceSpec{EnergyMetricFrom: explicit}},
+		{name: "empty", spec: chantico.DataCenterResourceSpec{}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resource := &chantico.DataCenterResource{Spec: test.spec}
+			normalizeDataCenterResource(resource)
+			if test.spec.EnergyMetric != "" {
+				if resource.Spec.EnergyMetricFrom == nil || resource.Spec.EnergyMetricFrom.Value != test.spec.EnergyMetric {
+					t.Fatalf("energy metric was not expanded: %#v", resource.Spec.EnergyMetricFrom)
+				}
+			} else if !reflect.DeepEqual(resource.Spec.EnergyMetricFrom, test.spec.EnergyMetricFrom) {
+				t.Fatal("explicit energy metric template changed")
 			}
-			if r.URL.Path != "/-/reload" {
-				http.NotFound(w, r)
-				return
+			for _, parent := range resource.Spec.Parents {
+				if parent.Coefficient != "" {
+					if parent.CoefficientFrom == nil || parent.CoefficientFrom.Value != parent.Coefficient {
+						t.Fatalf("coefficient for %s was not expanded: %#v", parent.Name, parent.CoefficientFrom)
+					}
+				} else if !reflect.DeepEqual(parent.CoefficientFrom, explicit) {
+					t.Fatal("explicit coefficient template changed")
+				}
 			}
-			reloads.Add(1)
-			w.WriteHeader(http.StatusOK)
-		})},
+			first := resource.DeepCopy()
+			normalizeDataCenterResource(resource)
+			if !reflect.DeepEqual(resource, first) {
+				t.Fatal("normalization is not idempotent")
+			}
+		})
 	}
-	server.Start()
-
-	return server
 }
 
-func serverHostPort(t *testing.T, server *httptest.Server) (string, string) {
-	t.Helper()
-
-	serverURL, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatalf("parse server URL %q: %v", server.URL, err)
-	}
-	host, port, err := net.SplitHostPort(serverURL.Host)
-	if err != nil {
-		t.Fatalf("split server host %q: %v", serverURL.Host, err)
-	}
-	return host, port
-}
-
-func TestReconcileWriteRuleFile_NonRootNode(t *testing.T) {
-	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
+func TestReconcileWriteRule_NonRootNode(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
 
 	bm := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "0.6"},
+				{Name: "pdu1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.6",
+					},
+				}},
 			},
 		},
 	}
 
-	res := reconciler.reconcileWriteRuleFile(t.Context(), bm)
+	res := reconciler.reconcileWriteRule(t.Context(), bm)
 	if res.Action == steps.ActionError {
-		t.Fatalf("reconcileWriteRuleFile errored: %v", res.Err)
+		t.Fatalf("reconcileWriteRule errored: %v", res.Err)
 	}
 	if res.Action != steps.ActionContinue {
 		t.Fatalf("expected Continue, got %v", res.Action)
 	}
 
-	rulePath := filepath.Join(tmpDir, prometheusRulesDir, "bm1.yml")
-	data, err := os.ReadFile(rulePath)
+	prometheusRule, err := fetchRuleResource(t, bm, client)
 	if err != nil {
-		t.Fatalf("expected rule file to exist at %s: %v", rulePath, err)
+		t.Fatalf("fetching PrometheusRule: %v", err)
 	}
+	groups := prometheusRule.Spec.Groups
 
-	var ruleFile dcr.RuleFile
-	if err := yaml.Unmarshal(data, &ruleFile); err != nil {
-		t.Fatalf("parse rule file: %v", err)
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(groups))
 	}
-
-	if len(ruleFile.Groups) != 1 {
-		t.Fatalf("expected 1 group, got %d", len(ruleFile.Groups))
+	if groups[0].Name != "chantico_"+bm.Name {
+		t.Errorf("expected group name %q, got %q", "chantico_"+bm.Name, groups[0].Name)
 	}
-	if ruleFile.Groups[0].Name != "chantico_bm1" {
-		t.Errorf("expected group name %q, got %q", "chantico_bm1", ruleFile.Groups[0].Name)
-	}
-	if len(ruleFile.Groups[0].Rules) != 2 {
-		t.Fatalf("expected 2 rules, got %d", len(ruleFile.Groups[0].Rules))
+	if len(groups[0].Rules) != 2 {
+		t.Fatalf("expected 2 rules, got %d", len(groups[0].Rules))
 	}
 	assertDataCenterResourceCondition(t, bm, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
-	assertReloads(t, reloads, 1)
 }
 
-func TestReconcileWriteRuleFile_RootNodeWithEnergyMetric(t *testing.T) {
-	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
+func TestReconcileWriteRule_RootNodeWithEnergyMetric(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
 
 	pdu := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
 		Spec: chantico.DataCenterResourceSpec{
-			Type:         dcr.DataCenterResourceTypePDU,
-			EnergyMetric: "snmp_pdu1_power_watts",
+			Type: dcr.DataCenterResourceTypePDU,
+			EnergyMetricFrom: &k8s.TemplateFrom{
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					Value: "snmp_pdu1_power_watts",
+				},
+			},
 		},
 	}
 
-	res := reconciler.reconcileWriteRuleFile(t.Context(), pdu)
+	res := reconciler.reconcileWriteRule(t.Context(), pdu)
 	if res.Action == steps.ActionError {
-		t.Fatalf("reconcileWriteRuleFile errored: %v", res.Err)
+		t.Fatalf("reconcileWriteRule errored: %v", res.Err)
 	}
 
-	rulePath := filepath.Join(tmpDir, prometheusRulesDir, "pdu1.yml")
-	if _, err := os.Stat(rulePath); err != nil {
-		t.Fatalf("expected rule file to exist at %s: %v", rulePath, err)
+	_, err := fetchRuleResource(t, pdu, client)
+	if err != nil {
+		t.Fatalf("expected existing PrometheusRule but got error: %v", err)
 	}
 	assertDataCenterResourceCondition(t, pdu, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
-	assertReloads(t, reloads, 1)
 }
 
-func TestReconcileWriteRuleFile_OverwritesExisting(t *testing.T) {
-	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
+func TestReconcileWriteRule_OverwritesExisting(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
 
 	bm := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "bm1"},
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "0.5"},
+				{Name: "pdu1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.5",
+					},
+				}},
 			},
 		},
 	}
 
-	if res := reconciler.reconcileWriteRuleFile(t.Context(), bm); res.Action == steps.ActionError {
-		t.Fatalf("first reconcileWriteRuleFile errored: %v", res.Err)
+	if res := reconciler.reconcileWriteRule(t.Context(), bm); res.Action == steps.ActionError {
+		t.Fatalf("first reconcileWriteRule errored: %v", res.Err)
 	}
-	bm.Spec.Parents[0].Coefficient = "0.8"
-	if res := reconciler.reconcileWriteRuleFile(t.Context(), bm); res.Action == steps.ActionError {
-		t.Fatalf("second reconcileWriteRuleFile errored: %v", res.Err)
+	bm.Spec.Parents[0].Name = "pdu2"
+	if res := reconciler.reconcileWriteRule(t.Context(), bm); res.Action == steps.ActionError {
+		t.Fatalf("second reconcileWriteRule errored: %v", res.Err)
 	}
 
-	rulePath := filepath.Join(tmpDir, prometheusRulesDir, "bm1.yml")
-	data, err := os.ReadFile(rulePath)
+	data, err := fetchRuleResource(t, bm, client)
 	if err != nil {
-		t.Fatalf("expected rule file to exist: %v", err)
+		t.Fatalf("expected existing PrometheusRule but got error: %v", err)
 	}
-	if !strings.Contains(string(data), "0.8") {
-		t.Errorf("expected updated coefficient 0.8 in rule file, got:\n%s", string(data))
+	assertDataCenterResourceCondition(t, bm, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
+
+	if len(data.Spec.Groups) != 1 {
+		t.Fatalf("expected 1 group in PrometheusRule, got %d", len(data.Spec.Groups))
 	}
-	assertReloads(t, reloads, 2)
+
+	found := false
+	for _, rule := range data.Spec.Groups[0].Rules {
+		if rule.Record == "chantico_power_coefficient" && rule.Labels["parent"] == "pdu2" {
+			found = true
+		}
+		if rule.Labels["parent"] == "pdu1" {
+			t.Errorf("expected stale parent 'pdu1' to be replaced, got rule %+v", rule)
+		}
+	}
+	if !found {
+		t.Errorf("expected coefficient rule with parent label 'pdu2', got %+v", data.Spec.Groups[0].Rules)
+	}
 }
 
 func TestReconcileDeletion_RemovesRuleFile(t *testing.T) {
-	tmpDir, reconciler, reloads := setupDataCenterResourceRuleTest(t)
-	rulePath := filepath.Join(tmpDir, prometheusRulesDir, "bm1.yml")
-	writeDCRTestFile(t, rulePath, []byte("groups: []\n"))
+	client, reconciler := setupDataCenterResourceRuleTest(t)
+
+	promRule := &monitoringv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bm1",
+			Namespace: "default",
+		},
+		Spec: monitoringv1.PrometheusRuleSpec{
+			Groups: []monitoringv1.RuleGroup{
+				{
+					Name:  "bm1",
+					Rules: []monitoringv1.Rule{},
+				},
+			},
+		},
+	}
+	writePrometheusRuleTestResource(t, client, promRule)
 
 	now := metav1.Now()
 	bm := &chantico.DataCenterResource{
@@ -257,17 +262,18 @@ func TestReconcileDeletion_RemovesRuleFile(t *testing.T) {
 	if res.Action != steps.ActionStop {
 		t.Fatalf("expected Stop, got %v", res.Action)
 	}
-	if _, err := os.Stat(rulePath); !os.IsNotExist(err) {
-		t.Fatalf("expected rule file to be deleted, stat err = %v", err)
+	if bm.DeletionTimestamp == nil {
+		t.Fatalf("expected DeletionTimestamp to be set")
 	}
+
+	assertPrometheusRuleExistence(t, client, bm, false)
 	if controllerutil.ContainsFinalizer(bm, chantico.DataCenterResourceGraphFinalizer) {
 		t.Fatalf("expected finalizer %q to be removed", chantico.DataCenterResourceGraphFinalizer)
 	}
-	assertReloads(t, reloads, 1)
 }
 
 func TestReconcileDeletion_NonExistentRuleFile(t *testing.T) {
-	_, reconciler, reloads := setupDataCenterResourceRuleTest(t)
+	_, reconciler := setupDataCenterResourceRuleTest(t)
 	now := metav1.Now()
 	bm := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{
@@ -284,17 +290,20 @@ func TestReconcileDeletion_NonExistentRuleFile(t *testing.T) {
 	if res.Action != steps.ActionStop {
 		t.Fatalf("expected Stop, got %v", res.Action)
 	}
-	assertReloads(t, reloads, 1)
 }
 
-func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
-	tmpDir, reconciler, _ := setupDataCenterResourceRuleTest(t)
+func TestReconcileWriteRule_FullThreeLayerHierarchy(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
 
 	pdu1 := &chantico.DataCenterResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
 		Spec: chantico.DataCenterResourceSpec{
-			Type:         dcr.DataCenterResourceTypePDU,
-			EnergyMetric: "snmp_pdu1_power_watts",
+			Type: dcr.DataCenterResourceTypePDU,
+			EnergyMetricFrom: &k8s.TemplateFrom{
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+					Value: "snmp_pdu1_power_watts",
+				},
+			},
 		},
 	}
 	bm1 := &chantico.DataCenterResource{
@@ -302,7 +311,11 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeBaremetal,
 			Parents: []chantico.ParentRef{
-				{Name: "pdu1", Coefficient: "1"},
+				{Name: "pdu1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "1",
+					},
+				}},
 			},
 		},
 	}
@@ -311,7 +324,11 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeVM,
 			Parents: []chantico.ParentRef{
-				{Name: "bm1", Coefficient: "0.4"},
+				{Name: "bm1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.4",
+					},
+				}},
 			},
 		},
 	}
@@ -320,31 +337,40 @@ func TestReconcileWriteRuleFile_FullThreeLayerHierarchy(t *testing.T) {
 		Spec: chantico.DataCenterResourceSpec{
 			Type: dcr.DataCenterResourceTypeVM,
 			Parents: []chantico.ParentRef{
-				{Name: "bm1", Coefficient: "0.6"},
+				{Name: "bm1", CoefficientFrom: &k8s.TemplateFrom{
+					SecretConfigMapSelector: k8s.SecretConfigMapSelector{
+						Value: "0.6",
+					},
+				}},
 			},
 		},
 	}
 
 	for _, resource := range []*chantico.DataCenterResource{pdu1, bm1, vm1, vm2} {
-		if res := reconciler.reconcileWriteRuleFile(t.Context(), resource); res.Action == steps.ActionError {
-			t.Fatalf("reconcileWriteRuleFile(%s) errored: %v", resource.Name, res.Err)
+		if res := reconciler.reconcileWriteRule(t.Context(), resource); res.Action == steps.ActionError {
+			t.Fatalf("reconcileWriteRule(%s) errored: %v", resource.Name, res.Err)
 		}
 	}
 
-	rulesDir := filepath.Join(tmpDir, prometheusRulesDir)
-	assertDCRRuleFileExists(t, rulesDir, "pdu1.yml")
-	assertDCRRuleFileExists(t, rulesDir, "bm1.yml")
-	assertDCRRuleFileExists(t, rulesDir, "vm1.yml")
-	assertDCRRuleFileExists(t, rulesDir, "vm2.yml")
+	assertPrometheusRuleExistence(t, client, pdu1, true)
+	assertPrometheusRuleExistence(t, client, bm1, true)
+	assertPrometheusRuleExistence(t, client, vm1, true)
+	assertPrometheusRuleExistence(t, client, vm2, true)
 
-	pdu1RuleFile := readDCRRuleFile(t, filepath.Join(rulesDir, "pdu1.yml"))
-	if len(pdu1RuleFile.Groups[0].Rules) != 1 {
-		t.Errorf("PDU1: expected 1 alias rule, got %d", len(pdu1RuleFile.Groups[0].Rules))
+	pdu1Rule, err := readRuleResource(t, client, pdu1)
+	if err != nil {
+		t.Fatalf("PDU1: %v", err)
+	}
+	if len(pdu1Rule.Spec.Groups[0].Rules) != 1 {
+		t.Errorf("PDU1: expected 1 alias rule, got %d", len(pdu1Rule.Spec.Groups[0].Rules))
 	}
 
-	bm1RuleFile := readDCRRuleFile(t, filepath.Join(rulesDir, "bm1.yml"))
-	if len(bm1RuleFile.Groups[0].Rules) != 2 {
-		t.Errorf("BM1: expected 2 rules (1 coefficient + 1 energy), got %d", len(bm1RuleFile.Groups[0].Rules))
+	bm1Rule, err := readRuleResource(t, client, bm1)
+	if err != nil {
+		t.Fatalf("BM1: %v", err)
+	}
+	if len(bm1Rule.Spec.Groups[0].Rules) != 2 {
+		t.Errorf("BM1: expected 2 rules (1 coefficient + 1 energy), got %d", len(bm1Rule.Spec.Groups[0].Rules))
 	}
 }
 
@@ -363,304 +389,33 @@ func assertDataCenterResourceCondition(t *testing.T, resource *chantico.DataCent
 	}
 }
 
-func assertReloads(t *testing.T, reloads *atomic.Int32, want int32) {
+func readRuleResource(t *testing.T, client client.WithWatch, resource *chantico.DataCenterResource) (*monitoringv1.PrometheusRule, error) {
 	t.Helper()
 
-	if got := reloads.Load(); got != want {
-		t.Fatalf("expected %d Prometheus reloads, got %d", want, got)
+	ruleResource, err := fetchRuleResource(t, resource, client)
+	if err != nil {
+		return nil, fmt.Errorf("fetch rule resource: %w", err)
 	}
+
+	return ruleResource, nil
 }
 
-func assertDCRRuleFileExists(t *testing.T, rulesDir, filename string) {
+func assertPrometheusRuleExistence(t *testing.T, client client.WithWatch, resource *chantico.DataCenterResource, exists bool) {
 	t.Helper()
 
-	path := filepath.Join(rulesDir, filename)
-	if _, err := os.Stat(path); err != nil {
-		t.Errorf("expected rule file %s to exist: %v", filename, err)
+	_, err := readRuleResource(t, client, resource)
+	if exists && err != nil {
+		t.Fatalf("expected Prometheus rule to exist for resource %s: %v", resource.Name, err)
+	}
+	if !exists && err == nil {
+		t.Fatalf("expected Prometheus rule to not exist for resource %s, but it does", resource.Name)
 	}
 }
 
-func readDCRRuleFile(t *testing.T, path string) dcr.RuleFile {
+func writePrometheusRuleTestResource(t *testing.T, client client.WithWatch, rule *monitoringv1.PrometheusRule) {
 	t.Helper()
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read rule file %s: %v", path, err)
-	}
-	var ruleFile dcr.RuleFile
-	if err := yaml.Unmarshal(data, &ruleFile); err != nil {
-		t.Fatalf("parse rule file %s: %v", path, err)
-	}
-	return ruleFile
-}
-
-func writeDCRTestFile(t *testing.T, path string, data []byte) {
-	t.Helper()
-
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		t.Fatalf("write %s: %v", path, err)
-	}
-}
-
-func TestResolveAndApplyTemplate_ConfigMapTemplateWithIncludedParameter(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vm-attribution-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
-		},
-		Parameters: []corev1.EnvVar{
-			{
-				Name:  "vmid",
-				Value: "3",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
-	}
-
-	expected := `vm_cpu_percentage{vmid="3"}`
-	if rendered != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered)
-	}
-}
-
-func TestResolveAndApplyTemplate_ConfigMapTemplateWithIncludedMultipleParameter(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vm-attribution-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `vm_cpu_percentage{variable1="{{ .var1 }}", variable2="{{ .var2 }}"}`,
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
-		},
-		Parameters: []corev1.EnvVar{
-			{
-				Name:  "var1",
-				Value: "3",
-			},
-			{
-				Name:  "var2",
-				Value: "4",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
-	}
-
-	expected := `vm_cpu_percentage{variable1="3", variable2="4"}`
-	if rendered != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered)
-	}
-}
-
-func TestResolveAndApplyTemplate_ConfigMapTemplateWithParameterFromSecret(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vm-attribution-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			},
-		},
-		&corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vmid-secret",
-				Namespace: "chantico",
-			},
-			Data: map[string][]byte{
-				"vmid": []byte("3"),
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
-		},
-		Parameters: []corev1.EnvVar{
-			{
-				Name: "vmid",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "vmid-secret",
-						},
-						Key: "vmid",
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
-	}
-
-	expected := `vm_cpu_percentage{vmid="3"}`
-	if rendered != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered)
-	}
-}
-
-func TestResolveAndApplyTemplate_ConfigMapTemplateWithParameterFromConfigMap(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vm-attribution-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `vm_cpu_percentage{vmid="{{ .vmid }}"}`,
-			},
-		},
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "vmid-configmap",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"vmid": "3",
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveAndApplyTemplate(t.Context(), "chantico", &chantico.TemplateFrom{
-		ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-			Name: "vm-attribution-coefficient-template",
-			Key:  "template",
-		},
-		Parameters: []corev1.EnvVar{
-			{
-				Name: "vmid",
-				ValueFrom: &corev1.EnvVarSource{
-					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "vmid-configmap",
-						},
-						Key: "vmid",
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("resolveAndApplyTemplate returned error: %v", err)
-	}
-
-	expected := `vm_cpu_percentage{vmid="3"}`
-	if rendered != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered)
-	}
-}
-
-func TestResolveCoefficientTemplates(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pdu-coefficient-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `usage_coeff{identifier="{{ .identifier }}"}`,
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveCoefficientTemplates(t.Context(), &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1", Namespace: "chantico"},
-		Spec: chantico.DataCenterResourceSpec{
-			Type: dcr.DataCenterResourceTypeBaremetal,
-			Parents: []chantico.ParentRef{
-				{
-					Name: "pdu1",
-					CoefficientFrom: &chantico.TemplateFrom{
-						ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-							Name: "pdu-coefficient-template",
-							Key:  "template",
-						},
-						Parameters: []corev1.EnvVar{
-							{
-								Name:  "identifier",
-								Value: "pdu1",
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-
-	if err != nil {
-		t.Fatalf("resolveCoefficientTemplates returned error: %v", err)
-	}
-	expected := `usage_coeff{identifier="pdu1"}`
-	if len(rendered.Spec.Parents) == 0 || rendered.Spec.Parents[0].Coefficient != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered.Spec.Parents[0].Coefficient)
-	}
-}
-
-func TestResolveEnergyMetricTemplates(t *testing.T) {
-	reconciler := newDataCenterResourceReconciler(t,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pdu-energymetric-template",
-				Namespace: "chantico",
-			},
-			Data: map[string]string{
-				"template": `power_watts{identifier="{{ .identifier }}"}`,
-			},
-		},
-	)
-
-	rendered, err := reconciler.resolveEnergyMetricTemplate(t.Context(), &chantico.DataCenterResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "bm1", Namespace: "chantico"},
-		Spec: chantico.DataCenterResourceSpec{
-			Type: dcr.DataCenterResourceTypeBaremetal,
-			EnergyMetricFrom: &chantico.TemplateFrom{
-				ConfigMapKeyRef: chantico.TemplateConfigMapKeyRef{
-					Name: "pdu-energymetric-template",
-					Key:  "template",
-				},
-				Parameters: []corev1.EnvVar{
-					{
-						Name:  "identifier",
-						Value: "pdu1",
-					},
-				},
-			},
-		},
-	})
-
-	if err != nil {
-		t.Fatalf("resolveEnergyMetricTemplates returned error: %v", err)
-	}
-	expected := `power_watts{identifier="pdu1"}`
-	if rendered.Spec.EnergyMetric != expected {
-		t.Fatalf("expected %q, got %q", expected, rendered.Spec.EnergyMetric)
+	if err := client.Create(t.Context(), rule); err != nil {
+		t.Fatalf("creating PrometheusRule: %v", err)
 	}
 }

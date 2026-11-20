@@ -4,13 +4,82 @@ commonLabels: {}
 commonAnnotations: {}
 persistentVolumeClaimName: chantico-persistent-volume-claim
 prometheusRetention: 5h
-snmpExporterAddress: "" # defaults to <fullname>-snmp:9116
+
+# These are overrides of the default kube prometheus stack values
+# Required to disable the default kube prometheus stack components that are not needed for Chantico
+# When updating the dependency, be sure to check the default values of the kube prometheus stack and adjust overrides accordingly
+kube-prometheus-stack:
+  crds:
+    upgradeJob:
+      enabled: true
+  defaultRules:
+    create: false
+  alertmanager:
+    enabled: false
+  grafana:
+    enabled: true
+    fullnameOverride: chantico-stack-grafana
+    adminPassword: admin
+    defaultDashboardsEnabled: false
+    grafana.ini:
+      auth.anonymous:
+        enabled: true
+        org_role: Viewer
+      security:
+        allow_embedding: true
+      users:
+        default_theme: light
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        labelValue: chantico
+        searchNamespace: "" # Search only the release namespace.
+        provider:
+          name: chantico
+          folder: Chantico
+          disableDelete: true
+          allowUiUpdates: false
+      datasources:
+        enabled: true
+        defaultDatasourceEnabled: false
+        label: grafana_datasource
+        labelValue: chantico
+        searchNamespace: ""
+  kubeApiServer:
+    enabled: false
+  kubelet:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  coreDns:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeProxy:
+    enabled: false
+  kubeStateMetrics:
+    enabled: false
+  nodeExporter:
+    enabled: false
+  prometheus:
+    enabled: false
+  prometheusOperator:
+    tls:
+      enabled: false
+    admissionWebhooks:
+      enabled: false
+    serviceMonitor:
+      selfMonitor: false
 imagePullSecretName: "" # Set if pulled from private registry, otherwise leave empty
 controller:
   include: true
   image:
     repository: "ghcr.io/chantico-project/images/chantico"
     tag: "" # defaults to Chart.version
+  watchNamespace: "" # defaults to the namespace of the release, "*" to watch resources in all namespaces
 snmp:
   service:
     type: "ClusterIP"
@@ -18,20 +87,29 @@ filebrowser:
   service:
     type: "ClusterIP"
 prometheus:
+  useOperator: true
   service:
     type: "ClusterIP"
 victoriaMetrics:
   include: true
   # Long-term retention period (e.g. 12 months)
   retention: 12
-  # Storage path inside the PVC subPath
-  storagePath: /tmp/victoria-metrics-volume/storage
+  # VictoriaMetrics data directory, backed directly by its PVC
+  storagePath: /victoria-metrics-data
+  # Settings of the claim template of the StatefulSet
+  pvc:
+    storageClassName: "" # empty uses the cluster default storage class
+    storage: 3Gi
+    accessModes:
+      - ReadWriteOnce
   service:
     type: "ClusterIP"
-grafana:
-  include: true
-  adminPassword: admin
-  anonymous: true
+visualisationWebapp:
+  include: false
+  image:
+    repository: "ghcr.io/chantico-project/images/chantico-visualisation-webapp"
+    tag: "" # defaults to Chart.version
+    pullPolicy: IfNotPresent
   service:
     type: "ClusterIP"
 pv:
@@ -45,7 +123,7 @@ pv:
     - ReadWriteOnce
 pvc:
   include: true
-  storageClassName: "csi-rbd"
+  storageClassName: "" # empty uses the cluster default storage class
   storage: 3Gi
   accessModes:
     - ReadWriteOnce

@@ -29,11 +29,12 @@ the local `<root-project>/bin` folder.
 Set up the following environment variables (this can be automated using [direnv](https://direnv.net/))
 
 ```bash
-export CHANTICO_PROMETHEUS_SERVICE_HOST="localhost"
-export CHANTICO_PROMETHEUS_SERVICE_PORT="19090"
 export CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME="chantico-persistent-volume-claim"
 export CHANTICO_DATA_PATH=".chantico-persistent-volume"
-export CHANTICO_NAMESPACE="chantico" # optional
+export CHANTICO_NAMESPACE="chantico"
+export CHANTICO_WATCH_NAMESPACE="chantico" # optional, default is same as namespace
+export CHANTICO_SNMP_EXPORTER_SERVICE_HOST="chantico-snmp.chantico.svc.cluster.local"
+export CHANTICO_SNMP_EXPORTER_SERVICE_PORT="9116"
 ```
 
 The controller will run locally on your computer. The controller will talk to a Kubernetes cluster (typically KinD) and other dependencies like a timeseries database. Everything will therefore run inside the Kubernetes cluster, except for the controller, when developing. A typical flow is:
@@ -55,6 +56,11 @@ You should now have access to:
 - [SNMP Exporter](http://localhost:19116)
 - [VictoriaMetrics](http://localhost:18428)
 - [Grafana](http://localhost:13000) - username and password are both `admin`
+
+Grafana is provided by the `kube-prometheus-stack` dependency. Chantico's
+dashboards and Prometheus/VictoriaMetrics datasources are provisioned through
+its Grafana sidecars. The `chantico-grafana` Service is available on port
+3000 (NodePort 13000 in the local environment).
 
 
 #### Running a demo

@@ -1,31 +1,21 @@
 package controller
 
 import (
-	"bytes"
 	chantico "chantico/api/v1alpha1"
-	ph "chantico/internal/patch"
+	"chantico/internal/k8s"
 	"chantico/internal/steps"
 	"context"
 	"errors"
-	"fmt"
-	"net"
-	"net/http"
-	"net/url"
-	"os"
-	"path/filepath"
-	"text/template"
 
-	config "chantico/internal/configuration"
 	dcr "chantico/internal/datacenterresource"
 
 	"github.com/go-logr/logr"
-	yaml "go.yaml.in/yaml/v2"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,7 +27,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const prometheusRulesDir = "prometheus/rules"
+type RecordingRuleConfigurer interface {
+	Reconcile(context.Context, *chantico.DataCenterResource) error
+	Delete(context.Context, *chantico.DataCenterResource) error
+}
 
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=datacenterresources,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=datacenterresources/status,verbs=get;update;patch
@@ -45,18 +38,20 @@ const prometheusRulesDir = "prometheus/rules"
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch;create;update;patch;delete
 
 // DataCenterResourceReconciler reconciles a DataCenterResource object
 type DataCenterResourceReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	RuleConfigurer RecordingRuleConfigurer
 }
 
 func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chantico.DataCenterResource{}).
 		Owns(&batchv1.Job{}).
+		Owns(&monitoringv1.PrometheusRule{}).
 		// Watch config maps for updates. Only trigger reconciliation if the configmap is referenced in either coefficient or energyMetric template
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.dataCenterResourcesForConfigMap)).
 		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 1}). // Race conditions might occur when multiple generator jobs run simultaneously, so only allow one at a time.
@@ -70,6 +65,7 @@ func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Complete(r)
 }
 
+// TODO: Add a secrets check since the templates can also reference secrets. Needs another watcher
 func (r *DataCenterResourceReconciler) dataCenterResourcesForConfigMap(ctx context.Context, configMap client.Object) []reconcile.Request {
 	dataCenterResources := &chantico.DataCenterResourceList{}
 	if err := r.List(ctx, dataCenterResources, client.InNamespace(configMap.GetNamespace())); err != nil {
@@ -90,13 +86,22 @@ func (r *DataCenterResourceReconciler) dataCenterResourcesForConfigMap(ctx conte
 	return requests
 }
 
+func configMapNameMatchesSelector(configMapName string, selector *k8s.TemplateFrom) bool {
+	if selector == nil || selector.ValueFrom == nil || selector.ValueFrom.ConfigMapKeyRef == nil {
+		return false
+	}
+	return selector.ValueFrom.ConfigMapKeyRef.Name == configMapName
+}
+
 // Check if either energyMetricFrom or parent.CoefficientFrom references this configmap.
 func dataCenterResourceReferencesConfigMap(dataCenterResource *chantico.DataCenterResource, configMapName string) bool {
-	if dataCenterResource.Spec.EnergyMetricFrom != nil && dataCenterResource.Spec.EnergyMetricFrom.ConfigMapKeyRef.Name == configMapName {
+	energyMetricFrom := dataCenterResource.Spec.EnergyMetricFrom
+	if configMapNameMatchesSelector(configMapName, energyMetricFrom) {
 		return true
 	}
 	for _, parent := range dataCenterResource.Spec.Parents {
-		if parent.CoefficientFrom != nil && parent.CoefficientFrom.ConfigMapKeyRef.Name == configMapName {
+		coefficientFrom := parent.CoefficientFrom
+		if configMapNameMatchesSelector(configMapName, coefficientFrom) {
 			return true
 		}
 	}
@@ -117,6 +122,8 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 	l = l.WithValues("generation", dataCenterResource.GetGeneration())
 	ctx = log.IntoContext(ctx, l)
 
+	normalizeDataCenterResource(dataCenterResource)
+
 	// Patches the changes to the DataCenterResource at the end of reconciliation. This updates the observedGeneration and conditions in the status.
 	patcher, err := patch.NewHelper(dataCenterResource, r.Client)
 	if err != nil {
@@ -133,9 +140,27 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 		r.reconcileDeletion,
 		r.ensureFinalizerIsSet,
 		r.reconcileValidation,
-		r.reconcileWriteRuleFile,
+		r.reconcileWriteRule,
 		r.reconcileReady,
 	)
+}
+
+// Resolves the shorthand of EnergyMetric and Coefficient fields into their respective From fields.
+// If the EnergyMetric or Coefficient fields are set, it populates the corresponding From fields with a TemplateFrom referencing the value.
+func normalizeDataCenterResource(dataCenterResource *chantico.DataCenterResource) {
+	if dataCenterResource.Spec.EnergyMetric != "" {
+		dataCenterResource.Spec.EnergyMetricFrom = &k8s.TemplateFrom{
+			SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: dataCenterResource.Spec.EnergyMetric},
+		}
+	}
+	for index := range dataCenterResource.Spec.Parents {
+		parent := &dataCenterResource.Spec.Parents[index]
+		if parent.Coefficient != "" {
+			parent.CoefficientFrom = &k8s.TemplateFrom{
+				SecretConfigMapSelector: k8s.SecretConfigMapSelector{Value: parent.Coefficient},
+			}
+		}
+	}
 }
 
 func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
@@ -147,19 +172,8 @@ func (r *DataCenterResourceReconciler) reconcileDeletion(ctx context.Context, da
 		return steps.Stop()
 	}
 
-	l := log.FromContext(ctx)
-
-	volumePath := config.ValidatedEnv.VolumeLocation
-	rulePath := filepath.Join(volumePath, prometheusRulesDir, dataCenterResource.Name+".yml")
-
-	l.Info("Deleting rule file", "file", rulePath)
-
-	if err := deleteRuleFile(dataCenterResource); err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
-		return steps.Error(err)
-	}
-	if err := reloadPrometheus(ctx); err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Error reloading Prometheus: "+err.Error())
+	if err := r.RuleConfigurer.Delete(ctx, dataCenterResource); err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Failed to delete recording rules: "+err.Error())
 		return steps.Error(err)
 	}
 
@@ -182,10 +196,7 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 	dataCenterResources := &chantico.DataCenterResourceList{}
 	_ = r.List(ctx, dataCenterResources, listOptions...)
 
-	physicalMeasurements := &chantico.PhysicalMeasurementList{}
-	_ = r.List(ctx, physicalMeasurements, listOptions...)
-
-	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items, physicalMeasurements.Items)
+	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items)
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
 		dataCenterResource.Status.InvolvedResource = involvedResource
@@ -206,7 +217,7 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 		items := mergeUnique(visited, references.Items, children.Items)
 
 		for _, item := range items {
-			r.clearReferencedValidation(ctx, dataCenterResource, &item)
+			r.clearReferencedValidation(ctx, dataCenterResource, &item, l)
 		}
 		dataCenterResource.Status.InvolvedResource = ""
 		dataCenterResource.UpdateStatusCondition(chantico.ConditionValidated, metav1.ConditionTrue, chantico.ReasonReconciled, "Validation successful")
@@ -214,194 +225,20 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 	return steps.Continue()
 }
 
-func (r *DataCenterResourceReconciler) reconcileWriteRuleFile(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
-	l := log.FromContext(ctx)
+func (r *DataCenterResourceReconciler) reconcileWriteRule(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
 
-	// Resolve the coefficient templates and apply them to the data center resource
-	resolvedDataCenterResource := dataCenterResource.DeepCopy()
-	resolvedDataCenterResource, err := r.resolveCoefficientTemplates(ctx, resolvedDataCenterResource)
-	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve coefficient template: "+err.Error())
-		return steps.Error(err)
-	}
-	// Resolve the energy metric template and apply it
-	resolvedDataCenterResource, err = r.resolveEnergyMetricTemplate(ctx, resolvedDataCenterResource)
-	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonTemplateResolutionFailed, "Failed to resolve energy metric template: "+err.Error())
-		return steps.Error(err)
-	}
-	ruleFile := dcr.BuildRuleFile(resolvedDataCenterResource)
-
-	if ruleFile == nil {
-		l.Info("No rule file found")
-		if err := deleteRuleFile(dataCenterResource); err != nil {
-			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonCleanupFailed, "Error deleting rule file: "+err.Error())
-			return steps.Error(err)
-		}
-		if err := reloadPrometheus(ctx); err != nil {
-			dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
-			return steps.Error(err)
-		}
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "No recording rule file required")
-		return steps.Continue()
-	}
-
-	volumePath := config.ValidatedEnv.VolumeLocation
-	rulesDir := filepath.Join(volumePath, prometheusRulesDir)
-	if err := os.MkdirAll(rulesDir, 0777); err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to create directory "+rulesDir+": "+err.Error())
+	if err := r.RuleConfigurer.Reconcile(ctx, dataCenterResource); err != nil {
+		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to reconcile recording rules: "+err.Error())
 		return steps.Error(err)
 	}
 
-	data, err := yaml.Marshal(ruleFile)
-	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to marshal rule file: "+err.Error())
-		return steps.Error(err)
-	}
-
-	rulePath := filepath.Join(rulesDir, dataCenterResource.Name+".yml")
-	if err := os.WriteFile(rulePath, data, 0644); err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonApplyFailed, "Failed to write rule file: "+err.Error())
-		return steps.Error(err)
-	}
-
-	l.Info("Wrote recording rule file", "file", rulePath, "resource", dataCenterResource.Name)
-	err = reloadPrometheus(ctx)
-	if err != nil {
-		dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionFalse, chantico.ReasonReloadFailed, "Failed to reload Prometheus: "+err.Error())
-		return steps.Error(err)
-	}
-
-	dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Recording rule file applied successfully")
+	dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Recording rule applied successfully")
 	return steps.Continue()
-}
-
-// Helper function which resolves and performs the substitution for of the templates. Used for both the coefficient templates and energy metrics templates.
-func (r *DataCenterResourceReconciler) resolveAndApplyTemplate(ctx context.Context, namespace string, templateFrom *chantico.TemplateFrom) (string, error) {
-	// Lookup the configmap and resolve retrieve the template text
-	configMap := &corev1.ConfigMap{}
-	if templateFrom == nil {
-		return "", fmt.Errorf("DataCenterResource does not have a template ConfigMap")
-	}
-	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: templateFrom.ConfigMapKeyRef.Name}, configMap); err != nil {
-		return "", fmt.Errorf("get template ConfigMap %q: %w", templateFrom.ConfigMapKeyRef.Name, err)
-	}
-	templateText, ok := configMap.Data[templateFrom.ConfigMapKeyRef.Key]
-	if !ok {
-		return "", fmt.Errorf("template ConfigMap %q does not contain key %q", templateFrom.ConfigMapKeyRef.Name, templateFrom.ConfigMapKeyRef.Key)
-	}
-
-	// Gather all of the template parameters and resolve their values
-	parameters := make(map[string]string, len(templateFrom.Parameters))
-	for _, parameter := range templateFrom.Parameters {
-		value, err := r.resolveEnvVar(ctx, namespace, parameter)
-		if err != nil {
-			return "", fmt.Errorf("resolve template parameter %q: %w", parameter.Name, err)
-		}
-		parameters[parameter.Name] = value
-	}
-
-	// Apply the template with the resolved parameters
-	tmpl, err := template.New(templateFrom.ConfigMapKeyRef.Name).Option("missingkey=error").Parse(templateText)
-	if err != nil {
-		return "", fmt.Errorf("parse template from ConfigMap %q: %w", templateFrom.ConfigMapKeyRef.Name, err)
-	}
-	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, parameters); err != nil {
-		return "", fmt.Errorf("render template from ConfigMap %q: %w", templateFrom.ConfigMapKeyRef.Name, err)
-	}
-	return rendered.String(), nil
-}
-
-// Resolves the coefficient template for each parent in the DataCenterResource spec.
-// The resolved template is put back into the `Coefficient` field of each parent.
-func (r *DataCenterResourceReconciler) resolveCoefficientTemplates(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (*chantico.DataCenterResource, error) {
-	for index := range dataCenterResource.Spec.Parents {
-		parent := &dataCenterResource.Spec.Parents[index]
-		if parent.CoefficientFrom == nil {
-			continue
-		}
-		configMapRef := parent.CoefficientFrom.ConfigMapKeyRef
-		if configMapRef.Name == "" || configMapRef.Key == "" {
-			return nil, fmt.Errorf("parent %q coefficient template requires both configMapKeyRef.name and configMapKeyRef.key", parent.Name)
-		}
-
-		rendered, err := r.resolveAndApplyTemplate(ctx, dataCenterResource.Namespace, parent.CoefficientFrom)
-		if err != nil {
-			return nil, fmt.Errorf("resolve and apply coefficient template for parent %q: %w", parent.Name, err)
-		}
-
-		// Write it back into the parent coefficient field
-		parent.Coefficient = rendered
-	}
-
-	return dataCenterResource, nil
-}
-
-// Resolves the energy metric template and puts the value (after substituting in the template variables) into
-// the `EnergyMetric` field of the DataCenterResource spec.
-func (r *DataCenterResourceReconciler) resolveEnergyMetricTemplate(ctx context.Context, dataCenterResource *chantico.DataCenterResource) (*chantico.DataCenterResource, error) {
-	if dataCenterResource.Spec.EnergyMetricFrom == nil {
-		return dataCenterResource, nil
-	}
-	rendered, err := r.resolveAndApplyTemplate(ctx, dataCenterResource.Namespace, dataCenterResource.Spec.EnergyMetricFrom)
-	if err != nil {
-		return nil, fmt.Errorf("resolve and apply energy metric template: %w", err)
-	}
-	dataCenterResource.Spec.EnergyMetric = rendered
-
-	return dataCenterResource, nil
-}
-
-// This uses the same struct as the kubernetes environment variable to resolve the parameters for a template.
-// It resolves the value of the parameter in the envVar variable, either directly from the Value field,
-// or from a ConfigMap or Secret if ValueFrom is specified.
-func (r *DataCenterResourceReconciler) resolveEnvVar(ctx context.Context, namespace string, variable corev1.EnvVar) (string, error) {
-
-	if variable.ValueFrom == nil {
-		return variable.Value, nil
-	}
-
-	// Resolve the value from a config map
-	if ref := variable.ValueFrom.ConfigMapKeyRef; ref != nil {
-		configMap := &corev1.ConfigMap{}
-		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ref.Name}, configMap); err != nil {
-			return "", fmt.Errorf("get ConfigMap %q: %w", ref.Name, err)
-		}
-		value, ok := configMap.Data[ref.Key]
-		if !ok {
-			return "", fmt.Errorf("ConfigMap %q does not contain key %q", ref.Name, ref.Key)
-		}
-		return value, nil
-	}
-
-	// Resolve the value from a secret
-	if ref := variable.ValueFrom.SecretKeyRef; ref != nil {
-		secret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ref.Name}, secret); err != nil {
-			return "", fmt.Errorf("get Secret %q: %w", ref.Name, err)
-		}
-		value, ok := secret.Data[ref.Key]
-		if !ok {
-			return "", fmt.Errorf("Secret %q does not contain key %q", ref.Name, ref.Key)
-		}
-		return string(value), nil
-	}
-	return "", fmt.Errorf("must specify configMapKeyRef or secretKeyRef")
 }
 
 func (r *DataCenterResourceReconciler) reconcileReady(ctx context.Context, dataCenterResource *chantico.DataCenterResource) steps.StepResult {
 	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionTrue, chantico.ReasonReconciled, "Fully reconciled and ready")
 	return steps.Continue()
-}
-
-func deleteRuleFile(dataCenterResource *chantico.DataCenterResource) error {
-	volumePath := config.ValidatedEnv.VolumeLocation
-	rulePath := filepath.Join(volumePath, prometheusRulesDir, dataCenterResource.Name+".yml")
-	if err := os.Remove(rulePath); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return nil
 }
 
 func validationFailureReason(err error) chantico.ConditionReason {
@@ -434,37 +271,19 @@ func (r *DataCenterResourceReconciler) clearReferencedValidation(
 	ctx context.Context,
 	dataCenterResource *chantico.DataCenterResource,
 	referenced *chantico.DataCenterResource,
+	l logr.Logger,
 ) {
 	referenced.GetConditions()
 	// Revalidate if previously failed or current item is being removed
 	if meta.IsStatusConditionFalse(*referenced.GetConditions(), string(chantico.ConditionValidated)) || meta.IsStatusConditionFalse(*dataCenterResource.GetConditions(), string(chantico.ConditionValidated)) {
-		patch := ph.Initialize(ctx, r.Client, referenced)
+		patcher, err := patch.NewHelper(referenced, r.Client)
+		if err != nil {
+			l.Error(err, "Failed to create patch helper for referenced DataCenterResource", "referenced", referenced.Name)
+			return
+		}
 		referenced.Status.InvolvedResource = ""
-		_ = patch.PatchStatus()
+		if err := patcher.Patch(ctx, referenced, patch.WithStatusObservedGeneration{}); err != nil {
+			l.Error(err, "Failed to patch referenced DataCenterResource", "referenced", referenced.Name)
+		}
 	}
-}
-func reloadPrometheus(ctx context.Context) error {
-	l := log.FromContext(ctx)
-	host := config.ValidatedEnv.PrometheusServiceHost
-	port := config.ValidatedEnv.PrometheusServicePort
-
-	sanitizedPrometheusURL := url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort(host, port),
-		Path:   "/-/reload",
-	}
-	resp, err := http.Post(sanitizedPrometheusURL.String(), "", nil)
-	if err != nil {
-		l.Error(err, "Failed to reload Prometheus")
-		return err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	if resp.StatusCode != http.StatusOK {
-		l.Info("Prometheus reload returned status", "status", resp.StatusCode)
-		return fmt.Errorf("prometheus reload returned status %d", resp.StatusCode)
-	}
-	l.Info("Prometheus configuration reloaded")
-	return nil
 }

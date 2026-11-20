@@ -39,7 +39,7 @@ jobs:
             docs/go.sum
 
       - name: Cache Hugo modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/hugo_cache/modules
           key: ${{ runner.os }}-hugo-modules-${{ hashFiles('docs/go.sum') }}
@@ -50,27 +50,13 @@ jobs:
         run: |
           make docs-mod-download
 
-      - name: Build and run documentation
+      - name: Build the documentation
+        env:
+          HUGO_PARAMS_KROKI_ENDPOINT: http://localhost:8000/
         run: |
-          make docs-sources
-          make docs-serve-only &
+          make docs-build
 
-          echo "Waiting for Hugo server on port ${{ env.DOCS_PORT }}..."
-          TIMEOUT=180
-          ELAPSED=0
-          
-          while ! curl -s --head http://localhost:${{ env.DOCS_PORT }} > /dev/null; do
-            if [ $ELAPSED -ge $TIMEOUT ]; then
-              echo "Error: Hugo server failed to start within $TIMEOUT seconds."
-              exit 1
-            fi
-            sleep 1
-            ELAPSED=$((ELAPSED + 1))
-          done
-          
-          echo "Hugo server is up and running!"
-
-      - name: Run tests against local server
+      - name: Run tests
         run: |
           make docs-test
 
@@ -78,6 +64,20 @@ jobs:
         with:
           name: docs-${{ steps.clean_name.outputs.clean_ref }}
           path: docs/public
+
+    services:
+      kroki:
+        image: yuzutech/kroki:0.34.0
+        ports:
+          - 8000:8000
+        env:
+          KROKI_MERMAID_HOST: mermaid
+        options: >-
+          --health-cmd "wget -qO- http://localhost:8000/health || exit 1"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      mermaid:
+        image: yuzutech/kroki-mermaid:0.34.0 # same version as kroki
+
 
   # Deployment of documentation to GitHub Pages
   pages:

@@ -1,9 +1,22 @@
 {{- if and .Values.controller.include .Values.controller.image }}
-# Generated from controller-gen rbac markers — keep rules in sync with `make manifests` and manually add any additional rules as needed
+{{- $watchNamespace := .Values.controller.watchNamespace | default .Release.Namespace }}
+{{- $allNamespaces := eq $watchNamespace "*" }}
+{{- $deploymentsCoveredByManagerRole := or $allNamespaces (eq $watchNamespace .Release.Namespace) }}
+# Originally generated from controller-gen rbac markers
+# Keep rules in sync with `make manifests` and manually add any additional rules as needed
+# The chantico-manager-role allows access (create/update/watch/get/list) to the resources
+# managed by the controller, including configmaps. If the watched resources live in
+# the same namespace as the release namespace or if we watch resources in all namespaces,
+# then the chantico-snmp Deployment is included here. As the release namespace is independent of the
+# watched namespace, its rules need their own Role/RoleBinding when watchNamespace differs
+# from the release namespace and isn't "*" (which already grants cluster-wide access).
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: {{ if $allNamespaces }}ClusterRole{{ else }}Role{{ end }}
 metadata:
   name: {{ include "chantico.fullname" . }}-manager-role
+  {{- if not $allNamespaces }}
+  namespace: {{ $watchNamespace }}
+  {{- end }}
   labels:
     {{- include "chantico.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller
@@ -17,9 +30,21 @@ rules:
   resources:
   - configmaps
   verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
   - get
   - list
   - watch
+{{- if $deploymentsCoveredByManagerRole }}
 - apiGroups:
   - apps
   resources:
@@ -30,6 +55,7 @@ rules:
   - watch
   - update
   - patch
+{{- end }}
 - apiGroups:
   - batch
   resources:
@@ -81,11 +107,28 @@ rules:
   - create
   - patch
   - update
+  # Allow access to Prometheus Operator Resources monitoring resources
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - prometheusrules
+  - scrapeconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: {{ if $allNamespaces }}ClusterRoleBinding{{ else }}RoleBinding{{ end }}
 metadata:
   name: {{ include "chantico.fullname" . }}-manager-rolebinding
+  {{- if not $allNamespaces }}
+  namespace: {{ $watchNamespace }}
+  {{- end }}
   labels:
     {{- include "chantico.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller
@@ -95,12 +138,57 @@ metadata:
   {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: {{ if $allNamespaces }}ClusterRole{{ else }}Role{{ end }}
   name: {{ include "chantico.fullname" . }}-manager-role
 subjects:
 - kind: ServiceAccount
   name: {{ include "chantico.fullname" . }}-controller-manager
   namespace: {{ .Release.Namespace }}
+{{- if not $deploymentsCoveredByManagerRole }}
+---
+# The chantico-snmp Deployment always lives in the release namespace, so it needs its own
+# Role/RoleBinding here since chantico-manager-role is scoped to the watch namespace instead.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chantico-manager-deployments-role
+  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chantico-manager-deployments-rolebinding
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chantico-manager-deployments-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "chantico.fullname" . }}-controller-manager
+  namespace: {{ .Release.Namespace }}
+{{- end }}
 ---
 # Leader election — namespaced Role
 apiVersion: rbac.authorization.k8s.io/v1
@@ -169,3 +257,53 @@ subjects:
   name: {{ include "chantico.fullname" . }}-controller-manager
   namespace: {{ .Release.Namespace }}
 {{- end }}
+---
+# RBAC resources for Prometheus to discover Kubernetes targets and scrape metrics.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/metrics
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["get"]
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs: ["get", "list", "watch"]
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: {{ .Release.Namespace }}
