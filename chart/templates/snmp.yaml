@@ -2,25 +2,18 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: snmp-exporter
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  name: {{ include "chantico.fullname" . }}-snmp
+    app: chantico
+  name: chantico-snmp
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ include "chantico.fullname" . }}-snmp
+      app: chantico-snmp
   template:
     metadata:
       labels:
-        app: {{ include "chantico.fullname" . }}-snmp
-        {{- include "chantico.labels" . | nindent 8 }}
-        app.kubernetes.io/component: snmp-exporter
+        app: chantico-snmp
     spec:
       securityContext:
         runAsNonRoot: true
@@ -58,19 +51,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "chantico.fullname" . }}-snmp
+  name: chantico-snmp
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: snmp-exporter
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
   type: {{ .Values.snmp.service.type }}
   selector:
-    app: {{ include "chantico.fullname" . }}-snmp
+    app: chantico-snmp
   ports:
     - protocol: TCP
       port: 9116

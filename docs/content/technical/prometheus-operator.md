@@ -83,7 +83,7 @@ scrapeConfigNamespaceSelector:
 ```
 
 The retention, scrape and evaluation intervals, and the VictoriaMetrics
-`remoteWrite` (when `victoriaMetrics.include` is enabled) are set on the same
+`remoteWrite` (when `victoriaMetrics.enabled` is true) are set on the same
 resource. The `chantico-prometheus` Service routes to the Prometheus pods
 created by the operator.
 

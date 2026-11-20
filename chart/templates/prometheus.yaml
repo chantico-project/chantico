@@ -2,15 +2,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "chantico.fullname" . }}-prometheus
+  name: chantico-prometheus
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: prometheus
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    app: chantico-prometheus
 spec:
   type: {{ .Values.prometheus.service.type }}
   selector:
@@ -18,7 +13,7 @@ spec:
     app.kubernetes.io/name: prometheus
     operator.prometheus.io/name: prometheus
     {{- else }}
-    app: {{ include "chantico.fullname" . }}-prometheus
+    app: chantico-prometheus
     {{- end }}
   ports:
     - protocol: TCP
@@ -60,7 +55,7 @@ spec:
     matchLabels:
       kubernetes.io/metadata.name: {{ $watchNamespace }}
     {{- end }}
-  {{- if .Values.victoriaMetrics.include }}
+  {{- if .Values.victoriaMetrics.enabled }}
   remoteWrite:
-    - url: http://{{ include "chantico.fullname" . }}-victoriametrics:8428/api/v1/write
+    - url: http://chantico-victoriametrics:8428/api/v1/write
   {{- end }}

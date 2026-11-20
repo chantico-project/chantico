@@ -3,16 +3,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "chantico.fullname" . }}-grafana-datasources
+  name: chantico-grafana-datasources
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: grafana
     {{ $grafana.sidecar.datasources.label }}: {{ $grafana.sidecar.datasources.labelValue | quote }}
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 data:
   datasources.yaml: |
     apiVersion: 1
@@ -21,28 +15,22 @@ data:
         uid: chantico-prometheus
         type: prometheus
         access: proxy
-        url: http://{{ include "chantico.fullname" . }}-prometheus:9090
+        url: http://chantico-prometheus:9090
         isDefault: true
       - name: Chantico-VictoriaMetrics
         uid: chantico-victoriametrics
         type: prometheus
         access: proxy
-        url: http://{{ include "chantico.fullname" . }}-victoriametrics:8428
+        url: http://chantico-victoriametrics:8428
         isDefault: false
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "chantico.fullname" . }}-grafana-dashboards
+  name: chantico-grafana-dashboards
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: grafana
     {{ $grafana.sidecar.dashboards.label }}: {{ $grafana.sidecar.dashboards.labelValue | quote }}
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 data:
 {{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
   {{ base $path }}: |
@@ -52,15 +40,8 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "chantico.fullname" . }}-grafana
+  name: chantico-grafana
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: grafana
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
   type: {{ $grafana.service.type }}
   selector:

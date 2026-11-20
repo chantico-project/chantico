@@ -1,4 +1,4 @@
-{{- if .Values.victoriaMetrics.include }}
+{{- if .Values.victoriaMetrics.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -22,26 +22,19 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   labels:
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: victoriametrics
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  name: {{ include "chantico.fullname" . }}-victoriametrics
+    app: chantico
+  name: chantico-victoriametrics
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
-  serviceName: {{ include "chantico.fullname" . }}-victoriametrics
+  serviceName: chantico-victoriametrics
   selector:
     matchLabels:
-      app: {{ include "chantico.fullname" . }}-victoriametrics
+      app: chantico-victoriametrics
   template:
     metadata:
       labels:
-        app: {{ include "chantico.fullname" . }}-victoriametrics
-        {{- include "chantico.labels" . | nindent 8 }}
-        app.kubernetes.io/component: victoriametrics
+        app: chantico-victoriametrics
     spec:
       securityContext:
         runAsNonRoot: true
@@ -117,19 +110,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "chantico.fullname" . }}-victoriametrics
+  name: chantico-victoriametrics
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: victoriametrics
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
   type: {{ .Values.victoriaMetrics.service.type }}
   selector:
-    app: {{ include "chantico.fullname" . }}-victoriametrics
+    app: chantico-victoriametrics
   ports:
     - protocol: TCP
       port: 8428

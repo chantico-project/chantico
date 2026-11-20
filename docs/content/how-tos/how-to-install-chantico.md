@@ -16,7 +16,7 @@ helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico
 
 - The command above installs the latest version of Chantico. See available [chart versions](https://github.com/chantico-project/chantico/pkgs/container/charts%2Fchantico). Also check out the [releases](https://github.com/chantico-project/chantico/releases) or the [changelog](/technical/changelog.md) on the documentation website for the list of changes throughout the version history.
 
-- Inspect the [values.yaml](https://github.com/chantico-project/chantico/blob/main/chart/values.yaml) file to see what parameters can be provided. For example, excluding the Chantico controller from the installation can be done with `--set controller.include=false`.
+- Inspect the [values.yaml](https://github.com/chantico-project/chantico/blob/main/chart/values.yaml) file to see what parameters can be provided. For example, excluding the Chantico controller from the installation can be done with `--set controller.enabled=false`.
 
 ## Upgrading using OCI Registry
 
@@ -52,7 +52,7 @@ helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico
   --set pvc.storageClassName="STORAGE_CLASS_NAME"
 ```
 
-The shared claim name is configured with `persistentVolumeClaimName`. To use an existing claim, set its name and disable creation with `pvc.include=false`. Disabling creation does not disable the volume mount.
+The shared claim name is configured with `persistentVolumeClaimName`. To use an existing claim, set its name and disable creation with `pvc.enabled=false`. Disabling creation does not disable the volume mount.
 
 ### VictoriaMetrics storage
 

@@ -1,31 +1,19 @@
-{{- if and .Values.controller.include .Values.controller.image.repository }}
+{{- if and .Values.controller.enabled .Values.controller.image.repository }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "chantico.fullname" . }}-controller-manager
+  name: chantico-controller-manager
   namespace: {{ .Release.Namespace }}
   labels:
     control-plane: controller-manager
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: controller
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "chantico.fullname" . }}-controller-manager
+  name: chantico-controller-manager
   namespace: {{ .Release.Namespace }}
   labels:
     control-plane: controller-manager
-    {{- include "chantico.labels" . | nindent 4 }}
-    app.kubernetes.io/component: controller
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
   replicas: 1
   selector:
@@ -35,8 +23,6 @@ spec:
     metadata:
       labels:
         control-plane: controller-manager
-        {{- include "chantico.labels" . | nindent 8 }}
-        app.kubernetes.io/component: controller
         chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
@@ -76,7 +62,7 @@ spec:
             - name: CHANTICO_WATCH_NAMESPACE
               value: {{ .Values.controller.watchNamespace | default .Release.Namespace | quote }}
             - name: CHANTICO_SNMP_EXPORTER_SERVICE_HOST
-              value: "{{ include "chantico.fullname" . }}-snmp.{{ .Release.Namespace }}.svc.cluster.local"
+              value: "chantico-snmp.{{ .Release.Namespace }}.svc.cluster.local"
             - name: CHANTICO_SNMP_EXPORTER_SERVICE_PORT
               value: "9116"
           ports:
@@ -120,6 +106,6 @@ spec:
       imagePullSecrets:
         - name: {{ .Values.imagePullSecretName }}
       {{- end }}
-      serviceAccountName: {{ include "chantico.fullname" . }}-controller-manager
+      serviceAccountName: chantico-controller-manager
       terminationGracePeriodSeconds: 10
 {{- end }}

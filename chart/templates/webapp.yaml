@@ -1,4 +1,4 @@
-{{- if (index .Values "visualisationWebapp").include }}
+{{- if .Values.webapp.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -49,8 +49,8 @@ spec:
       serviceAccountName: chantico-visualisation-webapp
       containers:
         - name: chantico-visualisation-webapp
-          image: "{{ .Values.visualisationWebapp.image.repository }}:{{ .Values.visualisationWebapp.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.visualisationWebapp.image.pullPolicy | default "IfNotPresent" }}
+          image: "{{ .Values.webapp.image.repository }}:{{ .Values.webapp.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.webapp.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - containerPort: 80
           livenessProbe:
@@ -75,13 +75,13 @@ metadata:
   name: chantico-visualisation-webapp
   namespace: {{ .Release.Namespace }}
 spec:
-  type: {{ .Values.visualisationWebapp.service.type }}
+  type: {{ .Values.webapp.service.type }}
   selector:
     app: chantico-visualisation-webapp
   ports:
     - protocol: TCP
       port: 80
-      {{- if eq .Values.visualisationWebapp.service.type "NodePort" }}
+      {{- if eq .Values.webapp.service.type "NodePort" }}
       nodePort: 30005
       {{- else }}
       targetPort: 80
