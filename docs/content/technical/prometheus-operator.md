@@ -70,7 +70,7 @@ that only selects the resources managed by Chantico:
 ```yaml
 ruleSelector:
   matchLabels:
-    app.kubernetes.io/managed-by: chantico
+    chantico-project.io/prometheus-rule: "true"
 ruleNamespaceSelector:
   matchLabels:
     kubernetes.io/metadata.name: <release namespace>
@@ -86,6 +86,13 @@ The retention, scrape and evaluation intervals, and the VictoriaMetrics
 `remoteWrite` (when `victoriaMetrics.include` is enabled) are set on the same
 resource. The `chantico-prometheus` Service routes to the Prometheus pods
 created by the operator.
+
+Prometheus rules carry the `chantico-project.io/prometheus-rule: "true"` label,
+which the instance uses to select both the chart's static overhead rules and
+rules generated for `DataCenterResource`s. The static rule is installed in the
+watched namespace; when `controller.watchNamespace` is `*`, it is installed in
+the release namespace and the Prometheus instance selects rules from all
+namespaces.
 
 ## Grafana
 

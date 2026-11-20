@@ -37,9 +37,9 @@ const (
 )
 
 type ExpectedRule struct {
-	Record         string
-	Expr           string
-	ServiceIdLabel string
+	Record string
+	Expr   string
+	Labels map[string]string
 }
 
 func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
@@ -49,9 +49,11 @@ func testExpectedRule(t *testing.T, rule RecordingRule, expected ExpectedRule) {
 	if rule.Expr != expected.Expr {
 		t.Errorf("Expected rule expr = %q, got %q", expected.Expr, rule.Expr)
 	}
-	if expected.ServiceIdLabel != "" {
-		if val, ok := rule.Labels[testServiceIdLabel]; !ok || val != expected.ServiceIdLabel {
-			t.Errorf("Expected serviceId label = %q, got %q", expected.ServiceIdLabel, val)
+	if expected.Labels != nil {
+		for k, v := range expected.Labels {
+			if val, ok := rule.Labels[k]; !ok || val != v {
+				t.Errorf("Expected label %q = %q, got %q", k, v, val)
+			}
 		}
 	}
 }
@@ -202,7 +204,7 @@ func TestSanitizeMetricName(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			result := SanitizeMetricName(tc.input)
+			result := sanitizeMetricName(tc.input)
 			if result != tc.expected {
 				t.Errorf("sanitizeMetricName(%q) = %q, want %q", tc.input, result, tc.expected)
 			}
@@ -255,7 +257,7 @@ func TestCoefficientMetricQuery(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			result := CoefficientMetricQuery(tc.parentName, tc.childName)
+			result := coefficientMetricQuery(tc.parentName, tc.childName)
 			if result != tc.expected {
 				t.Errorf("CoefficientMetricQuery(%q, %q) = %q, want %q",
 					tc.parentName, tc.childName, result, tc.expected)
@@ -279,9 +281,11 @@ func TestBuildRecordingRules_RootNodeNoChildren(t *testing.T) {
 		t.Fatalf("Expected 1 alias rule for root node, got %d rules", len(rules))
 	}
 	testExpectedRule(t, rules[0], ExpectedRule{
-		Record:         "chantico_power_watts",
-		Expr:           testSNMPPDU1PowerWatts,
-		ServiceIdLabel: testServiceId,
+		Record: "chantico_power_watts",
+		Expr:   testSNMPPDU1PowerWatts,
+		Labels: map[string]string{
+			testServiceIdLabel: testServiceId,
+		},
 	})
 }
 
@@ -306,10 +310,22 @@ func TestBuildRecordingRules_RootNodeWithParentsWithCoefficients(t *testing.T) {
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record: "chantico_power_coefficient",
 		Expr:   testPDU1Coefficient,
+		Labels: map[string]string{
+			"kind":   EnergyCoefficientKindAttribution,
+			"parent": testPDU1,
+			"child":  testBM1,
+			"type":   DataCenterResourceTypeBaremetal,
+		},
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
 		Record: "chantico_power_coefficient",
 		Expr:   testPDU2Coefficient,
+		Labels: map[string]string{
+			"kind":   EnergyCoefficientKindAttribution,
+			"parent": testPDU2,
+			"child":  testBM1,
+			"type":   DataCenterResourceTypeBaremetal,
+		},
 	})
 }
 
@@ -333,16 +349,28 @@ func TestBuildRecordingRules_NonRootWithParentsAndChildren(t *testing.T) {
 	testExpectedRule(t, rules[0], ExpectedRule{
 		Record: "chantico_power_coefficient",
 		Expr:   testPDU1Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU1,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 	testExpectedRule(t, rules[1], ExpectedRule{
 		Record: "chantico_power_coefficient",
 		Expr:   testPDU2Coefficient,
+		Labels: map[string]string{
+			"kind":     EnergyCoefficientKindAttribution,
+			"parent":   testPDU2,
+			"resource": testBM1,
+			"type":     DataCenterResourceTypeBaremetal,
+		},
 	})
 
 	// Last should be the energy rule
 	testExpectedRule(t, rules[2], ExpectedRule{
 		Record: "chantico_power_watts",
-		Expr:   `sum(chantico_power_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_power_watts, "parent", "$1", "resource", "(.*)"))`,
+		Expr:   `sum(chantico_power_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`,
 	})
 }
 
@@ -363,9 +391,9 @@ func TestBuildRecordingRules_LeafNode(t *testing.T) {
 	}
 
 	testExpectedRule(t, rules[0], ExpectedRule{
-		Record:         "chantico_power_watts",
-		Expr:           `sum(chantico_power_coefficient{child="vm1"} * on (parent) group_left () label_replace(chantico_power_watts, "parent", "$1", "resource", "(.*)"))`,
-		ServiceIdLabel: "a479357a-2680-4577-8ffe-5105e634c836",
+		Record: "chantico_power_watts",
+		Expr:   `sum(chantico_power_coefficient{child="vm1"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`,
+		Labels: map[string]string{"serviceId": "a479357a-2680-4577-8ffe-5105e634c836"},
 	})
 }
 
@@ -453,7 +481,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	if len(vm1Rules) != 2 {
 		t.Fatalf("VM1: expected 2 rules, got %d", len(vm1Rules))
 	}
-	expectedExpr := `sum(chantico_power_coefficient{child="vm1"} * on (parent) group_left () label_replace(chantico_power_watts, "parent", "$1", "resource", "(.*)"))`
+	expectedExpr := `sum(chantico_power_coefficient{child="vm1"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`
 	if vm1Rules[1].Expr != expectedExpr {
 		t.Errorf("VM1: expected expr %q, got %q", expectedExpr, vm1Rules[1].Expr)
 	}
@@ -473,7 +501,7 @@ func TestBuildRecordingRules_ThreeLayerHierarchy(t *testing.T) {
 	if len(vm2Rules) != 2 {
 		t.Fatalf("VM2: expected 2 rules, got %d", len(vm2Rules))
 	}
-	expectedExpr = `sum(chantico_power_coefficient{child="vm2"} * on (parent) group_left () label_replace(chantico_power_watts, "parent", "$1", "resource", "(.*)"))`
+	expectedExpr = `sum(chantico_power_coefficient{child="vm2"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`
 	if vm2Rules[1].Expr != expectedExpr {
 		t.Errorf("VM2: expected expr %q, got %q", expectedExpr, vm2Rules[1].Expr)
 	}
@@ -493,7 +521,7 @@ func TestBuildRecordingRules_ManyToOneParents(t *testing.T) {
 	}
 
 	// Parents should be sorted in the expression
-	expectedExpr := `sum(chantico_power_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_power_watts, "parent", "$1", "resource", "(.*)"))`
+	expectedExpr := `sum(chantico_power_coefficient{child="bm1"} * on (parent) group_left () label_replace(chantico_power_watts{kind="total"}, "parent", "$1", "resource", "(.*)"))`
 	if rules[0].Expr != expectedExpr {
 		t.Errorf("Expected expr %q, got %q", expectedExpr, rules[0].Expr)
 	}

@@ -19,3 +19,8 @@ package k8s
 var ManagedResourceLabels = map[string]string{
 	"app.kubernetes.io/managed-by": "chantico",
 }
+
+var PrometheusRuleLabels = map[string]string{
+	"app.kubernetes.io/managed-by":        "chantico",
+	"chantico-project.io/prometheus-rule": "true",
+}
