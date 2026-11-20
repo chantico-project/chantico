@@ -1,3 +1,9 @@
+## 0.27.0 (2026-11-20)
+
+#### Feature
+
+* Improve webapp visualizer to show more nodes and update automatically (#278) (4c44c876)
+
 ## 0.27.0 (2026-11-17)
 
 #### Feature
