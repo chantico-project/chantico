@@ -146,6 +146,34 @@ func TestGraphAPI(t *testing.T) {
 	})
 }
 
+func TestSuggestAPI(t *testing.T) {
+	h := newTestServer(t,
+		newDCR("ns1", "pdu-a"),
+		newDCR("ns1", "pdu-b"),
+		newDCR("ns1", "vm-1"),
+		newDCR("ns2", "pdu-other"),
+	)
+
+	rec := serve(t, h, http.MethodGet, "/api/nodes/suggest?namespace=ns1&q=PDU", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{`data-label="pdu-a"`, `data-label="pdu-b"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %s: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "vm-1") || strings.Contains(body, "pdu-other") {
+		t.Errorf("body includes non-matching nodes: %s", body)
+	}
+
+	rec = serve(t, h, http.MethodGet, "/api/nodes/suggest?namespace=ns1&q=", nil)
+	if rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != "" {
+		t.Errorf("empty query: status = %d, body = %q, want 200 and empty", rec.Code, rec.Body.String())
+	}
+}
+
 func TestNamespacesAPI(t *testing.T) {
 	h := newTestServer(t,
 		newDCR("beta", "a"),

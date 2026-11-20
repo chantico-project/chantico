@@ -10,6 +10,7 @@ const searchForm = document.getElementById("node-search");
 const searchInput = document.getElementById("node-search-input");
 const searchClear = document.getElementById("node-search-clear");
 const searchStatus = document.getElementById("node-search-status");
+const suggestionList = document.getElementById("node-suggestions");
 
 let searchedNode = "";
 
@@ -162,13 +163,26 @@ const cy = window.cytoscape({
 cy.on("mouseover", "node", (event) => event.target.addClass("hovered"));
 cy.on("mouseout", "node", (event) => event.target.removeClass("hovered"));
 
-cy.on("tap", "node", (event) => {
+function selectNode(node) {
   cy.nodes(".selected").removeClass("selected");
-  event.target.addClass("selected");
+  node.addClass("selected");
   document.body.dispatchEvent(
-    new window.CustomEvent("node-selected", { bubbles: true, detail: { id: event.target.id() } }),
+    new window.CustomEvent("node-selected", { bubbles: true, detail: { id: node.id() } }),
   );
+}
+
+cy.on("tap", "node", (event) => selectNode(event.target));
+cy.on("dblclick", "node", (event) => {
+  searchInput.value = event.target.data("label");
+  runSearch(event.target.data("label"));
 });
+cy.on("dblclick", (event) => {
+  if (event.target === cy) {
+    searchInput.value = "";
+    runSearch("");
+  }
+});
+
 
 // Resizing logic
 function resizePanes(event) {
@@ -268,18 +282,81 @@ async function runSearch(name) {
 
 searchForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  clearSuggestions();
   runSearch(searchInput.value.trim());
 });
 
 searchClear.addEventListener("click", () => {
   searchInput.value = "";
+  clearSuggestions();
   runSearch("");
+});
+
+function clearSuggestions() {
+  suggestionList.replaceChildren();
+  searchInput.setAttribute("aria-expanded", "false");
+}
+
+function activeSuggestion() {
+  return suggestionList.querySelector(".suggestion.active");
+}
+
+function setActiveSuggestion(item) {
+  activeSuggestion()?.classList.remove("active");
+  if (item) {
+    item.classList.add("active");
+    searchInput.setAttribute("aria-activedescendant", item.id);
+  } else {
+    searchInput.removeAttribute("aria-activedescendant");
+  }
+}
+
+function chooseSuggestion(item) {
+  searchInput.value = item.dataset.label;
+  clearSuggestions();
+  runSearch(item.dataset.label).then(() => {
+    const node = cy.getElementById(item.dataset.id);
+    if (node.nonempty()) {
+      selectNode(node);
+    }
+  });
+}
+
+suggestionList.addEventListener("click", (event) => {
+  const item = event.target.closest(".suggestion");
+  if (item) {
+    chooseSuggestion(item);
+  }
+});
+
+searchInput.addEventListener("keydown", (event) => {
+  const items = [...suggestionList.querySelectorAll(".suggestion")];
+  if (items.length === 0) {
+    return;
+  }
+  const index = items.indexOf(activeSuggestion());
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    const next = (index + step + items.length) % items.length;
+    setActiveSuggestion(items[next]);
+  } else if (event.key === "Enter" && index !== -1) {
+    event.preventDefault();
+    chooseSuggestion(items[index]);
+  } else if (event.key === "Escape") {
+    clearSuggestions();
+  }
+});
+
+searchInput.addEventListener("htmx:afterSettle", () => {
+  searchInput.setAttribute("aria-expanded", suggestionList.children.length > 0 ? "true" : "false");
 });
 
 namespaceSelect.addEventListener("change", () => {
   searchedNode = "";
   searchInput.value = "";
   setSearchStatus("");
+  clearSuggestions();
   refreshGraph();
 });
 refreshNamespaces().then(() => refreshGraph());
