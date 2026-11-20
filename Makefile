@@ -26,6 +26,10 @@ VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visu
 VISUALISATION_WEBAPP_TAG ?= $(IMAGE_TAG)
 VISUALISATION_WEBAPP_IMG ?= $(VISUALISATION_WEBAPP_REPOSITORY):$(VISUALISATION_WEBAPP_TAG)
 
+# Opt-in Gateway API setup for Kind (see cluster-gateway).
+ENVOY_GATEWAY_VERSION ?= v1.10.0
+CLUSTER_GATEWAY ?= false
+
 LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
 LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 
@@ -185,7 +189,19 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 		--set webapp.image.registry="" \
 		--set webapp.image.repository="$(VISUALISATION_WEBAPP_REPOSITORY)" \
 		--set webapp.image.tag="$(VISUALISATION_WEBAPP_TAG)" \
-		--set webapp.service.type="NodePort"
+		--set webapp.service.type="NodePort" \
+		--set webapp.httpRoute.enabled=$(CLUSTER_GATEWAY) \
+		--set webapp.httpRoute.parentRefs[0].name=chantico-dev
+
+.PHONY: cluster-gateway
+cluster-gateway: ## Install Envoy Gateway with a dev Gateway and route the webapp through it (http://localhost:18080)
+	helm upgrade --install eg oci://docker.io/envoyproxy/gateway-helm \
+		--version $(ENVOY_GATEWAY_VERSION) \
+		--namespace envoy-gateway-system --create-namespace
+	$(KUBECTL) wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
+	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	$(KUBECTL) apply -n $(CHANTICO_NAMESPACE) -f dev/k8s/gateway.yaml
+	$(MAKE) cluster-configure CLUSTER_GATEWAY=true
 
 .PHONY: cluster-load-visualisation-webapp
 cluster-load-visualisation-webapp: kind ## Load the visualisation webapp image into the Kind cluster.

@@ -24,3 +24,5 @@ nodes:
         containerPort: 30909
       - hostPort: 38080 # visualisation-webapp
         containerPort: 30005
+      - hostPort: 18080 # envoy-gateway (opt-in, make cluster-gateway)
+        containerPort: 30080

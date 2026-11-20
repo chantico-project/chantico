@@ -113,6 +113,12 @@ webapp:
     pullPolicy: IfNotPresent
   service:
     type: "ClusterIP"
+  # Gateway API HTTPRoute; needs the Gateway API CRDs and an existing Gateway
+  httpRoute:
+    enabled: false
+    parentRefs: [] # e.g. [{name: my-gateway, namespace: gateway-system}]
+    hostnames: [] # empty matches all hostnames of the Gateway listener
+    annotations: {}
 # Shared claim of the controller, SNMP generator jobs and filebrowser
 persistence:
   existingClaim: "" # use this claim instead of creating chantico-persistent-volume-claim

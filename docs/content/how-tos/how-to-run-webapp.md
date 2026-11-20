@@ -24,6 +24,24 @@ The webapp Service is internal to the cluster by default. Forward it to your mac
 kubectl port-forward -n chantico service/chantico-visualisation-webapp 8080:80
 ```
 
+#### Expose the webapp through the Gateway API
+
+The chart can create an `HTTPRoute` for the webapp. This requires the [Gateway API](https://gateway-api.sigs.k8s.io/) CRDs, a Gateway API implementation and an existing `Gateway` that allows routes from the Chantico namespace:
+
+```sh
+helm upgrade --install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico \
+  --set webapp.enabled=true \
+  --set webapp.httpRoute.enabled=true \
+  --set webapp.httpRoute.parentRefs[0].name=my-gateway \
+  --set webapp.httpRoute.parentRefs[0].namespace=gateway-system \
+  --set webapp.httpRoute.hostnames[0]=chantico.example.com
+```
+
+The webapp has no authentication and its service account can read all DataCenterResource objects in the cluster. Only expose it on trusted networks, or add appropriate authentication at the Gateway.
+
+In the local development environment, `make cluster-gateway` installs [Envoy Gateway](https://gateway.envoyproxy.io/), creates the `chantico-dev` Gateway from `dev/k8s/gateway.yaml` and reruns `cluster-configure` with the route enabled. 
+The webapp is then available at [http://localhost:18080](http://localhost:18080). 
+
 #### Use a locally built image in the development cluster
 
 When using the local development environment, `make cluster-configure` deploys 
