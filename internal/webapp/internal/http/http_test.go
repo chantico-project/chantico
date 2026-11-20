@@ -119,6 +119,25 @@ func TestGraphAPI(t *testing.T) {
 		}
 	})
 
+	t.Run("neighbourhood includes grandparents and grandchildren", func(t *testing.T) {
+		deep := newTestServer(t,
+			newDCR("ns1", "root"),
+			newDCR("ns1", "mid", "root"),
+			newDCR("ns1", "leaf", "mid"),
+		)
+		rec := serve(t, deep, http.MethodGet, "/api/graph?namespace=ns1&node=mid", nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		var sub graph.Elements
+		if err := json.Unmarshal(rec.Body.Bytes(), &sub); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if len(sub.Nodes) != 3 || len(sub.Edges) != 2 {
+			t.Errorf("nodes = %d, edges = %d, want 3 and 2", len(sub.Nodes), len(sub.Edges))
+		}
+	})
+
 	t.Run("neighbourhood unknown node", func(t *testing.T) {
 		rec := serve(t, h, http.MethodGet, "/api/graph?namespace=ns1&node=other", nil)
 		if rec.Code != http.StatusNotFound {

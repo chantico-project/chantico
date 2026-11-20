@@ -114,9 +114,9 @@ func TestNeighbourhood(t *testing.T) {
 		id   string
 		want []string
 	}{
-		{name: "middle node keeps parent and child", id: "ns-middle", want: []string{"ns-root", "ns-middle", "ns-leaf"}},
-		{name: "root keeps only its child", id: "ns-root", want: []string{"ns-root", "ns-middle"}},
-		{name: "leaf keeps only its parent", id: "ns-leaf", want: []string{"ns-middle", "ns-leaf"}},
+		{name: "middle node keeps all ancestors and descendants", id: "ns-middle", want: []string{"ns-root", "ns-middle", "ns-leaf"}},
+		{name: "root keeps all descendants", id: "ns-root", want: []string{"ns-root", "ns-middle", "ns-leaf"}},
+		{name: "leaf keeps all ancestors", id: "ns-leaf", want: []string{"ns-root", "ns-middle", "ns-leaf"}},
 		{name: "isolated node stands alone", id: "ns-isolated", want: []string{"ns-isolated"}},
 		{name: "unknown node", id: "ns-missing", want: nil},
 	}
@@ -140,6 +140,82 @@ func TestNeighbourhood(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNeighbourhoodTopologies(t *testing.T) {
+	tests := []struct {
+		name      string
+		nodes     []*Node
+		id        string
+		wantNodes []string
+		wantEdges []string
+	}{
+		{
+			name: "diamond includes both branches and the shared root",
+			nodes: []*Node{
+				{Name: "ns-top"},
+				{Name: "ns-left", Parents: []*Node{{Name: "ns-top"}}},
+				{Name: "ns-right", Parents: []*Node{{Name: "ns-top"}}},
+				{Name: "ns-bottom", Parents: []*Node{{Name: "ns-left"}, {Name: "ns-right"}}},
+			},
+			id:        "ns-left",
+			wantNodes: []string{"ns-top", "ns-left", "ns-bottom"},
+			wantEdges: []string{"ns-left->ns-top", "ns-bottom->ns-left"},
+		},
+		{
+			name: "co-parent outside the closure is dropped",
+			nodes: []*Node{
+				{Name: "ns-a"},
+				{Name: "ns-b"},
+				{Name: "ns-child", Parents: []*Node{{Name: "ns-a"}, {Name: "ns-b"}}},
+			},
+			id:        "ns-a",
+			wantNodes: []string{"ns-a", "ns-child"},
+			wantEdges: []string{"ns-child->ns-a"},
+		},
+		{
+			name: "cycle terminates and keeps every member",
+			nodes: []*Node{
+				{Name: "ns-x", Parents: []*Node{{Name: "ns-y"}}},
+				{Name: "ns-y", Parents: []*Node{{Name: "ns-x"}}},
+			},
+			id:        "ns-x",
+			wantNodes: []string{"ns-x", "ns-y"},
+			wantEdges: []string{"ns-x->ns-y", "ns-y->ns-x"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Neighbourhood(tt.nodes, tt.id)
+			var gotNodes []string
+			for _, node := range got {
+				gotNodes = append(gotNodes, node.Name)
+			}
+			if !equalStrings(gotNodes, tt.wantNodes) {
+				t.Fatalf("nodes = %v, want %v", gotNodes, tt.wantNodes)
+			}
+			var gotEdges []string
+			for _, edge := range BuildElements(got).Edges {
+				gotEdges = append(gotEdges, edge.Data["id"])
+			}
+			if !equalStrings(gotEdges, tt.wantEdges) {
+				t.Fatalf("edges = %v, want %v", gotEdges, tt.wantEdges)
+			}
+		})
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func assertData(t *testing.T, kind string, index int, got, want map[string]string) {

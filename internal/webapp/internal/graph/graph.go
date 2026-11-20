@@ -20,37 +20,84 @@ type Elements struct {
 // Neighbourhood returns the node named name together with its direct parents
 // and direct children, keeping the order of nodes. It returns nil when name is
 // not present in nodes.
+// Neighbourhood returns the node named name together with all of its ancestors
+// (parents, grandparents, ...) and all of its descendants (children, children
+// of children, ...), keeping the order of nodes. Parent references are limited
+// to the returned nodes so that no edge points outside the result. It returns
+// nil when name is not present in nodes.
 func Neighbourhood(nodes []*Node, name string) []*Node {
-	var target *Node
+	byName := make(map[string]*Node, len(nodes))
+	children := make(map[string][]string)
 	for _, node := range nodes {
-		if node.Name == name {
-			target = node
-			break
+		if _, exists := byName[node.Name]; !exists {
+			byName[node.Name] = node
+		}
+		for _, parent := range node.Parents {
+			children[parent.Name] = append(children[parent.Name], node.Name)
 		}
 	}
-	if target == nil {
+	if _, ok := byName[name]; !ok {
 		return nil
 	}
 
-	included := map[string]bool{target.Name: true}
-	for _, parent := range target.Parents {
-		included[parent.Name] = true
-	}
-	for _, node := range nodes {
-		for _, parent := range node.Parents {
-			if parent.Name == target.Name {
-				included[node.Name] = true
+	parentsOf := func(current string) []string {
+		var names []string
+		if node, ok := byName[current]; ok {
+			for _, parent := range node.Parents {
+				names = append(names, parent.Name)
 			}
 		}
+		return names
+	}
+	childrenOf := func(current string) []string {
+		return children[current]
+	}
+
+	included := map[string]bool{}
+	for member := range walk(name, parentsOf) {
+		included[member] = true
+	}
+	for member := range walk(name, childrenOf) {
+		included[member] = true
 	}
 
 	result := []*Node{}
 	for _, node := range nodes {
-		if included[node.Name] {
-			result = append(result, node)
+		if !included[node.Name] {
+			continue
 		}
+		kept := &Node{
+			Name:   node.Name,
+			Label:  node.Label,
+			Type:   node.Type,
+			Status: node.Status,
+		}
+		for _, parent := range node.Parents {
+			if included[parent.Name] {
+				kept.Parents = append(kept.Parents, parent)
+			}
+		}
+		result = append(result, kept)
 	}
 	return result
+}
+
+// walk returns the set of names reachable from start by repeatedly applying
+// next, including start itself. The visited set makes cyclic references finite.
+func walk(start string, next func(string) []string) map[string]bool {
+	seen := map[string]bool{start: true}
+	queue := []string{start}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, neighbour := range next(current) {
+			if !seen[neighbour] {
+				seen[neighbour] = true
+				queue = append(queue, neighbour)
+			}
+		}
+	}
+	return seen
 }
 
 func BuildElements(nodes []*Node) Elements {
