@@ -349,6 +349,36 @@ main {
   font-weight: var(--font-weight-bold);
 }
 
+.manifest-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.edit-toggle {
+  padding: var(--space-xs) var(--space-sm);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.edit-toggle:hover,
+.edit-toggle[aria-pressed="true"] {
+  border-color: var(--color-label);
+}
+
+.panel-form textarea[readonly] {
+  color: var(--color-foreground);
+  background-color: var(--color-surface);
+  border-color: var(--color-surface);
+  cursor: default;
+}
+
 .panel details {
   display: flex;
   flex-direction: column;
