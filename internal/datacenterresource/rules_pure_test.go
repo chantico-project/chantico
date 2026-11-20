@@ -73,7 +73,7 @@ func (f *ruleFixture) buildRuleBuilder() *RuleBuilder {
 		},
 	}
 	for _, parent := range f.Parents {
-		resource.Spec.Parents = append(resource.Spec.Parents, chantico.ParentRef{Name: parent.Name})
+		resource.Spec.Parents = append(resource.Spec.Parents, chantico.ParentRef{Name: parent.Name, Coefficient: parent.Coefficient})
 	}
 	return NewRuleBuilder(resource, &ResolvedExpressions{EnergyMetric: f.EnergyMetric, Parents: f.Parents})
 }
