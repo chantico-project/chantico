@@ -48,9 +48,6 @@ func NewTemplateRenderer(client client.Client, namespace string) *TemplateRender
 func (tr *TemplateRenderer) resolveParentExpressions(ctx context.Context, dataCenterResource *chantico.DataCenterResource) ([]ResolvedParent, error) {
 	var parents []ResolvedParent
 	for _, parent := range dataCenterResource.Spec.Parents {
-		if parent.CoefficientFrom == nil {
-			continue
-		}
 		coefficient, err := parent.CoefficientFrom.Render(ctx, tr.client, tr.namespace)
 		if err != nil {
 			return nil, err

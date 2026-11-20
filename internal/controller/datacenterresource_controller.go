@@ -6,7 +6,6 @@ import (
 	"chantico/internal/steps"
 	"context"
 	"errors"
-	"maps"
 
 	dcr "chantico/internal/datacenterresource"
 
@@ -20,14 +19,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	util "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -50,18 +46,6 @@ func indexInvolvedResource(object client.Object) []string {
 var dataCenterResourceIndexes = map[string]client.IndexerFunc{
 	parentsIndexField:          indexParents,
 	involvedResourceIndexField: indexInvolvedResource,
-}
-
-// Only updates that change the propagated labels need to reach the children.
-var propagatedLabelsChanged = predicate.Funcs{
-	CreateFunc:  func(event.CreateEvent) bool { return false },
-	DeleteFunc:  func(event.DeleteEvent) bool { return false },
-	GenericFunc: func(event.GenericEvent) bool { return false },
-	UpdateFunc: func(e event.UpdateEvent) bool {
-		oldLabels := e.ObjectOld.(*chantico.DataCenterResource).Status.PropagatedLabels
-		newLabels := e.ObjectNew.(*chantico.DataCenterResource).Status.PropagatedLabels
-		return !maps.Equal(oldLabels, newLabels)
-	},
 }
 
 type RecordingRuleConfigurer interface {
@@ -96,7 +80,6 @@ func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&monitoringv1.PrometheusRule{}).
 		// Watch config maps for updates. Only trigger reconciliation if the configmap is referenced in either coefficient or energyMetric template
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.dataCenterResourcesForConfigMap)).
-		Watches(&chantico.DataCenterResource{}, handler.EnqueueRequestsFromMapFunc(r.dataCenterResourcesForParent), builder.WithPredicates(propagatedLabelsChanged)).
 		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 1}). // Race conditions might occur when multiple generator jobs run simultaneously, so only allow one at a time.
 		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
 			log := mgr.GetLogger().WithName("DataCenterResourceController")
@@ -124,23 +107,6 @@ func (r *DataCenterResourceReconciler) dataCenterResourcesForConfigMap(ctx conte
 		requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{
 			Namespace: dataCenterResource.Namespace,
 			Name:      dataCenterResource.Name,
-		}})
-	}
-	return requests
-}
-
-func (r *DataCenterResourceReconciler) dataCenterResourcesForParent(ctx context.Context, parent client.Object) []reconcile.Request {
-	children := &chantico.DataCenterResourceList{}
-	if err := r.List(ctx, children, client.InNamespace(parent.GetNamespace()), client.MatchingFields{parentsIndexField: parent.GetName()}); err != nil {
-		log.FromContext(ctx).Error(err, "Failed to list children of DataCenterResource", "parent", parent.GetName(), "namespace", parent.GetNamespace())
-		return nil
-	}
-
-	requests := make([]reconcile.Request, 0, len(children.Items))
-	for _, child := range children.Items {
-		requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{
-			Namespace: child.Namespace,
-			Name:      child.Name,
 		}})
 	}
 	return requests
@@ -257,9 +223,6 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 	_ = r.List(ctx, dataCenterResources, listOptions...)
 
 	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items)
-	if err == nil {
-		dataCenterResource.Status.PropagatedLabels, err = dcr.DeriveLabels(dataCenterResource, visited)
-	}
 	if err != nil {
 		l.Info("Setting validation error", "error", err)
 		dataCenterResource.Status.InvolvedResource = involvedResource

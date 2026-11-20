@@ -126,7 +126,7 @@ func (b *RuleBuilder) constructParentNamesLabel() string {
 }
 
 // buildSharedLabels builds the set of labels for the prometheus rule.
-// It includes the resource name, type, service ID, parent names, propagated labels, any base labels, and additional labels specified in the resource.
+// It includes the resource name, type, service ID, parent names, any base labels, and additional labels specified in the resource.
 func (b *RuleBuilder) buildSharedLabels(base labels) labels {
 	labels := labels{
 		"resource": b.resource.Name,
@@ -135,10 +135,6 @@ func (b *RuleBuilder) buildSharedLabels(base labels) labels {
 
 	if len(b.resource.Spec.Parents) > 0 {
 		labels["parents"] = b.constructParentNamesLabel()
-	}
-
-	if b.resource.Status.PropagatedLabels != nil {
-		labels = applyAdditionalLabels(labels, b.resource.Status.PropagatedLabels)
 	}
 
 	if base != nil {
@@ -157,10 +153,9 @@ func (b *RuleBuilder) buildSharedLabels(base labels) labels {
 // a labelled time series under the `chantico_power_watts` name. This allows
 // children to reference the parent's energy using a uniform naming convention.
 //
-// Returns nil if it is not a root node (has parents with coefficients) or has
-// no energy metric.
+// Returns nil if it is not a root node (has parents).
 func (b *RuleBuilder) BuildEnergyAliasRule() *RecordingRule {
-	if len(b.expressions.Parents) > 0 || b.expressions.EnergyMetric == "" {
+	if len(b.resource.Spec.Parents) > 0 {
 		return nil
 	}
 
@@ -223,7 +218,7 @@ func (b *RuleBuilder) BuildCoefficientRules() []RecordingRule {
 // For root nodes (no parents), returns nil — the energy timeseries is
 // already present in Prometheus (e.g. from an SNMP exporter).
 func (b *RuleBuilder) BuildEnergyRule() *RecordingRule {
-	if len(b.expressions.Parents) == 0 {
+	if len(b.resource.Spec.Parents) == 0 {
 		return nil
 	}
 

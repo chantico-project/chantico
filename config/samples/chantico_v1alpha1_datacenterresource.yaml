@@ -20,21 +20,9 @@ metadata:
   labels:
     app.kubernetes.io/name: chantico
     app.kubernetes.io/managed-by: kustomize
-  name: datacenterresource-site
-spec:
-  type: site
----
-apiVersion: chantico-project.github.io/v1alpha1
-kind: DataCenterResource
-metadata:
-  labels:
-    app.kubernetes.io/name: chantico
-    app.kubernetes.io/managed-by: kustomize
   name: datacenterresource-pdu1
 spec:
   type: pdu
-  parents:
-    - name: datacenterresource-site
   energyMetricFrom:
     valueFrom:
       configMapKeyRef:
@@ -53,8 +41,6 @@ metadata:
   name: datacenterresource-pdu2
 spec:
   type: pdu
-  parents:
-    - name: datacenterresource-site
   energyMetricFrom:
     valueFrom:
       configMapKeyRef:

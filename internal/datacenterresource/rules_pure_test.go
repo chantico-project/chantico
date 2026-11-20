@@ -60,7 +60,6 @@ type ruleFixture struct {
 	Name             string
 	Type             string
 	AdditionalLabels map[string]string
-	PropagatedLabels map[string]string
 	EnergyMetric     string
 	Parents          []ResolvedParent
 }
@@ -71,9 +70,6 @@ func (f *ruleFixture) buildRuleBuilder() *RuleBuilder {
 		Spec: chantico.DataCenterResourceSpec{
 			Type:             f.Type,
 			AdditionalLabels: f.AdditionalLabels,
-		},
-		Status: chantico.DataCenterResourceStatus{
-			PropagatedLabels: f.PropagatedLabels,
 		},
 	}
 	for _, parent := range f.Parents {
@@ -143,19 +139,6 @@ func TestBuildSharedLabels(t *testing.T) {
 				"resource":    testBM1,
 				"type":        DataCenterResourceTypeBaremetal,
 				"customLabel": "exampleValue",
-			},
-		},
-		"with propagated labels taking precedence over additional labels": {
-			resource: &ruleFixture{
-				Name: testBM1, Type: DataCenterResourceTypeBaremetal,
-				AdditionalLabels: map[string]string{siteLabel: "other"},
-				PropagatedLabels: map[string]string{siteLabel: "site1"},
-			},
-			extraLabels: nil,
-			expected: map[string]string{
-				"resource": testBM1,
-				"type":     DataCenterResourceTypeBaremetal,
-				siteLabel:  "site1",
 			},
 		},
 		"with conflicing labels": {

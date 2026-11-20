@@ -127,52 +127,6 @@ func validateParentTypes(dataCenterResource *chantico.DataCenterResource, ancest
 	return nil
 }
 
-func hasCoefficient(parent chantico.ParentRef) bool {
-	return parent.Coefficient != "" || parent.CoefficientFrom != nil
-}
-
-// ValidateEnergySource ensures resources have an energy metric or a parent with
-// a coefficient, and that grouping resources have no energy metric.
-func validateEnergySource(dataCenterResource *chantico.DataCenterResource, _ []chantico.DataCenterResource) error {
-	info, err := LookupType(dataCenterResource.Spec.Type)
-	if err != nil {
-		return err
-	}
-	hasEnergyMetric := dataCenterResource.Spec.EnergyMetric != "" || dataCenterResource.Spec.EnergyMetricFrom != nil
-	switch {
-	case !info.Grouping() && !hasEnergyMetric && !slices.ContainsFunc(dataCenterResource.Spec.Parents, hasCoefficient):
-		return ErrorMissingEnergySource{Type: dataCenterResource.Spec.Type}
-	case info.Grouping() && hasEnergyMetric:
-		return ErrorUnexpectedEnergyMetric{Type: dataCenterResource.Spec.Type}
-	}
-	return nil
-}
-
-// ValidateParentCoefficients ensures exactly the parents of non-grouping types
-// have a coefficient.
-func validateParentCoefficients(dataCenterResource *chantico.DataCenterResource, ancestors []chantico.DataCenterResource) error {
-	ancestorTypes := make(map[string]string, len(ancestors))
-	for _, ancestor := range ancestors {
-		ancestorTypes[ancestor.Name] = ancestor.Spec.Type
-	}
-	for _, parent := range dataCenterResource.Spec.Parents {
-		parentType := ancestorTypes[parent.Name]
-		info, err := LookupType(parentType)
-		if err != nil {
-			// The parent reports its own unknown type.
-			continue
-		}
-		if hasCoefficient(parent) == info.Grouping() {
-			return ErrorParentCoefficient{
-				InvolvedResource: parent.Name,
-				ParentType:       parentType,
-				Grouping:         info.Grouping(),
-			}
-		}
-	}
-	return nil
-}
-
 // ValidateAdditionalLabelNames rejects additional labels that are not valid Prometheus label names.
 func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResource, _ []chantico.DataCenterResource) error {
 	for labelName := range dataCenterResource.Spec.AdditionalLabels {
@@ -186,8 +140,6 @@ func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResourc
 var validators = []func(*chantico.DataCenterResource, []chantico.DataCenterResource) error{
 	validateResourceType,
 	validateParentTypes,
-	validateEnergySource,
-	validateParentCoefficients,
 	validateAdditionalLabelNames,
 }
 

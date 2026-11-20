@@ -70,10 +70,8 @@ type ParentRef struct {
 ```
 
 Each entry in `spec.parents` references a parent DataCenterResource by name
-and provides `coefficientFrom`, which supplies the PromQL expression for that 
-parent-child edge. Entries for grouping parents, such as a `site`, have no 
-coefficient and are not used for energy accounting. A simple coefficient such 
-as `1` is written under
+and must provide `coefficientFrom`, which supplies the PromQL expression for
+that parent-child edge. A simple coefficient such as `1` is written under
 `coefficientFrom.value`. If the expression comes from a ConfigMap- or Secret, use
 `coefficientFrom.valueFrom`. The coefficient can also be a Go template when
 `templateParameters` are provided. Examples include:
@@ -82,16 +80,15 @@ as `1` is written under
 - Part of a parent's energy flows to the child: use a fraction or PromQL
   expression.
 
-Root resources (those without parents with coefficients) must provide 
-`energyMetricFrom` in the same `TemplateFrom` shape. Resources with parents 
-with coefficients may also provide it, but their energy is calculated from the 
-parent coefficients.
+Root resources (those without parents) must provide `energyMetricFrom` in the
+same `TemplateFrom` shape. Resources with parents may also provide it, but
+their energy is calculated from the parent coefficients.
 
 ### `DataCenterResourceSpec` (relevant fields)
 
 | Field | Type | Description |
 |---|---|---|
-| `parents` | `[]ParentRef` | Parent resources; each entry requires a coefficient expression in `coefficientFrom`, except for grouping parents |
+| `parents` | `[]ParentRef` | Parent resources; each entry requires a coefficient expression in `coefficientFrom` |
 | `energyMetricFrom` | `TemplateFrom` | PromQL expression source for root nodes; accepts inline `value` or a `valueFrom` reference, with optional template parameters |
 | `additionalLabels` | `map[string]string` | Additional labels to attach to the resource's Prometheus timeseries |
 

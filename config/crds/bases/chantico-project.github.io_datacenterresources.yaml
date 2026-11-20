@@ -231,8 +231,7 @@ spec:
                     ParentRef references a parent DataCenterResource and carries the energy
                     coefficient for the edge from that parent to this node.
                     The coefficient represents what fraction of the parent's energy is
-                    attributable to this child. Parents of grouping types, such as a site, have
-                    no coefficient.
+                    attributable to this child.
                   properties:
                     coefficient:
                       description: Coefficient is shorthand for coefficientFrom.value.
@@ -403,9 +402,9 @@ spec:
                   - name
                   type: object
                   x-kubernetes-validations:
-                  - message: Coefficient and coefficientFrom cannot be set at the
-                      same time
-                    rule: '!(has(self.coefficient) && has(self.coefficientFrom))'
+                  - message: Exactly one of coefficient or coefficientFrom must be
+                      set
+                    rule: has(self.coefficient) != has(self.coefficientFrom)
                 type: array
               type:
                 type: string
@@ -413,6 +412,8 @@ spec:
             - type
             type: object
             x-kubernetes-validations:
+            - message: Resource must have at least one parent, energyMetric or energyMetricFrom
+              rule: (has(self.parents)&&size(self.parents)>0)||has(self.energyMetric)||has(self.energyMetricFrom)
             - message: EnergyMetric and EnergyMetricFrom cannot be set at the same
                 time
               rule: '!(has(self.energyMetric)&&has(self.energyMetricFrom))'
@@ -480,13 +481,6 @@ spec:
               observedGeneration:
                 format: int64
                 type: integer
-              propagatedLabels:
-                additionalProperties:
-                  type: string
-                description: |-
-                  PropagatedLabels are derived from the resource and its ancestors, such
-                  as the name of the site the resource belongs to.
-                type: object
             type: object
         required:
         - spec
