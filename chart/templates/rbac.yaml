@@ -22,10 +22,12 @@ rules:
   - ""
   resources:
   - configmaps
-  - secrets
   verbs:
+  - create
+  - delete
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - ""
@@ -138,6 +140,16 @@ metadata:
   name: chantico-manager-deployments-role
   namespace: {{ .Release.Namespace }}
 rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
 - apiGroups:
   - apps
   resources:

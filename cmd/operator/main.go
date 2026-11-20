@@ -43,6 +43,7 @@ import (
 	"chantico/internal/controller"
 	"chantico/internal/datacenterresource"
 	"chantico/internal/filestore"
+	md "chantico/internal/measurementdevice"
 	"chantico/internal/physicalmeasurement"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -163,6 +164,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// MIB uploads and the generator Jobs expect this directory on the data volume.
+	fileStore := filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation}
+	mibsDir := fileStore.Resolve(md.MibsSubDir)
+	if err := os.MkdirAll(mibsDir, 0777); err != nil {
+		setupLog.Error(err, "unable to create MIB directory", "path", mibsDir)
+		os.Exit(1)
+	}
+	outputDir := fileStore.Resolve(md.GeneratorOutputSubDir)
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
+		setupLog.Error(err, "unable to create generator output directory", "path", outputDir)
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -177,10 +191,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+	if err := controller.EnsureMergedSNMPConfig(ctx, mgr.GetAPIReader(), mgr.GetClient(), config.ValidatedEnv.PodNamespace); err != nil {
+		setupLog.Error(err, "unable to create initial SNMP ConfigMap")
+		os.Exit(1)
+	}
+
 	if err = (&controller.MeasurementDeviceReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Filestore: filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation},
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Jobs:   md.SNMPGeneratorJobBuilder{},
+		Files:  fileStore,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
 		os.Exit(1)
@@ -222,7 +243,7 @@ func main() {
 	}
 
 	setupLog.Info("Starting Chantico manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

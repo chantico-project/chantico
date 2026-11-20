@@ -62,53 +62,40 @@ Attribution mock](how-to-run-the-mock-prometheus-exporter.md)).
 
 ## Running the demo with the mock SNMP device
 
-### Querying the chantico-snmp-mock running in the development setup
+### Querying the mock directly
 
-If the development kind cluster is running the `chantico-snmp-mock` service, there is a Node Port that is visible on port `31161`.
-
-It can be queried as follow:
+In the kind development cluster, the `chantico-snmp-mock` service is exposed on
+NodePort `31161`. Query it with:
 
 ```bash
 snmpget -v2c -c public -M +./dev -m +TNO-PDU-MIB localhost:31161 tnoPduEnergyValue
 ```
 
-### Chantico workflow with the snmp-mock as snmp device (full demo)
+### Full demo
 
-For an overview of the workflow that is run in the background in this demo please see the below image.
+The demo connects the mock to Prometheus in three steps. The numbers in the diagram match the steps below. For what happens inside the controller, see the [system architecture]({{% relref "technical/controller-architecture.md" %}}).
 
 ```kroki {_type=plantuml}
-autonumber
 actor User
-participant "Kubernetes API" as K8s
-participant "MeasurementDevice Operator" as MDO
-participant "SNMP Generator Job" as SNMPJob
-participant "chantico-snmp Exporter" as SNMP
-participant "PhysicalMeasurement Operator" as PMO
+participant "Chantico controller" as Controller
+participant "SNMP exporter" as SNMP
 participant "Prometheus" as Prom
+participant "SNMP mock" as Mock
 
-User -> K8s: Apply MeasurementDevice CR
-K8s --> MDO: Reconcile MeasurementDevice
-MDO -> MDO: Write generator_<uid>.yml
-MDO -> SNMPJob: Create Job (mounts snmp/mibs + config paths)
-SNMPJob -> SNMPJob: Resolve OIDs from MIBs\nand generate config_<uid>.yml
-SNMPJob --> MDO: Job Succeeded
-MDO -> MDO: Merge config_*.yml -> snmp.yml
-MDO -> SNMP: Trigger rollout/reload
-SNMP --> MDO: New module/auth config active
-
-User -> K8s: Apply PhysicalMeasurement CR
-K8s --> PMO: Reconcile PhysicalMeasurement
-PMO -> PMO: Write targets/<name>.json\n(file_sd_configs target for device + ip)
-Prom -> Prom: Auto-detect target file changes\n(file_sd_configs refresh)
-Prom -> SNMP: Scrape /snmp with module+target
-SNMP --> Prom: Metrics
+User -> Controller: 1. Upload TNO-PDU-MIB (used to generate)
+User -> Controller: 2. Apply MeasurementDevice
+Controller -> SNMP: SNMP module + auth
+User -> Controller: 3. Apply PhysicalMeasurement
+Controller -> Prom: ScrapeConfig
+Prom -> SNMP: Scrape /snmp
+SNMP -> Mock: SNMP GET
 ```
 
-This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `PhysicalMeasurement` → Prometheus targets.
+`make cluster-mock-resources` applies the samples of steps 2 and 3 and the `DataCenterResource` sample from the next section in one go.
 
 1. Upload the MIB file `./dev/mibs/TNO-PDU-MIB.txt` to the cluster:
     ```bash
-    make cluster-mib
+    make cluster-mibs
     ```
 1. Create a `MeasurementDevice` for the mock MIB:
     ```bash
@@ -117,7 +104,8 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
     ```
 1. Wait for the SNMP generator job:
     ```bash
-    kubectl get jobs -n chantico -o wide | grep snmp-generator
+    kubectl get jobs -n chantico -o wide
+    ```
 1. Create a `PhysicalMeasurement` pointing at the mock target:
     ```bash
     kubectl apply -n chantico -f ./config/samples/chantico_v1alpha1_physicalmeasurement_mock.yaml
@@ -129,7 +117,7 @@ This section demonstrates a full flow: MIB upload → `MeasurementDevice` → `P
     ```
     Open http://localhost:19090/targets and verify the target is `UP`.
 
-> **Tip:** To add more devices beyond the second, copy the mock manifests, update the names (e.g. `chantico-snmp-mock-3`), pick a free NodePort, and create corresponding `MeasurementDevice` / `PhysicalMeasurement` resources. Prometheus will automatically pick up new targets via `file_sd_configs` — no restart required.
+> **Tip:** To add more devices beyond the second, copy the mock manifests, update the names (e.g. `chantico-snmp-mock-3`), pick a free NodePort, and create corresponding  `MeasurementDevice` / `PhysicalMeasurement` resources. Prometheus will automatically pick up new targets via `file_sd_configs` — no restart required.
 
 ### Adding baremetal resources and linking them to the mock SNMP device
 

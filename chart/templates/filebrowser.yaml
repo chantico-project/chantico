@@ -12,7 +12,17 @@ spec:
     metadata:
       labels:
         app: chantico-filebrowser
+        chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
     spec:
+      {{- if has "ReadWriteOnce" .Values.pvc.accessModes }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.securityContext.runAsUser }}
@@ -20,6 +30,21 @@ spec:
         fsGroup: {{ .Values.securityContext.runAsGroup }}
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+      - name: structure-initialization
+        image: docker.io/library/busybox:1.36.1-glibc
+        command: ["/bin/sh", "-c", "mkdir -p /srv/snmp/mibs"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: chantico-volume-mount
+          mountPath: /srv
       containers:
       - name: filebrowser
         image: docker.io/filebrowser/filebrowser:v2.32.2
