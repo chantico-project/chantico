@@ -1,3 +1,14 @@
+## 0.28.0 (2026-11-20)
+
+#### Feature
+
+* Add more data center resource types (#293) (f8fb1d8d)
+
+#### Chores
+
+* **docs:** Add documentation of Alumet Deployment (#286) (f98a89c6)
+* **docs:** Merge duplicate v0.27.0 changelog entry and add feature (925b0275)
+
 ## 0.27.0 (2026-11-20)
 
 #### Feature
