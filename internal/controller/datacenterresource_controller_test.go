@@ -17,6 +17,8 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -30,18 +32,23 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func setupDataCenterResourceRuleTest(t *testing.T) (client.WithWatch, *DataCenterResourceReconciler) {
+func setupDataCenterResourceRuleTest(t *testing.T, funcs ...interceptor.Funcs) (client.WithWatch, *DataCenterResourceReconciler) {
 	t.Helper()
 
 	builder := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1.AddToScheme).
 		WithStatusSubresource(&chantico.DataCenterResource{})
 	for field, indexer := range dataCenterResourceIndexes {
 		builder = builder.WithIndex(&chantico.DataCenterResource{}, field, indexer)
+	}
+	for _, f := range funcs {
+		builder = builder.WithInterceptorFuncs(f)
 	}
 	kubeClient := builder.Build()
 
@@ -413,6 +420,86 @@ func TestReconcileValidation_ClearsInvolvedResourceReferences(t *testing.T) {
 	if vm.Status.InvolvedResource != "" {
 		t.Errorf("InvolvedResource = %q, want it cleared", vm.Status.InvolvedResource)
 	}
+}
+
+func TestReconcileValidation_SkipsDeletedInvolvedResource(t *testing.T) {
+	client, reconciler := setupDataCenterResourceRuleTest(t)
+
+	pdu := &chantico.DataCenterResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
+		Spec:       chantico.DataCenterResourceSpec{Type: dcr.DataCenterResourceTypePDU, EnergyMetric: "pdu_power_watts"},
+	}
+	if err := client.Create(t.Context(), pdu); err != nil {
+		t.Fatalf("creating pdu1: %v", err)
+	}
+	pdu.Status.InvolvedResource = "deleted"
+
+	if res := reconciler.reconcileValidation(t.Context(), pdu); res.Action != steps.ActionContinue {
+		t.Fatalf("expected Continue, got %v (%v)", res.Action, res.Err)
+	}
+	if pdu.Status.InvolvedResource != "" {
+		t.Errorf("InvolvedResource = %q, want it cleared", pdu.Status.InvolvedResource)
+	}
+}
+
+func TestReconcileValidation_ReturnsClientErrors(t *testing.T) {
+	errClient := errors.New("client failure")
+	// failList fails the List call that selects on the given index field, or
+	// the unfiltered List call if field is empty.
+	failList := func(field string) interceptor.Funcs {
+		return interceptor.Funcs{
+			List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				options := &client.ListOptions{}
+				options.ApplyOptions(opts)
+				if matchesField(options.FieldSelector, field) {
+					return errClient
+				}
+				return c.List(ctx, list, opts...)
+			},
+		}
+	}
+	tests := map[string]interceptor.Funcs{
+		"resources list":  failList(""),
+		"references list": failList(involvedResourceIndexField),
+		"children list":   failList(parentsIndexField),
+		"involved get": {
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if key.Name == "involved" {
+					return errClient
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		},
+	}
+	for name, funcs := range tests {
+		t.Run(name, func(t *testing.T) {
+			client, reconciler := setupDataCenterResourceRuleTest(t, funcs)
+
+			pdu := &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "pdu1"},
+				Spec:       chantico.DataCenterResourceSpec{Type: dcr.DataCenterResourceTypePDU, EnergyMetric: "pdu_power_watts"},
+			}
+			if err := client.Create(t.Context(), pdu); err != nil {
+				t.Fatalf("creating pdu1: %v", err)
+			}
+			pdu.Status.InvolvedResource = "involved"
+
+			res := reconciler.reconcileValidation(t.Context(), pdu)
+			if res.Action != steps.ActionError || !errors.Is(res.Err, errClient) {
+				t.Fatalf("expected client error, got %v (%v)", res.Action, res.Err)
+			}
+		})
+	}
+}
+
+// matchesField reports whether a List field selector requires the given field,
+// or whether there is no field selector if field is empty.
+func matchesField(selector fields.Selector, field string) bool {
+	if selector == nil {
+		return field == ""
+	}
+	_, found := selector.RequiresExactMatch(field)
+	return found
 }
 
 func assertDataCenterResourceCondition(t *testing.T, resource *chantico.DataCenterResource, conditionType chantico.ConditionType, status metav1.ConditionStatus, reason chantico.ConditionReason) {

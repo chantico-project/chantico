@@ -220,7 +220,9 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 
 	listOptions := []client.ListOption{client.InNamespace(dataCenterResource.Namespace)}
 	dataCenterResources := &chantico.DataCenterResourceList{}
-	_ = r.List(ctx, dataCenterResources, listOptions...)
+	if err := r.List(ctx, dataCenterResources, listOptions...); err != nil {
+		return steps.Error(err)
+	}
 
 	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items)
 	if err != nil {
@@ -231,13 +233,21 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 	} else {
 		l.Info("Clearing validation errors", "status", dataCenterResource.Status)
 		references := &chantico.DataCenterResourceList{}
-		_ = r.List(ctx, references, append(listOptions, client.MatchingFields{involvedResourceIndexField: dataCenterResource.Name})...)
+		if err := r.List(ctx, references, append(listOptions, client.MatchingFields{involvedResourceIndexField: dataCenterResource.Name})...); err != nil {
+			return steps.Error(err)
+		}
 		children := &chantico.DataCenterResourceList{}
-		_ = r.List(ctx, children, append(listOptions, client.MatchingFields{parentsIndexField: dataCenterResource.Name})...)
+		if err := r.List(ctx, children, append(listOptions, client.MatchingFields{parentsIndexField: dataCenterResource.Name})...); err != nil {
+			return steps.Error(err)
+		}
 		if dataCenterResource.Status.InvolvedResource != "" {
 			involved := &chantico.DataCenterResource{}
-			_ = r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
-			visited = append(visited, *involved)
+			err := r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
+			if err == nil {
+				visited = append(visited, *involved)
+			} else if !apierrors.IsNotFound(err) {
+				return steps.Error(err)
+			}
 		}
 		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited), "references", dcr.FormatResources(references.Items), "children", dcr.FormatResources(children.Items))
 		items := mergeUnique(visited, references.Items, children.Items)
