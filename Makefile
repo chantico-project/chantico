@@ -21,7 +21,6 @@ TAG ?= $(IMAGE_TAG)
 IMG ?= $(REPO):$(TAG)
 CHANTICO_DATA_PATH ?= .chantico-persistent-volume
 CHANTICO_PERSISTENT_VOLUME_NAME ?= chantico-persistent-volume
-CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME ?= chantico-persistent-volume-claim
 CHANTICO_NAMESPACE ?= chantico
 VISUALISATION_WEBAPP_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-visualisation-webapp$(IMAGE_SUFFIX)
 VISUALISATION_WEBAPP_TAG ?= $(IMAGE_TAG)
@@ -29,6 +28,23 @@ VISUALISATION_WEBAPP_IMG ?= $(VISUALISATION_WEBAPP_REPOSITORY):$(VISUALISATION_W
 
 LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
 LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
+
+# Local development pv for Kind cluster.
+define LOCAL_DEVELOPMENT_PERSISTENT_VOLUME
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $(CHANTICO_PERSISTENT_VOLUME_NAME)
+spec:
+  capacity:
+    storage: $(LOCAL_DEVELOPMENT_STORAGE)
+  storageClassName: $(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME)
+  hostPath:
+    path: /data/chantico-persistent-volume
+  accessModes:
+    - ReadWriteOnce
+endef
+export LOCAL_DEVELOPMENT_PERSISTENT_VOLUME
 
 SNMP_MOCK_TAG ?= $(IMAGE_TAG)
 SNMP_MOCK_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-snmp-mock$(IMAGE_SUFFIX)
@@ -148,27 +164,25 @@ cluster-clean: cluster-down cluster-delete-mount ## Delete Kind cluster and volu
 cluster-configure: sync-deployment-crds ## Configure cluster with namespace and helm installation
 # 	idempotent function to create namespace
 	$(KUBECTL) create namespace $(CHANTICO_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	echo "$$LOCAL_DEVELOPMENT_PERSISTENT_VOLUME" | $(KUBECTL) apply -f -
 # 	idempotent helm installation
 	helm dependency build ./chart/
 	helm upgrade --install chantico ./chart/ \
 		--namespace $(CHANTICO_NAMESPACE) \
 		--set controller.enabled=false \
-		--set securityContext.runAsUser="$(shell id -u)" \
-		--set securityContext.runAsGroup="$(shell id -g)" \
-		--set persistentVolumeClaimName=$(CHANTICO_PERSISTENT_VOLUME_CLAIM_NAME) \
-		--set pvc.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
-		--set pvc.volumeName=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
-		--set pv.enabled=true \
-		--set pv.name=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
-		--set pv.storage=$(LOCAL_DEVELOPMENT_STORAGE) \
-		--set pv.storageClassName=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
-		--set pv.hostPath.path="/data/chantico-persistent-volume" \
-		--set snmp.service.type="NodePort" \
+		--set podSecurityContext.runAsUser="$(shell id -u)" \
+		--set podSecurityContext.runAsGroup="$(shell id -g)" \
+		--set podSecurityContext.fsGroup="$(shell id -g)" \
+		--set persistence.storageClass=$(LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME) \
+		--set persistence.size=$(LOCAL_DEVELOPMENT_STORAGE) \
+		--set persistence.volumeName=$(CHANTICO_PERSISTENT_VOLUME_NAME) \
+		--set snmpExporter.service.type="NodePort" \
 		--set filebrowser.service.type="NodePort" \
 		--set prometheus.service.type="NodePort" \
 		--set victoriaMetrics.service.type="NodePort" \
 		--set kube-prometheus-stack.grafana.service.type="NodePort" \
 		--set webapp.enabled=true \
+		--set webapp.image.registry="" \
 		--set webapp.image.repository="$(VISUALISATION_WEBAPP_REPOSITORY)" \
 		--set webapp.image.tag="$(VISUALISATION_WEBAPP_TAG)" \
 		--set webapp.service.type="NodePort"

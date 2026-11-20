@@ -42,29 +42,29 @@ See [Prometheus Operator integration](/technical/prometheus-operator.md) for det
 
 The Chantico chart creates two persistent volumes:
 
-- `pvc`: claim with data shared by the controller, SNMP generator jobs, filebrowser and Prometheus.
-- `victoriaMetrics.pvc`: settings of the claim template of the VictoriaMetrics StatefulSet.
+- `persistence`: claim `chantico-persistent-volume-claim` with data shared by the controller, SNMP generator jobs and filebrowser.
+- `victoriaMetrics.persistence`: settings of the claim template of the VictoriaMetrics StatefulSet.
 
-By default, both claims use the default storage class of the cluster. Override `storageClassName` when installing or upgrading Chantico. Each block also accepts `storage`, `accessModes` and `volumeName`.
+By default, both claims use the default storage class of the cluster. Override `storageClass` when installing or upgrading Chantico. Each block also accepts `size`, `accessModes` and `volumeName`.
 
 ```bash
 helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace \
-  --set pvc.storageClassName="STORAGE_CLASS_NAME"
+  --set persistence.storageClass="STORAGE_CLASS_NAME"
 ```
 
-The shared claim name is configured with `persistentVolumeClaimName`. To use an existing claim, set its name and disable creation with `pvc.enabled=false`. Disabling creation does not disable the volume mount.
+To use an existing claim instead, set `persistence.existingClaim` to its name. The chart then does not create a claim.
 
 ### VictoriaMetrics storage
 
-VictoriaMetrics runs as a StatefulSet that creates its own claim, `chantico-volume-mount-chantico-victoriametrics-0`, from a claim template. Set a different storage class or size with `victoriaMetrics.pvc`.
+VictoriaMetrics runs as a StatefulSet that creates its own claim, `chantico-volume-mount-chantico-victoriametrics-0`, from a claim template. Set a different storage class or size with `victoriaMetrics.persistence`.
 
 ```bash
 helm install chantico oci://ghcr.io/chantico-project/charts/chantico -n chantico --create-namespace \
-  --set victoriaMetrics.pvc.storageClassName="STORAGE_CLASS_NAME" \
-  --set victoriaMetrics.pvc.storage="10Gi"
+  --set victoriaMetrics.persistence.storageClass="STORAGE_CLASS_NAME" \
+  --set victoriaMetrics.persistence.size="10Gi"
 ```
 
-To bind the claim to a specific existing volume, set `victoriaMetrics.pvc.volumeName`. The claim is not removed when the StatefulSet or release is deleted, so VictoriaMetrics data is kept. VictoriaMetrics stores its data in the `victoria-metrics/` directory of its claim.
+To bind the claim to a specific existing volume, set `victoriaMetrics.persistence.volumeName`. The claim is not removed when the StatefulSet or release is deleted, so VictoriaMetrics data is kept. VictoriaMetrics stores its data in the `victoria-metrics/` directory of its claim.
 
 You can list the storage classes available on your cluster with kubectl.
 

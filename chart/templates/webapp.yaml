@@ -47,10 +47,16 @@ spec:
         app: chantico-visualisation-webapp
     spec:
       serviceAccountName: chantico-visualisation-webapp
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: chantico-visualisation-webapp
-          image: "{{ .Values.webapp.image.repository }}:{{ .Values.webapp.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.webapp.image.pullPolicy | default "IfNotPresent" }}
+          {{- with .Values.webapp.image }}
+          image: "{{ with .registry }}{{ . }}/{{ end }}{{ .repository }}{{ if .digest }}@{{ .digest }}{{ else }}:{{ .tag | default $.Chart.AppVersion }}{{ end }}"
+          imagePullPolicy: {{ .pullPolicy | default "IfNotPresent" }}
+          {{- end }}
           ports:
             - containerPort: 80
           livenessProbe:

@@ -36,33 +36,26 @@ spec:
       labels:
         app: chantico-victoriametrics
     spec:
+      {{- if .Values.podSecurityContext.enabled }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: {{ .Values.securityContext.runAsUser }}
-        runAsGroup: {{ .Values.securityContext.runAsGroup }}
-        fsGroup: {{ .Values.securityContext.runAsGroup }}
-        seccompProfile:
-          type: RuntimeDefault
+        {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
       containers:
       - image: victoriametrics/victoria-metrics:v1.115.0
         name: victoriametrics
         args:
-          - -storageDataPath={{ .Values.victoriaMetrics.storagePath }}
+          - -storageDataPath={{ .Values.victoriaMetrics.persistence.mountPath }}
           - -retentionPeriod={{ .Values.victoriaMetrics.retention }}
           - -httpListenAddr=:8428
         volumeMounts:
-        - mountPath: {{ .Values.victoriaMetrics.storagePath | quote }}
+        - mountPath: {{ .Values.victoriaMetrics.persistence.mountPath | quote }}
           name: chantico-volume-mount
         ports:
         - containerPort: 8428
+        {{- if .Values.containerSecurityContext.enabled }}
         securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
+          {{- omit .Values.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
       # vmalert evaluates recording rules against VictoriaMetrics every minute
       # and writes the results back, producing the per-minute downsampled series.
       - image: victoriametrics/vmalert:v1.115.0
@@ -78,14 +71,10 @@ spec:
         - mountPath: "/tmp/victoria-metrics-config"
           name: chantico-victoriametrics-config
           readOnly: true
+        {{- if .Values.containerSecurityContext.enabled }}
         securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
+          {{- omit .Values.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
       volumes:
       - name: chantico-victoriametrics-config
         configMap:
@@ -95,17 +84,19 @@ spec:
   - metadata:
       name: chantico-volume-mount
     spec:
-      {{- if .Values.victoriaMetrics.pvc.volumeName }}
-      volumeName: {{ .Values.victoriaMetrics.pvc.volumeName }}
+      {{- with .Values.victoriaMetrics.persistence }}
+      {{- if .volumeName }}
+      volumeName: {{ .volumeName }}
       {{- end }}
-      {{- if .Values.victoriaMetrics.pvc.storageClassName }}
-      storageClassName: {{ .Values.victoriaMetrics.pvc.storageClassName }}
+      {{- if .storageClass }}
+      storageClassName: {{ .storageClass }}
       {{- end }}
       accessModes:
-        {{- toYaml .Values.victoriaMetrics.pvc.accessModes | nindent 8 }}
+        {{- toYaml .accessModes | nindent 8 }}
       resources:
         requests:
-          storage: {{ .Values.victoriaMetrics.pvc.storage }}
+          storage: {{ .size }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

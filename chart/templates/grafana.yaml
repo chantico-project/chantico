@@ -1,5 +1,5 @@
 {{- $grafana := index .Values "kube-prometheus-stack" "grafana" }}
-{{- if and .Values.prometheus.useOperator $grafana.enabled }}
+{{- if $grafana.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

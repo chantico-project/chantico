@@ -15,13 +15,10 @@ spec:
       labels:
         app: chantico-snmp
     spec:
+      {{- if .Values.podSecurityContext.enabled }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: {{ .Values.securityContext.runAsUser }}
-        runAsGroup: {{ .Values.securityContext.runAsGroup }}
-        fsGroup: {{ .Values.securityContext.runAsGroup }}
-        seccompProfile:
-          type: RuntimeDefault
+        {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
       containers:
       - image: docker.io/ricardbejarano/snmp_exporter:0.26.0
         name: snmp
@@ -33,15 +30,10 @@ spec:
           readOnly: true
         ports:
         - containerPort: 9116
+        {{- if .Values.containerSecurityContext.enabled }}
         securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-              - ALL
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
+          {{- merge (omit .Values.containerSecurityContext "enabled") (dict "readOnlyRootFilesystem" true) | toYaml | nindent 10 }}
+        {{- end }}
       volumes:
       - name: snmp-config
         configMap:
@@ -54,13 +46,13 @@ metadata:
   name: chantico-snmp
   namespace: {{ .Release.Namespace }}
 spec:
-  type: {{ .Values.snmp.service.type }}
+  type: {{ .Values.snmpExporter.service.type }}
   selector:
     app: chantico-snmp
   ports:
     - protocol: TCP
       port: 9116
-      {{- if eq .Values.snmp.service.type "NodePort" }}
+      {{- if eq .Values.snmpExporter.service.type "NodePort" }}
       nodePort: 30002
       {{- else }}
       targetPort: 9116    

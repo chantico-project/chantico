@@ -9,12 +9,8 @@ metadata:
 spec:
   type: {{ .Values.prometheus.service.type }}
   selector:
-    {{- if .Values.prometheus.useOperator }}
     app.kubernetes.io/name: prometheus
     operator.prometheus.io/name: prometheus
-    {{- else }}
-    app: chantico-prometheus
-    {{- end }}
   ports:
     - protocol: TCP
       port: 9090
@@ -30,7 +26,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   serviceAccountName: prometheus
-  retention: {{ .Values.prometheusRetention }}
+  retention: {{ .Values.prometheus.retention }}
   scrapeInterval: 10s
   scrapeTimeout: 5s
   evaluationInterval: 5s

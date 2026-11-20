@@ -1,19 +1,19 @@
-{{- if .Values.pvc.enabled }}
+{{- if not .Values.persistence.existingClaim }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Values.persistentVolumeClaimName }}
+  name: chantico-persistent-volume-claim
   namespace: {{ .Release.Namespace }}
 spec:
-  {{- if .Values.pvc.volumeName }}
-  volumeName: {{ .Values.pvc.volumeName }}
+  {{- if .Values.persistence.volumeName }}
+  volumeName: {{ .Values.persistence.volumeName }}
   {{- end }}
-  {{- if .Values.pvc.storageClassName }}
-  storageClassName: {{ .Values.pvc.storageClassName }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass }}
   {{- end }}
   accessModes:
-    {{- toYaml .Values.pvc.accessModes | nindent 4 }}
+    {{- toYaml .Values.persistence.accessModes | nindent 4 }}
   resources:
     requests:
-      storage: {{ .Values.pvc.storage }}
+      storage: {{ .Values.persistence.size }}
 {{- end }}

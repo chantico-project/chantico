@@ -1,3 +1,4 @@
+{{- $claim := .Values.persistence.existingClaim | default "chantico-persistent-volume-claim" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,50 +13,39 @@ spec:
     metadata:
       labels:
         app: chantico-filebrowser
-        chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
+        chantico-project.github.io/data-volume: {{ $claim | quote }}
     spec:
-      {{- if has "ReadWriteOnce" .Values.pvc.accessModes }}
+      {{- if has "ReadWriteOnce" .Values.persistence.accessModes }}
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
                 matchLabels:
-                  chantico-project.github.io/data-volume: {{ .Values.persistentVolumeClaimName | quote }}
+                  chantico-project.github.io/data-volume: {{ $claim | quote }}
               topologyKey: kubernetes.io/hostname
       {{- end }}
+      {{- if .Values.podSecurityContext.enabled }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: {{ .Values.securityContext.runAsUser }}
-        runAsGroup: {{ .Values.securityContext.runAsGroup }}
-        fsGroup: {{ .Values.securityContext.runAsGroup }}
-        seccompProfile:
-          type: RuntimeDefault
+        {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
       initContainers:
       - name: structure-initialization
         image: docker.io/library/busybox:1.36.1-glibc
         command: ["/bin/sh", "-c", "mkdir -p /srv/snmp/mibs"]
+        {{- if .Values.containerSecurityContext.enabled }}
         securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
+          {{- omit .Values.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
         volumeMounts:
         - name: chantico-volume-mount
           mountPath: /srv
       containers:
       - name: filebrowser
         image: docker.io/filebrowser/filebrowser:v2.32.2
+        {{- if .Values.containerSecurityContext.enabled }}
         securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
+          {{- omit .Values.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
         ports:
         - containerPort: 80
         volumeMounts:
@@ -71,7 +61,7 @@ spec:
       volumes:
       - name: chantico-volume-mount
         persistentVolumeClaim:
-          claimName: {{ .Values.persistentVolumeClaimName }}
+          claimName: {{ $claim }}
 ---
 apiVersion: v1
 kind: Service

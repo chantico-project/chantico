@@ -1,5 +1,6 @@
-persistentVolumeClaimName: chantico-persistent-volume-claim
-prometheusRetention: 5h
+global:
+  # Shared with kube-prometheus-stack, e.g. [{name: my-registry-secret}]
+  imagePullSecrets: []
 
 # These are overrides of the default kube prometheus stack values
 # Required to disable the default kube prometheus stack components that are not needed for Chantico
@@ -69,60 +70,71 @@ kube-prometheus-stack:
       enabled: false
     serviceMonitor:
       selfMonitor: false
-imagePullSecretName: "" # Set if pulled from private registry, otherwise leave empty
 controller:
   enabled: true
   image:
-    repository: "ghcr.io/chantico-project/images/chantico"
+    registry: "ghcr.io"
+    repository: "chantico-project/images/chantico"
     tag: "" # defaults to Chart.version
+    digest: "" # overrides tag when set
+    pullPolicy: IfNotPresent
   watchNamespace: "" # defaults to the namespace of the release, "*" to watch resources in all namespaces
-snmp:
+snmpExporter:
   service:
     type: "ClusterIP"
 filebrowser:
   service:
     type: "ClusterIP"
 prometheus:
-  useOperator: true
+  retention: 5h
   service:
     type: "ClusterIP"
 victoriaMetrics:
   enabled: true
   # Long-term retention period (e.g. 12 months)
   retention: 12
-  # VictoriaMetrics data directory, backed directly by its PVC
-  storagePath: /victoria-metrics-data
   # Settings of the claim template of the StatefulSet
-  pvc:
-    storageClassName: "" # empty uses the cluster default storage class
-    storage: 3Gi
+  persistence:
+    mountPath: /victoria-metrics-data
+    storageClass: "" # empty uses the cluster default storage class
+    size: 3Gi
     accessModes:
       - ReadWriteOnce
+    volumeName: ""
   service:
     type: "ClusterIP"
 webapp:
   enabled: false
   image:
-    repository: "ghcr.io/chantico-project/images/chantico-visualisation-webapp"
+    registry: "ghcr.io"
+    repository: "chantico-project/images/chantico-visualisation-webapp"
     tag: "" # defaults to Chart.version
+    digest: "" # overrides tag when set
     pullPolicy: IfNotPresent
   service:
     type: "ClusterIP"
-pv:
-  enabled: false
-  name: chantico-persistent-volume
-  storage: "" # should probably match the pvc
-  storageClassName: ""
-  hostPath:
-    path: "/data/chantico-persistent-volume"
+# Shared claim of the controller, SNMP generator jobs and filebrowser
+persistence:
+  existingClaim: "" # use this claim instead of creating chantico-persistent-volume-claim
+  storageClass: "" # empty uses the cluster default storage class
+  size: 3Gi
   accessModes:
     - ReadWriteOnce
-pvc:
+  volumeName: ""
+podSecurityContext:
   enabled: true
-  storageClassName: "" # empty uses the cluster default storage class
-  storage: 3Gi
-  accessModes:
-    - ReadWriteOnce
-securityContext:
+  runAsNonRoot: true
   runAsUser: 1000
   runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  enabled: true
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
