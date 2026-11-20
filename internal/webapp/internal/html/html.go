@@ -60,6 +60,19 @@ func (r *TemplateRenderer) RenderNodePartial(w io.Writer, d NodePartialData) err
 	return r.tmpl.ExecuteTemplate(w, "node.html", d)
 }
 
+type SuggestionItem struct {
+	ID    string
+	Label string
+}
+
+type SuggestionsPartialData struct {
+	Items []SuggestionItem
+}
+
+func (r *TemplateRenderer) RenderSuggestionsPartial(w io.Writer, d SuggestionsPartialData) error {
+	return r.tmpl.ExecuteTemplate(w, "suggestions.html", d)
+}
+
 type ErrorPageData struct {
 	Error          string
 	Host           string

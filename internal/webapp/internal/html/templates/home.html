@@ -23,12 +23,43 @@
             {{ range .Namespaces }}<option value="{{ . }}">{{ . }}</option>{{ end }}
           </select>
         </dd>
+        <dt><label for="node-search-input">Search</label></dt>
+        <dd>
+          <form id="node-search" role="search">
+            <div id="node-search-wrapper">
+              <input id="node-search-input" name="q" type="search" placeholder="Node name" autocomplete="off"
+                     hx-get="/api/nodes/suggest"
+                     hx-trigger="input changed delay:200ms, search"
+                     hx-vals="js:{namespace: document.getElementById('namespace').value}"
+                     hx-target="#node-suggestions"
+                     hx-swap="innerHTML"
+                     hx-sync="this:replace">
+              <ul id="node-suggestions" role="listbox" aria-label="Node suggestions"></ul>
+            </div>
+            <button type="submit">Show neighbours</button>
+            <button type="button" id="node-search-clear">Clear</button>
+          </form>
+          <span id="node-search-status" role="status"></span>
+        </dd>
       </dl>
     </header>
 
     <main>
       <div class="layout">
-        <div id="graph" class="graph"></div>
+        <div id="graph" class="graph">
+          <ul class="graph-legend" aria-label="Node shapes and statuses">
+            <li><img class="legend-swatch" src="/static/shapes/rectangle.svg" alt="">PDU</li>
+            <li><img class="legend-swatch" src="/static/shapes/star.svg" alt="">Bare metal</li>
+            <li><img class="legend-swatch" src="/static/shapes/hexagon.svg" alt="">VM</li>
+            <li><img class="legend-swatch" src="/static/shapes/diamond.svg" alt="">Kubernetes</li>
+            <li><img class="legend-swatch" src="/static/shapes/triangle.svg" alt="">Heat</li>
+            <li><img class="legend-swatch" src="/static/shapes/ellipse.svg" alt="">Other</li>
+            <li class="legend-break" aria-hidden="true"></li>
+            <li><span class="legend-color legend-color-ok"></span>OK</li>
+            <li><span class="legend-color legend-color-pending"></span>Pending</li>
+            <li><span class="legend-color legend-color-faulty"></span>Faulty</li>
+          </ul>
+        </div>
         <div id="divider" class="divider" role="separator" aria-orientation="vertical"></div>
         <aside class="panel">
           <div id="panel-content"

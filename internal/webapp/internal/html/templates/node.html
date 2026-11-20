@@ -4,21 +4,44 @@
     <span>Status</span>
     <strong>{{ .Status }}</strong>
   </p>
-  <label>
+  <div class="manifest-header">
     <span>Manifest</span>
-    <textarea name="manifest" rows="20">{{ .Manifest }}</textarea>
-  </label>
+    <button type="button"
+            class="edit-toggle"
+            aria-pressed="false"
+            onclick="toggleManifestEdit(this)">Edit</button>
+  </div>
+  <textarea name="manifest" rows="20" readonly>{{ .Manifest }}</textarea>
   <div class="panel-actions">
     <button type="button"
+            class="manifest-update"
+            hidden
             hx-put="/api/nodes/{{ .ID }}"
             hx-include="closest form"
             hx-target="#panel-content"
             hx-swap="innerHTML">Update</button>
     <button type="button"
-            class="danger"
+            class="danger manifest-delete"
+            hidden
             hx-delete="/api/nodes/{{ .ID }}"
             hx-confirm="Delete {{ .Name }}?"
             hx-target="#panel-content"
             hx-swap="innerHTML">Delete</button>
   </div>
 </form>
+<script>
+function toggleManifestEdit(button) {
+  const form = button.closest("form");
+  const textarea = form.querySelector("textarea[name='manifest']");
+  const editing = textarea.hasAttribute("readonly");
+  if (editing) {
+    textarea.removeAttribute("readonly");
+  } else {
+    textarea.setAttribute("readonly", "");
+  }
+  button.setAttribute("aria-pressed", String(editing));
+  button.textContent = editing ? "View" : "Edit";
+  form.querySelector(".manifest-update").hidden = !editing;
+  form.querySelector(".manifest-delete").hidden = !editing;
+}
+</script>

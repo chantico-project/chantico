@@ -6,10 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"sigs.k8s.io/yaml"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"chantico/api/v1alpha1"
 	"chantico/internal/webapp/internal/graph"
@@ -37,6 +41,7 @@ func New(h *HTTPServerHandler, config *HTTPServerConfig) *HTTPServer {
 	mux.HandleFunc("GET /", h.HomePage)
 	mux.HandleFunc("GET /api/graph", h.GraphAPI)
 	mux.HandleFunc("GET /api/namespaces", h.NamespacesAPI)
+	mux.HandleFunc("GET /api/nodes/suggest", h.SuggestAPI)
 	mux.HandleFunc("GET /api/nodes/{id}", h.NodeAPI)
 	mux.HandleFunc("PUT /api/nodes/{id}", h.UpdateNodeAPI)
 	mux.HandleFunc("DELETE /api/nodes/{id}", h.DeleteNodeAPI)
@@ -67,10 +72,19 @@ func (s HTTPServer) Stop(ctx context.Context) error {
 }
 
 func (h *HTTPServerHandler) GraphAPI(w http.ResponseWriter, r *http.Request) {
-	nodes, err := h.Kubernetes.GetDataCenterResources(r.URL.Query().Get("namespace"))
+	namespace := r.URL.Query().Get("namespace")
+	nodes, err := h.Kubernetes.GetDataCenterResources(namespace)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if name := r.URL.Query().Get("node"); name != "" {
+		nodes = graph.Neighbourhood(nodes, namespace+"-"+name)
+		if nodes == nil {
+			http.Error(w, "node not found", http.StatusNotFound)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -102,6 +116,38 @@ func (h *HTTPServerHandler) NodeAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.renderNode(w, id, dcr)
+}
+
+const suggestionLimit = 10
+
+func (h *HTTPServerHandler) SuggestAPI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	query := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
+	if query == "" {
+		return
+	}
+
+	nodes, err := h.Kubernetes.GetDataCenterResources(r.URL.Query().Get("namespace"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var items []html.SuggestionItem
+	for _, node := range nodes {
+		if strings.Contains(strings.ToLower(node.Label), query) {
+			items = append(items, html.SuggestionItem{ID: node.Name, Label: node.Label})
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].Label < items[j].Label })
+	if len(items) > suggestionLimit {
+		items = items[:suggestionLimit]
+	}
+
+	if err := h.Renderer.RenderSuggestionsPartial(w, html.SuggestionsPartialData{Items: items}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (h *HTTPServerHandler) UpdateNodeAPI(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +195,16 @@ func (h *HTTPServerHandler) DeleteNodeAPI(w http.ResponseWriter, r *http.Request
 }
 
 func (h *HTTPServerHandler) renderNode(w http.ResponseWriter, id string, dcr *v1alpha1.DataCenterResource) {
-	manifest, err := yaml.Marshal(dcr)
+	editable := dcr.DeepCopy()
+	editable.ManagedFields = nil
+	editable.CreationTimestamp = metav1.Time{}
+	editable.UID = ""
+	editable.ResourceVersion = ""
+	editable.Generation = 0
+	editable.Finalizers = nil
+	editable.Status = v1alpha1.DataCenterResourceStatus{}
+
+	manifest, err := yaml.Marshal(editable)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
