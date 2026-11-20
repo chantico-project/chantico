@@ -27,6 +27,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const (
+	parentsIndexField          = "spec.parents"
+	involvedResourceIndexField = "status.involvedResource"
+)
+
+func indexParents(object client.Object) []string {
+	return object.(*chantico.DataCenterResource).Spec.ParentNames()
+}
+
+func indexInvolvedResource(object client.Object) []string {
+	if involved := object.(*chantico.DataCenterResource).Status.InvolvedResource; involved != "" {
+		return []string{involved}
+	}
+	return nil
+}
+
+var dataCenterResourceIndexes = map[string]client.IndexerFunc{
+	parentsIndexField:          indexParents,
+	involvedResourceIndexField: indexInvolvedResource,
+}
+
 type RecordingRuleConfigurer interface {
 	Reconcile(context.Context, *chantico.DataCenterResource) error
 	Delete(context.Context, *chantico.DataCenterResource) error
@@ -48,6 +69,11 @@ type DataCenterResourceReconciler struct {
 }
 
 func (r *DataCenterResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	for field, indexer := range dataCenterResourceIndexes {
+		if err := mgr.GetFieldIndexer().IndexField(context.Background(), &chantico.DataCenterResource{}, field, indexer); err != nil {
+			return err
+		}
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chantico.DataCenterResource{}).
 		Owns(&batchv1.Job{}).
@@ -194,7 +220,9 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 
 	listOptions := []client.ListOption{client.InNamespace(dataCenterResource.Namespace)}
 	dataCenterResources := &chantico.DataCenterResourceList{}
-	_ = r.List(ctx, dataCenterResources, listOptions...)
+	if err := r.List(ctx, dataCenterResources, listOptions...); err != nil {
+		return steps.Error(err)
+	}
 
 	visited, involvedResource, err := dcr.Validate(dataCenterResource, dataCenterResources.Items)
 	if err != nil {
@@ -205,13 +233,21 @@ func (r *DataCenterResourceReconciler) reconcileValidation(ctx context.Context, 
 	} else {
 		l.Info("Clearing validation errors", "status", dataCenterResource.Status)
 		references := &chantico.DataCenterResourceList{}
-		_ = r.List(ctx, references, append(listOptions, client.MatchingFields{"status.involvedResource": dataCenterResource.Name})...)
+		if err := r.List(ctx, references, append(listOptions, client.MatchingFields{involvedResourceIndexField: dataCenterResource.Name})...); err != nil {
+			return steps.Error(err)
+		}
 		children := &chantico.DataCenterResourceList{}
-		_ = r.List(ctx, children, append(listOptions, client.MatchingFields{"spec.parents": dataCenterResource.Name})...)
+		if err := r.List(ctx, children, append(listOptions, client.MatchingFields{parentsIndexField: dataCenterResource.Name})...); err != nil {
+			return steps.Error(err)
+		}
 		if dataCenterResource.Status.InvolvedResource != "" {
 			involved := &chantico.DataCenterResource{}
-			_ = r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
-			visited = append(visited, *involved)
+			err := r.Get(ctx, types.NamespacedName{Namespace: dataCenterResource.Namespace, Name: dataCenterResource.Status.InvolvedResource}, involved)
+			if err == nil {
+				visited = append(visited, *involved)
+			} else if !apierrors.IsNotFound(err) {
+				return steps.Error(err)
+			}
 		}
 		l.Info("Visited nodes", "nodes", dcr.FormatResources(visited), "references", dcr.FormatResources(references.Items), "children", dcr.FormatResources(children.Items))
 		items := mergeUnique(visited, references.Items, children.Items)

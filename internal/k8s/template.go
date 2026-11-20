@@ -26,10 +26,7 @@ func (p *TemplateParameter) Resolve(ctx context.Context, r client.Client, namesp
 
 // Gets the template string from either the Value or the ValueFrom field of the TemplateFrom struct.
 func (p *TemplateFrom) ResolveTemplate(ctx context.Context, r client.Client, namespace string) (string, error) {
-	if p.Value != "" {
-		return p.Value, nil
-	}
-	return p.ValueFrom.Resolve(ctx, r, namespace)
+	return p.Resolve(ctx, r, namespace)
 }
 
 // Resolves all template parameters into values the renderer can substitute into the template.

@@ -31,6 +31,12 @@ and documentation that is not compatible with these respective licenses.
 - Read [coding style guidelines](coding-style-guidelines.md) for more details on 
   code formatting and style to apply during code generation.
 
+## Documentation
+
+- Update the relevant file in `docs/content/technical/custom-resources/` when 
+  changing CRD fields, validation or controller behavior.
+- Keep code marked with a "Keep in sync" comment consistent with documentation.
+
 ## Pull Requests
 
 - Always run tests and checks before creating a PR.

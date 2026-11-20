@@ -108,3 +108,13 @@ func TestRenderTemplate(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderEmptyValue(t *testing.T) {
+	got, err := (&TemplateFrom{}).Render(t.Context(), testTemplateClient(t), "chantico")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "" {
+		t.Errorf("Render() = %q, want empty string", got)
+	}
+}

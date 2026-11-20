@@ -61,7 +61,7 @@ spec:
   type: baremetal
   parents:
     - name: datacenterresource-pdu1
-      coefficientFrom: 
+      coefficientFrom:
         value: "1"
     - name: datacenterresource-pdu2
       coefficientFrom:

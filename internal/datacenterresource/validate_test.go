@@ -46,7 +46,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "bar"}},
+					Parents: []chantico.ParentRef{{Name: "bar", Coefficient: "1"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -55,15 +55,16 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "bar"}},
+					Parents: []chantico.ParentRef{{Name: "bar", Coefficient: "1"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:    "pdu",
-					Parents: []chantico.ParentRef{},
+					Type:         "pdu",
+					Parents:      []chantico.ParentRef{},
+					EnergyMetric: "pdu_power_watts",
 				},
 			}},
 			ExpectedVisited: []chantico.DataCenterResource{{
@@ -71,8 +72,9 @@ func TestValidate(t *testing.T) {
 					Name: "bar",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:    "pdu",
-					Parents: []chantico.ParentRef{},
+					Type:         "pdu",
+					Parents:      []chantico.ParentRef{},
+					EnergyMetric: "pdu_power_watts",
 				},
 			}},
 			ExpectedError:            nil,
@@ -85,7 +87,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "vm",
-					Parents: []chantico.ParentRef{{Name: "bm1"}, {Name: "bm2"}},
+					Parents: []chantico.ParentRef{{Name: "bm1", Coefficient: "0.5"}, {Name: "bm2", Coefficient: "0.5"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -93,16 +95,18 @@ func TestValidate(t *testing.T) {
 					Name: "pdu1",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:    "pdu",
-					Parents: []chantico.ParentRef{},
+					Type:         "pdu",
+					Parents:      []chantico.ParentRef{},
+					EnergyMetric: "pdu_power_watts",
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pdu2",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:    "pdu",
-					Parents: []chantico.ParentRef{},
+					Type:         "pdu",
+					Parents:      []chantico.ParentRef{},
+					EnergyMetric: "pdu_power_watts",
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
@@ -110,7 +114,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "pdu1"}, {Name: "pdu2"}},
+					Parents: []chantico.ParentRef{{Name: "pdu1", Coefficient: "0.5"}, {Name: "pdu2", Coefficient: "0.5"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
@@ -118,7 +122,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "pdu1"}, {Name: "pdu2"}},
+					Parents: []chantico.ParentRef{{Name: "pdu1", Coefficient: "0.5"}, {Name: "pdu2", Coefficient: "0.5"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
@@ -126,7 +130,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "vm",
-					Parents: []chantico.ParentRef{{Name: "bm1"}, {Name: "bm2"}},
+					Parents: []chantico.ParentRef{{Name: "bm1", Coefficient: "0.5"}, {Name: "bm2", Coefficient: "0.5"}},
 				},
 			}},
 			ExpectedVisited: []chantico.DataCenterResource{{
@@ -135,7 +139,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "pdu1"}, {Name: "pdu2"}},
+					Parents: []chantico.ParentRef{{Name: "pdu1", Coefficient: "0.5"}, {Name: "pdu2", Coefficient: "0.5"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
@@ -143,23 +147,25 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "baremetal",
-					Parents: []chantico.ParentRef{{Name: "pdu1"}, {Name: "pdu2"}},
+					Parents: []chantico.ParentRef{{Name: "pdu1", Coefficient: "0.5"}, {Name: "pdu2", Coefficient: "0.5"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pdu1",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:    "pdu",
-					Parents: []chantico.ParentRef{},
+					Type:         "pdu",
+					Parents:      []chantico.ParentRef{},
+					EnergyMetric: "pdu_power_watts",
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pdu2",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:    "pdu",
-					Parents: []chantico.ParentRef{},
+					Type:         "pdu",
+					Parents:      []chantico.ParentRef{},
+					EnergyMetric: "pdu_power_watts",
 				},
 			}},
 			ExpectedError:            nil,
@@ -172,7 +178,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "pdu",
-					Parents: []chantico.ParentRef{{Name: "bar"}},
+					Parents: []chantico.ParentRef{{Name: "bar", Coefficient: "1"}},
 				},
 			},
 			Resources:                []chantico.DataCenterResource{},
@@ -187,7 +193,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "pdu",
-					Parents: []chantico.ParentRef{{Name: "bar"}},
+					Parents: []chantico.ParentRef{{Name: "bar", Coefficient: "1"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -196,7 +202,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "pdu",
-					Parents: []chantico.ParentRef{{Name: "bar"}},
+					Parents: []chantico.ParentRef{{Name: "bar", Coefficient: "1"}},
 				},
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
@@ -204,7 +210,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "pdu",
-					Parents: []chantico.ParentRef{{Name: "foo"}},
+					Parents: []chantico.ParentRef{{Name: "foo", Coefficient: "1"}},
 				},
 			}},
 			ExpectedVisited:          []chantico.DataCenterResource{},
@@ -218,7 +224,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "pdu",
-					Parents: []chantico.ParentRef{{Name: "foo"}},
+					Parents: []chantico.ParentRef{{Name: "foo", Coefficient: "1"}},
 				},
 			},
 			Resources: []chantico.DataCenterResource{{
@@ -227,7 +233,7 @@ func TestValidate(t *testing.T) {
 				},
 				Spec: chantico.DataCenterResourceSpec{
 					Type:    "pdu",
-					Parents: []chantico.ParentRef{{Name: "foo"}},
+					Parents: []chantico.ParentRef{{Name: "foo", Coefficient: "1"}},
 				},
 			}},
 			ExpectedVisited:          []chantico.DataCenterResource{},
@@ -240,13 +246,45 @@ func TestValidate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: chantico.DataCenterResourceSpec{
-					Type:    "perpetuummobile",
-					Parents: []chantico.ParentRef{},
+					Type:         "perpetuummobile",
+					Parents:      []chantico.ParentRef{},
+					EnergyMetric: "power_watts",
 				},
 			},
 			Resources:                []chantico.DataCenterResource{},
 			ExpectedVisited:          []chantico.DataCenterResource{},
 			ExpectedError:            ErrorUnknownType{Type: "perpetuummobile"},
+			ExpectedInvolvedResource: "",
+		},
+		"gives error if parent type is not allowed": {
+			Resource: &chantico.DataCenterResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:    "baremetal",
+					Parents: []chantico.ParentRef{{Name: "bar", Coefficient: "1"}},
+				},
+			},
+			Resources: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:         "vm",
+					EnergyMetric: "vm_power_watts",
+				},
+			}},
+			ExpectedVisited: []chantico.DataCenterResource{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: chantico.DataCenterResourceSpec{
+					Type:         "vm",
+					EnergyMetric: "vm_power_watts",
+				},
+			}},
+			ExpectedError:            ErrorInvalidParentType{InvolvedResource: "bar", Type: "baremetal", ParentType: "vm"},
 			ExpectedInvolvedResource: "",
 		},
 	}

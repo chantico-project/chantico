@@ -9,14 +9,6 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-const (
-	DataCenterResourceTypePDU        = "pdu"
-	DataCenterResourceTypeBaremetal  = "baremetal"
-	DataCenterResourceTypeVM         = "vm"
-	DataCenterResourceTypeKubernetes = "kubernetes"
-	DataCenterResourceTypeHeat       = "heat"
-)
-
 type ErrorResourceNotFound struct {
 	InvolvedResource string
 }
@@ -31,14 +23,6 @@ type ErrorCycleDetected struct {
 
 func (e ErrorCycleDetected) Error() string {
 	return fmt.Sprintf("cyclic loop detected in data center resources from child %s", e.InvolvedResource)
-}
-
-type ErrorUnknownType struct {
-	Type string
-}
-
-func (e ErrorUnknownType) Error() string {
-	return fmt.Sprintf("unknown type: %s", e.Type)
 }
 
 type ErrorServiceDefinedOnParent struct {
@@ -118,17 +102,33 @@ func validateGraph(
 }
 
 // Ensure the resource type is in the list of known types.
-func validateResourceType(dataCenterResource *chantico.DataCenterResource) error {
-	switch dataCenterResource.Spec.Type {
-	case "", DataCenterResourceTypePDU, DataCenterResourceTypeBaremetal, DataCenterResourceTypeVM, DataCenterResourceTypeKubernetes, DataCenterResourceTypeHeat:
-		return nil
-	default:
-		return ErrorUnknownType{Type: dataCenterResource.Spec.Type}
+func validateResourceType(dataCenterResource *chantico.DataCenterResource, _ []chantico.DataCenterResource) error {
+	_, err := LookupType(dataCenterResource.Spec.Type)
+	return err
+}
+
+// ValidateParentTypes ensures the types of the parents are allowed for the
+// type of the resource.
+func validateParentTypes(dataCenterResource *chantico.DataCenterResource, ancestors []chantico.DataCenterResource) error {
+	info, err := LookupType(dataCenterResource.Spec.Type)
+	if err != nil {
+		return err
 	}
+	parentNames := dataCenterResource.Spec.ParentNames()
+	for _, ancestor := range ancestors {
+		if slices.Contains(parentNames, ancestor.Name) && !info.AcceptsParent(ancestor.Spec.Type) {
+			return ErrorInvalidParentType{
+				InvolvedResource: ancestor.Name,
+				Type:             dataCenterResource.Spec.Type,
+				ParentType:       ancestor.Spec.Type,
+			}
+		}
+	}
+	return nil
 }
 
 // ValidateAdditionalLabelNames rejects additional labels that are not valid Prometheus label names.
-func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResource) error {
+func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResource, _ []chantico.DataCenterResource) error {
 	for labelName := range dataCenterResource.Spec.AdditionalLabels {
 		if !model.UTF8Validation.IsValidLabelName(labelName) {
 			return ErrorInvalidLabelName{LabelName: labelName}
@@ -137,8 +137,9 @@ func validateAdditionalLabelNames(dataCenterResource *chantico.DataCenterResourc
 	return nil
 }
 
-var validators = []func(*chantico.DataCenterResource) error{
+var validators = []func(*chantico.DataCenterResource, []chantico.DataCenterResource) error{
 	validateResourceType,
+	validateParentTypes,
 	validateAdditionalLabelNames,
 }
 
@@ -152,7 +153,7 @@ func Validate(
 	}
 
 	for _, validate := range validators {
-		if err := validate(dataCenterResource); err != nil {
+		if err := validate(dataCenterResource, involvedResources); err != nil {
 			return involvedResources, "", err
 		}
 	}
