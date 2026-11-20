@@ -68,9 +68,10 @@ baremetal -> vm2
 
 In the diagram, the two PDU sockets and Alumet running on the bare metal alongside the Hypervisor. The metrics gathered by the Alumet instance running on the baremetal are used to attribute energy to the VMs running on the baremetal.
 
-## 1. Install Alumet on the hypervisor
+## 1. Install Alumet to perform attribution
 
-Install the Alumet agent on the hypervisor that runs the VMs. Follow the
+The Alumet agent needs to be installed on the baremetal that runs the virtual machines
+(Ie. it needs to be installed alongside the hypervisor). Follow the
 [Alumet installation guide](https://alumet-dev.github.io/user-book/start/install.html)
 for your operating system and installation method.
 
@@ -151,7 +152,7 @@ memory_mode = "quick"
 Start Alumet using the method for your installation, then check that its
 Prometheus exporter is available on port `9091` (or the port you configured).
 The exporter must be reachable from Chantico's Prometheus pod. If the
-hypervisor is not directly reachable from the cluster, arrange network access
+baremetal is not directly reachable from the cluster, arrange network access
 before adding the scrape target.
 
 ## 3. Add the Alumet exporter as a measurement target
