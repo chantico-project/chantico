@@ -1,9 +1,9 @@
 ---
 title: "How to run a stress test"
+weight: 100
 menus:
   main:
     parent: howto
-    weight: 30
 ---
 
 ## Stress test overview

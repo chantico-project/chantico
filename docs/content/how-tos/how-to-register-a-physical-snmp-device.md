@@ -1,9 +1,9 @@
 ---
 title: "How to register a physical snmp device"
+weight: 60
 menus:
   main:
     parent: howto
-    weight: 30
 ---
 
 `PhysicalMeasurement` does not parse MIBs. It links a concrete device IP to an existing `MeasurementDevice` (SNMP module/auth definition) and creates a Prometheus Operator `ScrapeConfig` for it. Prometheus Operator applies the scrape config to Prometheus.

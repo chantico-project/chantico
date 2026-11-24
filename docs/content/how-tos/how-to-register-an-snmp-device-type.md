@@ -1,9 +1,9 @@
 ---
 title: "How to register an SNMP device type"
+weight: 50
 menus:
   main:
     parent: howto
-    weight: 30
 ---
 
 In the current setting, a type of device using SNMP is configured by uploading MIBs and defining a `MeasurementDevice` custom resource.

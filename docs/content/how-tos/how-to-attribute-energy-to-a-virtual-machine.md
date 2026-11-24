@@ -1,9 +1,9 @@
 ---
 title: "How to attribute energy to a virtual machine"
+weight: 80
 menus:
   main:
     parent: howto
-    weight: 40
 ---
 
 This guide describes one way to attribute a bare-metal server's measured energy

@@ -1,9 +1,9 @@
 ---
 title: "How to run the webapp"
+weight: 90
 menus:
   main:
     parent: howto
-    weight: 40
 ---
 
 ## Webapp

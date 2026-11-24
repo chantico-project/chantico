@@ -1,9 +1,9 @@
 ---
 title: "How to set-up the local development environment"
+weight: 10
 menus:
   main:
     parent: howto
-    weight: 30
 ---
 
 ### Prerequisites
