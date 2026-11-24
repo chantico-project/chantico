@@ -498,5 +498,5 @@ endef
 # toolver prints the version of the module of tool package $1 pinned in $(TOOLS_DIR)/go.mod.
 # go install pkg@version still builds each tool with its own dependency versions.
 define toolver
-$(shell GOWORK=off go -C $(TOOLS_DIR) list -f '{{.Module.Version}}' $(1))
+$(or $(shell GOWORK=off go -C $(TOOLS_DIR) list -f '{{.Module.Version}}' $(1)),$(error Cannot read version of $(1) from $(TOOLS_DIR)/go.mod))
 endef

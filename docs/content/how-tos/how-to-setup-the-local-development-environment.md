@@ -13,7 +13,8 @@ MacOS and UNIX based environment.
 
 It requires the following packages:
 
-- go version v1.24.13+
+- go version v1.26.4+ (v1.27+ to install the tools listed below, including 
+  Hugo for building the documentation)
 - make version 4.3+
 - docker version v17.03+
 - kubectl version v1.11.3+
@@ -22,7 +23,9 @@ It requires the following packages:
 Other useful binaries, such as kind, are versioned in the Go module in the 
 `tools` folder (`tools/go.mod`), which Dependabot keeps up to date. These will 
 be installed automatically when needed by the Makefile and are installed into 
-the local `<root-project>/bin` folder.
+the local `<root-project>/bin` folder. The minimum Go versions follow the `go` 
+lines in `go.mod` and `tools/go.mod`. With the default `GOTOOLCHAIN=auto`, an 
+older Go downloads the required version automatically.
 
 
 ### Creating the environment
