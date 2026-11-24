@@ -274,9 +274,14 @@ helm-package: sync-deployment-crds ## Package Helm chart.
 helm-push: helm-package ## Package and push Helm chart to GHCR.
 	helm push chantico-$(VERSION).tgz $(GHCR_HELM_REPO)
 
+# Defaults for running the dry run locally; CI sets these itself. The commit must be pushed.
+GITHUB_REF ?= refs/heads/main
+GITHUB_SHA ?= $(shell git rev-parse HEAD)
+
 .PHONY: release-dry-run
-release-dry-run: semantic-release ## Write next version and changelog to .version-unreleased and CHANGELOG-unreleased.md (needs GITHUB_TOKEN, CI only).
-	$(SEMANTIC_RELEASE) --dry --version-file --changelog CHANGELOG-unreleased.md \
+release-dry-run: semantic-release ## Write next version and changelog to .version-unreleased and CHANGELOG-unreleased.md (needs GITHUB_TOKEN).
+	GITHUB_REPOSITORY="$(GITHUB_REPOSITORY)" GITHUB_REF="$(GITHUB_REF)" GITHUB_SHA="$(GITHUB_SHA)" \
+		$(SEMANTIC_RELEASE) --dry --version-file --changelog CHANGELOG-unreleased.md \
 		--allow-no-changes --allow-initial-development-versions $(SEMANTIC_RELEASE_PLUGINS)
 
 .PHONY: build-installer
