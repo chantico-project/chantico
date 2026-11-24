@@ -1,10 +1,3 @@
-{{ $howtos := slice }}
-{{ range .Site.RegularPages }}
-  {{ $menu := .Params.menus.main }}
-  {{ if and $menu (eq $menu.parent "howto") }}
-    {{ $howtos = $howtos | append . }}
-  {{ end }}
-{{ end }}
-{{ range sort $howtos "Weight" }}
+{{ range (where .Site.RegularPages "Params.menus.main.parent" "howto").ByWeight }}
 - [{{ .Title }}]({{ .File.Path }})
 {{ end }}

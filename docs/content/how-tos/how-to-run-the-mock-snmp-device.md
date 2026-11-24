@@ -1,10 +1,9 @@
-
 ---
 title: "How to run the mock snmp device"
+weight: 30
 menus:
   main:
     parent: howto
-    weight: 20
 ---
 
 ## The SNMP mock

@@ -1,9 +1,9 @@
 ---
 title: "How to install Chantico"
+weight: 20
 menus:
   main:
     parent: howto
-    weight: 20
 ---
 
 ## Installation of Chantico from OCI Registry

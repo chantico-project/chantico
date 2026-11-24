@@ -1,9 +1,9 @@
 ---
 title: "How to run the VM Attribution mock"
+weight: 40
 menus:
   main:
     parent: howto
-    weight: 20
 ---
 
 ## The VM Attribution mock

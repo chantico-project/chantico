@@ -1,9 +1,9 @@
 ---
 title: "How to register data center resources"
+weight: 70
 menus:
   main:
     parent: howto
-    weight: 30
 ---
 
 In Chantico, one of the custom resources that can be provided is the data 
