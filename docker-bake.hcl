@@ -30,6 +30,10 @@ group "mocks" {
 target "_common" {
   context   = "."
   platforms = [for arch in compact(split(",", IMAGE_ARCH)) : "linux/${trimspace(arch)}"]
+  # Link the GHCR package to the repository
+  labels = {
+    "org.opencontainers.image.source" = "https://github.com/chantico-project/chantico"
+  }
 }
 
 target "controller" {

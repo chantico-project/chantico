@@ -17,10 +17,8 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
   packages: write
-  pages: write
-  id-token: write
 
 jobs:
   # Helm release
@@ -28,22 +26,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.ref }}
+          persist-credentials: false
 
       - name: Set tags
         id: meta
+        env:
+          VERSION: ${{ inputs.version }}
+          PR: ${{ inputs.pr }}
+          SHA: ${{ inputs.sha }}
         run: |
-          if [ ! -z "${{ inputs.version }}" ]; then
+          if [ -n "$VERSION" ]; then
             echo "registry=charts" >> $GITHUB_OUTPUT
-            echo "versions=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          elif [ ! -z "${{ inputs.pr }}" ]; then
-            VERSION=$(helm show chart chart/ | sed -nE 's/^version: *//p')
+            echo "versions=$VERSION" >> $GITHUB_OUTPUT
+          elif [ -n "$PR" ]; then
+            CHART_VERSION=$(helm show chart chart/ | sed -nE 's/^version: *//p')
             echo "registry=charts-pr" >> $GITHUB_OUTPUT
-            VERSIONS="$VERSION-pr-${{ inputs.pr }}"
-            if [ ! -z "${{ inputs.sha }}" ]; then
-              VERSIONS="$VERSIONS $VERSION-pr-${{ inputs.pr }}-$(echo "${{ inputs.sha }}" | cut -c1-7)"
+            VERSIONS="$CHART_VERSION-pr-$PR"
+            if [ -n "$SHA" ]; then
+              VERSIONS="$VERSIONS $CHART_VERSION-pr-$PR-${SHA:0:7}"
             fi
             echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
           else
@@ -52,23 +55,28 @@ jobs:
           fi
 
       - name: Setup Helm
-        uses: azure/setup-helm@v5
+        uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
 
       - name: Package and lint chart
         id: package
+        env:
+          VERSIONS: ${{ steps.meta.outputs.versions }}
         run: |
           make sync-deployment-crds
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm dependency build chart/
           helm lint chart/
-          for v in ${{ steps.meta.outputs.versions }}; do
+          for v in $VERSIONS; do
             helm package chart/ --version "$v" --destination dist
           done
 
       - name: Push chart to GHCR
         if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]'
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+          DESTINATION: oci://ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.registry }}
         run: |
-          echo "${{ secrets.BOT_RELEASE_TOKEN }}" | helm registry login ghcr.io -u chantico-bot --password-stdin
+          echo "$REGISTRY_TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           for chart in dist/chantico-*.tgz; do
-            helm push "$chart" oci://ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.registry }}
+            helm push "$chart" "$DESTINATION"
           done

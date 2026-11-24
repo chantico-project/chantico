@@ -19,7 +19,8 @@ It requires the following packages:
 - kubectl version v1.11.3+
 - helm version 3.19+
 
-Other useful binaries, such as kind, are versioned in the Makefile. These will 
+Other useful binaries, such as kind, are versioned in the Go module in the 
+`tools` folder (`tools/go.mod`), which Dependabot keeps up to date. These will 
 be installed automatically when needed by the Makefile and are installed into 
 the local `<root-project>/bin` folder.
 
