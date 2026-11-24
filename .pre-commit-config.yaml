@@ -5,8 +5,11 @@ repos:
     rev: v1.0.0-rc.4
     hooks:
       - id: go-mod-tidy
+      # tools/ only holds a build-tagged file to pin tool versions
       - id: go-test-mod
+        exclude: ^tools/
       - id: go-vet-mod
+        exclude: ^tools/
       - id: go-fmt
   - repo: https://github.com/golangci/golangci-lint
     rev: v2.14.0

@@ -1,0 +1,15 @@
+# Changes to CI, build, release and dependency pinning need a maintainer review.
+/.github/                   @chantico-project/chantico-maintainers
+/Makefile                   @chantico-project/chantico-maintainers
+/tools/                     @chantico-project/chantico-maintainers
+/go.mod                     @chantico-project/chantico-maintainers
+/go.sum                     @chantico-project/chantico-maintainers
+/docs/go.mod                @chantico-project/chantico-maintainers
+/docs/go.sum                @chantico-project/chantico-maintainers
+/.gitmodules                @chantico-project/chantico-maintainers
+/Dockerfile*                @chantico-project/chantico-maintainers
+/docker-bake.hcl            @chantico-project/chantico-maintainers
+/.goreleaser.github.yaml    @chantico-project/chantico-maintainers
+/.semrelrc                  @chantico-project/chantico-maintainers
+/.golangci.yml              @chantico-project/chantico-maintainers
+/.pre-commit-config.yaml    @chantico-project/chantico-maintainers

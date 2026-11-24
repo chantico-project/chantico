@@ -35,3 +35,5 @@ toolchains.
     partial HTML layouts and themes.
 - `hack`: Boilerplate for new files to add license block to top of code.
 - `internal`: Controller and module source code of the Chantico operator.
+- `tools`: Go module that pins the versions of the development tools installed 
+  by the Makefile, such as kind and golangci-lint.

@@ -6,13 +6,12 @@ on:
       version:
         required: true
         type: string
-
+    secrets:
+      BOT_RELEASE_TOKEN:
+        required: true
 
 permissions:
-  contents: write
-  packages: write
-  pages: write
-  id-token: write
+  contents: read
 
 jobs:
   # GoReleaser
@@ -25,15 +24,16 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: refs/tags/v${{ inputs.version }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7.2.1
+        uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # v7.2.1
         with:
-          version: latest
+          version: v2.20.3
           args: release --config .goreleaser.github.yaml --clean
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}

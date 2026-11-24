@@ -109,6 +109,14 @@ vet: ## Run go vet against code.
 test: manifests generate ## Run tests.
 	go test ./internal/... -coverprofile cover.out
 
+.PHONY: test-report
+test-report: gotestsum gocover-cobertura ## Run tests with a JSON report and Cobertura coverage, as in CI.
+	$(GOTESTSUM) --jsonfile report.json --format testname -- -v -coverprofile=coverage.out ./internal/...
+	go tool cover -func coverage.out
+	$(GOCOVER_COBERTURA) < coverage.out > coverage.xml
+	# Strip module prefix so paths are repo-relative and survive truncation better
+	sed -i 's#filename="chantico/#filename="#' coverage.xml
+
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  ## Run the e2e tests against a Kind k8s instance that is spun up.
 test-e2e:
@@ -266,6 +274,16 @@ helm-package: sync-deployment-crds ## Package Helm chart.
 helm-push: helm-package ## Package and push Helm chart to GHCR.
 	helm push chantico-$(VERSION).tgz $(GHCR_HELM_REPO)
 
+# Defaults for running the dry run locally; CI sets these itself. The commit must be pushed.
+GITHUB_REF ?= refs/heads/main
+GITHUB_SHA ?= $(shell git rev-parse HEAD)
+
+.PHONY: release-dry-run
+release-dry-run: semantic-release ## Write next version and changelog to .version-unreleased and CHANGELOG-unreleased.md (needs GITHUB_TOKEN).
+	GITHUB_REPOSITORY="$(GITHUB_REPOSITORY)" GITHUB_REF="$(GITHUB_REF)" GITHUB_SHA="$(GITHUB_SHA)" \
+		$(SEMANTIC_RELEASE) --dry --version-file --changelog CHANGELOG-unreleased.md \
+		--allow-no-changes --allow-initial-development-versions $(SEMANTIC_RELEASE_PLUGINS)
+
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist
@@ -371,21 +389,8 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
-# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
-# $1 - target path with name of binary
-# $2 - package REPOSITORY_URL which can be installed
-# $3 - specific version of package
-define go-install-tool
-@[ -f "$(1)-$(3)" ] || { \
-set -e; \
-package=$(2)@$(3) ;\
-echo "Downloading $${package}" ;\
-rm -f $(1) || true ;\
-GOBIN=$(LOCALBIN) go install $${package} ;\
-mv $(1) $(1)-$(3) ;\
-} ;\
-ln -sf $(1)-$(3) $(1)
-endef
+## Location of the Go module that pins the tool versions
+TOOLS_DIR ?= $(shell pwd)/tools
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -397,16 +402,25 @@ KIND ?= $(LOCALBIN)/kind
 HUGO ?= $(LOCALBIN)/hugo
 DOC2GO ?= $(LOCALBIN)/doc2go
 HTMLTEST ?= $(LOCALBIN)/htmltest
+GOTESTSUM ?= $(LOCALBIN)/gotestsum
+GOCOVER_COBERTURA ?= $(LOCALBIN)/gocover-cobertura
+SEMANTIC_RELEASE ?= $(LOCALBIN)/semantic-release
 
-## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.3
-CONTROLLER_TOOLS_VERSION ?= v0.19.0
-ENVTEST_VERSION ?= release-0.19
-GOLANGCI_LINT_VERSION ?= v2.14.0
-KIND_VERSION ?= v0.31.0
-HUGO_VERSION ?= v0.163.3
-HTMLTEST_VERSION ?= v0.17.0
-DOC2GO_VERSION ?= v0.11.0
+## Tool Versions, read from $(TOOLS_DIR)/go.mod (updated by Dependabot)
+KUSTOMIZE_VERSION ?= $(call toolver,sigs.k8s.io/kustomize/kustomize/v5)
+CONTROLLER_TOOLS_VERSION ?= $(call toolver,sigs.k8s.io/controller-tools/cmd/controller-gen)
+ENVTEST_VERSION ?= $(call toolver,sigs.k8s.io/controller-runtime/tools/setup-envtest)
+GOLANGCI_LINT_VERSION ?= $(call toolver,github.com/golangci/golangci-lint/v2/cmd/golangci-lint)
+KIND_VERSION ?= $(call toolver,sigs.k8s.io/kind)
+HUGO_VERSION ?= $(call toolver,github.com/gohugoio/hugo)
+HTMLTEST_VERSION ?= $(call toolver,github.com/wjdp/htmltest)
+DOC2GO_VERSION ?= $(call toolver,go.abhg.dev/doc2go)
+GOTESTSUM_VERSION ?= $(call toolver,gotest.tools/gotestsum)
+GOCOVER_COBERTURA_VERSION ?= $(call toolver,github.com/t-yuki/gocover-cobertura)
+SEMANTIC_RELEASE_VERSION ?= $(call toolver,github.com/go-semantic-release/semantic-release/v2/cmd/semantic-release)
+# Plugins are downloaded at runtime, so pin them as well; the npm files-updater is unused
+SEMANTIC_RELEASE_PLUGINS ?= --provider github@1.19.0 --ci-condition github@1.11.0 \
+	--commit-analyzer default@1.15.0 --changelog-generator default@1.15.0 --files-updater=
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -448,23 +462,46 @@ doc2go: $(DOC2GO) ## Download doc2go locally if necessary.
 $(DOC2GO): $(LOCALBIN)
 	$(call go-install-tool,$(DOC2GO),go.abhg.dev/doc2go,$(DOC2GO_VERSION))
 
+.PHONY: gotestsum
+gotestsum: $(GOTESTSUM) ## Download gotestsum locally if necessary.
+$(GOTESTSUM): $(LOCALBIN)
+	$(call go-install-tool,$(GOTESTSUM),gotest.tools/gotestsum,$(GOTESTSUM_VERSION))
+
+.PHONY: gocover-cobertura
+gocover-cobertura: $(GOCOVER_COBERTURA) ## Download gocover-cobertura locally if necessary.
+$(GOCOVER_COBERTURA): $(LOCALBIN)
+	$(call go-install-tool,$(GOCOVER_COBERTURA),github.com/t-yuki/gocover-cobertura,$(GOCOVER_COBERTURA_VERSION))
+
+.PHONY: semantic-release
+semantic-release: $(SEMANTIC_RELEASE) ## Download go-semantic-release locally if necessary.
+$(SEMANTIC_RELEASE): $(LOCALBIN)
+	$(call go-install-tool,$(SEMANTIC_RELEASE),github.com/go-semantic-release/semantic-release/v2/cmd/semantic-release,$(SEMANTIC_RELEASE_VERSION))
+
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
 # $2 - package REPOSITORY_URL which can be installed
 # $3 - specific version of package
+# The version is expanded only once, since toolver runs go list.
 define go-install-tool
-@[ -f "$(1)-$(3)" ] && [ "$$(readlink -- "$(1)" 2>/dev/null)" = "$(1)-$(3)" ] || { \
+@version="$(3)" ;\
+[ -f "$(1)-$${version}" ] && [ "$$(readlink -- "$(1)" 2>/dev/null)" = "$(1)-$${version}" ] || { \
 set -e; \
-package=$(2)@$(3) ;\
+package=$(2)@$${version} ;\
 echo "Downloading $${package}" ;\
 rm -f "$(1)" ;\
 GOBIN="$(LOCALBIN)" go install $${package} ;\
-mv "$(LOCALBIN)/$$(basename "$(1)")" "$(1)-$(3)" ;\
+mv "$(LOCALBIN)/$$(basename "$(1)")" "$(1)-$${version}" ;\
 } ;\
-ln -sf "$$(realpath "$(1)-$(3)")" "$(1)"
+ln -sf "$$(realpath "$(1)-$${version}")" "$(1)"
 endef
 
 define gomodver
 $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' $(1) 2>/dev/null)
+endef
+
+# toolver prints the version of the module of tool package $1 pinned in $(TOOLS_DIR)/go.mod.
+# go install pkg@version still builds each tool with its own dependency versions.
+define toolver
+$(or $(shell GOWORK=off go -C $(TOOLS_DIR) list -f '{{.Module.Version}}' $(1)),$(error Cannot read version of $(1) from $(TOOLS_DIR)/go.mod))
 endef

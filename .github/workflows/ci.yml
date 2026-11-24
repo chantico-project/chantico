@@ -4,19 +4,14 @@ name: CI
 on:
   push:
     branches: [ main ]
-    tags: [ "v*" ]
   pull_request:
     branches: [ main ]
 
 permissions:
-  contents: write
-  packages: write
-  pages: write
-  id-token: write
-  code-quality: write
+  contents: read
 
 env:
-  GO_VERSION: "1.26"
+  GO_VERSION: "1.27"
 
 jobs:
   # Linters
@@ -24,9 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -42,38 +39,37 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      - name: Read golangci-lint version from tools/go.mod
+        id: golangci_lint
+        run: echo "version=$(go -C tools list -m -f '{{.Version}}' github.com/golangci/golangci-lint/v2)" >> "$GITHUB_OUTPUT"
+
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         continue-on-error: true
         with:
-          version: v2.12
+          version: ${{ steps.golangci_lint.outputs.version }}
 
   # Tests
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      code-quality: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install tools
-        run: |
-          go install gotest.tools/gotestsum@latest
-          go install github.com/t-yuki/gocover-cobertura@latest
-
       - name: Run tests
-        run: |
-          gotestsum --jsonfile report.json --format testname -- -v -coverprofile=coverage.out ./internal/...
-          go tool cover -func coverage.out
-          gocover-cobertura < coverage.out > coverage.xml
-          # Strip module prefix so paths are repo-relative and survive truncation better
-          sed -i 's#filename="chantico/#filename="#' coverage.xml
+        run: make test-report
 
       - name: Upload coverage report
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/upload-code-coverage@v1
+        uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
         with:
           file: coverage.xml
           language: Go
@@ -82,28 +78,35 @@ jobs:
   invoke-docker:
     if: github.repository == 'chantico-project/chantico' && github.actor != 'dependabot[bot]' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
     needs: test
-    uses: ./.github/workflows/docker.yml
+    permissions:
+      contents: read
+      packages: write
+    uses: $/.github/workflows/docker.yml
     with:
       ref: ${{ github.ref }}
       pr: ${{ github.event.pull_request.number }}
       sha: ${{ github.event.pull_request.head.sha }}
-    secrets: inherit
 
   invoke-helm:
     if: github.event_name == 'pull_request'
     needs: test
-    uses: ./.github/workflows/helm.yml
+    permissions:
+      contents: read
+      packages: write
+    uses: $/.github/workflows/helm.yml
     with:
       ref: ${{ github.ref }}
       pr: ${{ github.event.pull_request.number }}
       sha: ${{ github.event.pull_request.head.sha }}
-    secrets: inherit
 
   invoke-docs:
-    uses: ./.github/workflows/docs.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: $/.github/workflows/docs.yml
     with:
       ref: ${{ github.ref }}
-    secrets: inherit
 
   # Start a release to create a new Git version
   release:
@@ -118,23 +121,23 @@ jobs:
       version: ${{ steps.release.outputs.version }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
-          token: ${{ secrets.BOT_RELEASE_TOKEN }}
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
 
       - name: go-semantic-release and update versions
         id: release
         run: |
           set -euxo pipefail
-          curl -sSL https://get-release.xyz/semantic-release/linux/amd64 -o semantic-release
-          chmod +x semantic-release
           git config --global user.email "semantic-release@github"
           git config --global user.name "go-semantic-release"
-          ./semantic-release --dry -f \
-            --changelog CHANGELOG-unreleased.md \
-            --allow-no-changes \
-            --allow-initial-development-versions
+          make release-dry-run
           if [ ! -f .version-unreleased ]; then exit 0; fi
           VERSION=$(cat .version-unreleased)
           cat CHANGELOG-unreleased.md CHANGELOG.md > CHANGELOG-temp.md
@@ -161,33 +164,41 @@ jobs:
   invoke-release:
     if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
     needs: release
-    uses: ./.github/workflows/release.yml
+    uses: $/.github/workflows/release.yml
     with:
       version: ${{ needs.release.outputs.version }}
-    secrets: inherit
+    secrets:
+      BOT_RELEASE_TOKEN: ${{ secrets.BOT_RELEASE_TOKEN }}
 
   invoke-docker-release:
     if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
     needs: release
-    uses: ./.github/workflows/docker.yml
+    permissions:
+      contents: read
+      packages: write
+    uses: $/.github/workflows/docker.yml
     with:
       ref: refs/tags/v${{ needs.release.outputs.version }}
       version: ${{ needs.release.outputs.version }}
-    secrets: inherit
 
   invoke-helm-release:
     if: github.repository == 'chantico-project/chantico' && needs.release.outputs.version != ''
     needs: release
-    uses: ./.github/workflows/helm.yml
+    permissions:
+      contents: read
+      packages: write
+    uses: $/.github/workflows/helm.yml
     with:
       ref: refs/tags/v${{ needs.release.outputs.version }}
       version: ${{ needs.release.outputs.version }}
-    secrets: inherit
 
   invoke-docs-release:
     if: needs.release.outputs.version != ''
     needs: release
-    uses: ./.github/workflows/docs.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: $/.github/workflows/docs.yml
     with:
       ref: refs/tags/v${{ needs.release.outputs.version }}
-    secrets: inherit
