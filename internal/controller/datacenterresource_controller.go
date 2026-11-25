@@ -148,7 +148,7 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	defer func() { reterr = patchStatus(reterr) }()
+	defer patchStatus(&reterr)
 
 	dataCenterResource.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
 	return steps.Run(ctx, dataCenterResource,

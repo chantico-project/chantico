@@ -39,13 +39,20 @@ func controllerLogConstructor(mgr ctrl.Manager, name string) func(*reconcile.Req
 	}
 }
 
-func newStatusPatcher(ctx context.Context, c client.Client, obj client.Object) (func(error) error, error) {
+// newStatusPatcher creates a deferred status patcher that updates the observed generation.
+func newStatusPatcher(ctx context.Context, c client.Client, obj client.Object) (func(*error), error) {
 	patcher, err := patch.NewHelper(obj, c)
 	if err != nil {
 		return nil, err
 	}
 
-	return func(reterr error) error {
-		return errors.Join(reterr, patcher.Patch(ctx, obj, patch.WithStatusObservedGeneration{}))
+	return func(reterr *error) {
+		if patchErr := patcher.Patch(ctx, obj, patch.WithStatusObservedGeneration{}); patchErr != nil {
+			if *reterr == nil {
+				*reterr = patchErr
+			} else {
+				*reterr = errors.Join(*reterr, patchErr)
+			}
+		}
 	}, nil
 }

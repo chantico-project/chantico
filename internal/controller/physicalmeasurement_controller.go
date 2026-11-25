@@ -76,7 +76,7 @@ func (r *PhysicalMeasurementReconciler) Reconcile(ctx context.Context, req ctrl.
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	defer func() { reterr = patchStatus(reterr) }()
+	defer patchStatus(&reterr)
 
 	physicalMeasurement.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
 	return steps.Run(ctx, physicalMeasurement,

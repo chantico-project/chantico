@@ -23,6 +23,7 @@ from a specific device, with a selected authentication setting and module.
 | `metadata.name` | `string` | The name of the resource. This is used to reference the resource in instances of other custom resource definitions. |
 | `spec.type` | `string` | The measurement type: `snmp` (default) or `prometheus-exporter`. |
 | `spec.ip` | ` string` | The hostname or IP address of the physical device that is to be monitored. |
+| `spec.metricsPath` | `string` | Optional HTTP path to scrape for metrics. Defaults to `/snmp` for `snmp` measurements and `/metrics` for `prometheus-exporter` measurements. |
 | `spec.measurementDevice` | `string` | Reference to the name of the `MeasurementDevice` resource that describes the type of device and how it is to be monitored (authentication and walks). |
 | `spec.additionalLabels` | `map[string]string` | Optional additional labels to add to the Prometheus scrape configuration for this resource. This can be used to add custom labels to the metrics scraped from this device. |
 

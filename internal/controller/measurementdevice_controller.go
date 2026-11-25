@@ -116,7 +116,7 @@ func (r *MeasurementDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	defer func() { reterr = patchStatus(reterr) }()
+	defer patchStatus(&reterr)
 
 	measurementDevice.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
 	return steps.Run(ctx, measurementDevice,

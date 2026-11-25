@@ -124,10 +124,13 @@ func setupPhysicalMeasurementController(_ context.Context, mgr ctrl.Manager) err
 	}).SetupWithManager(mgr)
 }
 
-var controllerSetupFuncs = map[string]func(context.Context, ctrl.Manager) error{
-	"DataCenterResource":  setupDatacenterResourceController,
-	"MeasurementDevice":   setupMeasurementDeviceController,
-	"PhysicalMeasurement": setupPhysicalMeasurementController,
+var controllerSetupFuncs = []struct {
+	name  string
+	setup func(context.Context, ctrl.Manager) error
+}{
+	{name: "DataCenterResource", setup: setupDatacenterResourceController},
+	{name: "MeasurementDevice", setup: setupMeasurementDeviceController},
+	{name: "PhysicalMeasurement", setup: setupPhysicalMeasurementController},
 }
 
 func main() {
@@ -236,9 +239,9 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
-	for name, setupFunc := range controllerSetupFuncs {
-		if err := setupFunc(ctx, mgr); err != nil {
-			setupLog.Error(err, "unable to set up controller", "controller", name)
+	for _, controllerSetup := range controllerSetupFuncs {
+		if err := controllerSetup.setup(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to set up controller", "controller", controllerSetup.name)
 			os.Exit(1)
 		}
 	}
