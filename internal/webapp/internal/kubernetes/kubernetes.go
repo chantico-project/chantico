@@ -186,6 +186,7 @@ func (k *KubernetesClient) GetDataCenterResources(namespace string) ([]*graph.No
 		node := graph.Node{
 			Name:   nodeName(dcr),
 			Label:  dcr.GetName(),
+			Type:   dcr.Spec.Type,
 			Status: NodeStatus(dcr.Status.Conditions),
 		}
 

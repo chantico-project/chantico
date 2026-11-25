@@ -6,9 +6,25 @@ const API = {
 };
 
 const namespaceSelect = document.getElementById("namespace");
+const searchForm = document.getElementById("node-search");
+const searchInput = document.getElementById("node-search-input");
+const searchClear = document.getElementById("node-search-clear");
+const searchStatus = document.getElementById("node-search-status");
+const suggestionList = document.getElementById("node-suggestions");
 
-function graphURL() {
-  return `${API.graph}?namespace=${encodeURIComponent(namespaceSelect.value)}`;
+let searchedNode = "";
+
+function graphURL(node) {
+  const params = new URLSearchParams({ namespace: namespaceSelect.value });
+  if (node !== "") {
+    params.set("node", node);
+  }
+  return `${API.graph}?${params}`;
+}
+
+function setSearchStatus(message) {
+  searchStatus.textContent = message;
+  searchInput.setAttribute("aria-invalid", message === "" ? "false" : "true");
 }
 
 async function refreshNamespaces() {
@@ -40,6 +56,7 @@ const STYLE = {
   selected: { color: cssToken("--graph-node-selected-color") },
   faulty: { color: cssToken("--graph-node-faulty-color") },
   pending: { color: cssToken("--graph-node-pending-color") },
+  ok: { color: cssToken("--graph-node-ok-color") },
   edge: {
     width: cssNumber("--graph-edge-width"),
     color: cssToken("--graph-edge-color"),
@@ -82,6 +99,30 @@ const cy = window.cytoscape({
       },
     },
     {
+      selector: "node[type = 'pdu']",
+      style: { "shape": "rectangle" },
+    },
+    {
+      selector: "node[type = 'baremetal']",
+      style: { "shape": "star" },
+    },
+    {
+      selector: "node[type = 'vm']",
+      style: { "shape": "hexagon" },
+    },
+    {
+      selector: "node[type = 'kubernetes']",
+      style: { "shape": "diamond" },
+    },
+    {
+      selector: "node[type = 'heat']",
+      style: { "shape": "triangle" },
+    },
+    {
+      selector: "node[status = 'ok']",
+      style: { "background-color": STYLE.ok.color },
+    },
+    {
       selector: "node[status = 'faulty']",
       style: { "background-color": STYLE.faulty.color },
     },
@@ -122,13 +163,26 @@ const cy = window.cytoscape({
 cy.on("mouseover", "node", (event) => event.target.addClass("hovered"));
 cy.on("mouseout", "node", (event) => event.target.removeClass("hovered"));
 
-cy.on("tap", "node", (event) => {
+function selectNode(node) {
   cy.nodes(".selected").removeClass("selected");
-  event.target.addClass("selected");
+  node.addClass("selected");
   document.body.dispatchEvent(
-    new window.CustomEvent("node-selected", { bubbles: true, detail: { id: event.target.id() } }),
+    new window.CustomEvent("node-selected", { bubbles: true, detail: { id: node.id() } }),
   );
+}
+
+cy.on("tap", "node", (event) => selectNode(event.target));
+cy.on("dblclick", "node", (event) => {
+  searchInput.value = event.target.data("label");
+  runSearch(event.target.data("label"));
 });
+cy.on("dblclick", (event) => {
+  if (event.target === cy) {
+    searchInput.value = "";
+    runSearch("");
+  }
+});
+
 
 // Resizing logic
 function resizePanes(event) {
@@ -156,11 +210,25 @@ function updateLabelSize() {
 cy.on("zoom", updateLabelSize);
 
 // Graph logic
-async function refreshGraph() {
-  const response = await window.fetch(graphURL());
-  if (!response.ok) {
-    return;
+async function refreshGraph(node = searchedNode, isSearch = false) {
+  const response = await window.fetch(graphURL(node));
+  if (response.status === 404 && node !== "") {
+    if (isSearch) {
+      setSearchStatus(`No node named "${node}" in ${namespaceSelect.value}`);
+    } else if (node === searchedNode) {
+      setSearchStatus(`Node "${node}" no longer exists in ${namespaceSelect.value}`);
+      searchedNode = "";
+      searchInput.value = "";
+    }
+    return false;
   }
+  if (!response.ok) {
+    return false;
+  }
+  if (isSearch) {
+    searchedNode = node;
+  }
+  setSearchStatus("");
   const { nodes = [], edges = [] } = await response.json();
 
   const incomingIds = new Set([
@@ -202,9 +270,95 @@ async function refreshGraph() {
     cy.layout(LAYOUT.tree).run();
     updateLabelSize();
   }
+  return true;
 }
 
-namespaceSelect.addEventListener("change", refreshGraph);
-refreshNamespaces().then(refreshGraph);
+async function runSearch(name) {
+  const ok = await refreshGraph(name, true);
+  if (ok) {
+    cy.fit(undefined, 20);
+  }
+}
+
+searchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  clearSuggestions();
+  runSearch(searchInput.value.trim());
+});
+
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  clearSuggestions();
+  runSearch("");
+});
+
+function clearSuggestions() {
+  suggestionList.replaceChildren();
+  searchInput.setAttribute("aria-expanded", "false");
+}
+
+function activeSuggestion() {
+  return suggestionList.querySelector(".suggestion.active");
+}
+
+function setActiveSuggestion(item) {
+  activeSuggestion()?.classList.remove("active");
+  if (item) {
+    item.classList.add("active");
+    searchInput.setAttribute("aria-activedescendant", item.id);
+  } else {
+    searchInput.removeAttribute("aria-activedescendant");
+  }
+}
+
+function chooseSuggestion(item) {
+  searchInput.value = item.dataset.label;
+  clearSuggestions();
+  runSearch(item.dataset.label).then(() => {
+    const node = cy.getElementById(item.dataset.id);
+    if (node.nonempty()) {
+      selectNode(node);
+    }
+  });
+}
+
+suggestionList.addEventListener("click", (event) => {
+  const item = event.target.closest(".suggestion");
+  if (item) {
+    chooseSuggestion(item);
+  }
+});
+
+searchInput.addEventListener("keydown", (event) => {
+  const items = [...suggestionList.querySelectorAll(".suggestion")];
+  if (items.length === 0) {
+    return;
+  }
+  const index = items.indexOf(activeSuggestion());
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    const next = (index + step + items.length) % items.length;
+    setActiveSuggestion(items[next]);
+  } else if (event.key === "Enter" && index !== -1) {
+    event.preventDefault();
+    chooseSuggestion(items[index]);
+  } else if (event.key === "Escape") {
+    clearSuggestions();
+  }
+});
+
+searchInput.addEventListener("htmx:afterSettle", () => {
+  searchInput.setAttribute("aria-expanded", suggestionList.children.length > 0 ? "true" : "false");
+});
+
+namespaceSelect.addEventListener("change", () => {
+  searchedNode = "";
+  searchInput.value = "";
+  setSearchStatus("");
+  clearSuggestions();
+  refreshGraph();
+});
+refreshNamespaces().then(() => refreshGraph());
 window.setInterval(refreshNamespaces, REFRESH_INTERVAL_MS);
-window.setInterval(refreshGraph, REFRESH_INTERVAL_MS);
+window.setInterval(() => refreshGraph(), REFRESH_INTERVAL_MS);

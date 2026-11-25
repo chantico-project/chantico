@@ -1,0 +1,3 @@
+{{- range $index, $item := .Items -}}
+<li role="option" id="suggestion-{{ $index }}" class="suggestion" data-id="{{ $item.ID }}" data-label="{{ $item.Label }}">{{ $item.Label }}</li>
+{{- end -}}
