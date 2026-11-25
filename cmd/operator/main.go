@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"net"
@@ -84,6 +85,52 @@ func configureWatchNamespace() cache.Options {
 		setupLog.Info("watching resources in all namespaces")
 	}
 	return cacheOpts
+}
+
+func setupDatacenterResourceController(_ context.Context, mgr ctrl.Manager) error {
+	ruleConfigurer := &datacenterresource.PrometheusRecordingRuleConfigurer{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}
+	return (&controller.DataCenterResourceReconciler{
+		Client:         mgr.GetClient(),
+		RuleConfigurer: ruleConfigurer,
+	}).SetupWithManager(mgr)
+}
+
+func setupMeasurementDeviceController(ctx context.Context, mgr ctrl.Manager) error {
+	if err := controller.EnsureMergedSNMPConfig(ctx, mgr.GetAPIReader(), mgr.GetClient(), config.ValidatedEnv.PodNamespace); err != nil {
+		return err
+	}
+
+	return (&controller.MeasurementDeviceReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Jobs:   md.SNMPGeneratorJobBuilder{},
+		Files:  filestore.VolumeFileStore{Root: config.ValidatedEnv.VolumeLocation},
+	}).SetupWithManager(mgr)
+}
+
+func setupPhysicalMeasurementController(_ context.Context, mgr ctrl.Manager) error {
+	targetConfigurer := &physicalmeasurement.PrometheusTargetConfigurer{
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		SNMPExporterAddress: net.JoinHostPort(config.ValidatedEnv.SnmpExporterServiceHost, config.ValidatedEnv.SnmpExporterServicePort),
+	}
+
+	return (&controller.PhysicalMeasurementReconciler{
+		Client:           mgr.GetClient(),
+		TargetConfigurer: targetConfigurer,
+	}).SetupWithManager(mgr)
+}
+
+var controllerSetupFuncs = []struct {
+	name  string
+	setup func(context.Context, ctrl.Manager) error
+}{
+	{name: "DataCenterResource", setup: setupDatacenterResourceController},
+	{name: "MeasurementDevice", setup: setupMeasurementDeviceController},
+	{name: "PhysicalMeasurement", setup: setupPhysicalMeasurementController},
 }
 
 func main() {
@@ -192,45 +239,13 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
-	if err := controller.EnsureMergedSNMPConfig(ctx, mgr.GetAPIReader(), mgr.GetClient(), config.ValidatedEnv.PodNamespace); err != nil {
-		setupLog.Error(err, "unable to create initial SNMP ConfigMap")
-		os.Exit(1)
+	for _, controllerSetup := range controllerSetupFuncs {
+		if err := controllerSetup.setup(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to set up controller", "controller", controllerSetup.name)
+			os.Exit(1)
+		}
 	}
 
-	if err = (&controller.MeasurementDeviceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Jobs:   md.SNMPGeneratorJobBuilder{},
-		Files:  fileStore,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MeasurementDevice")
-		os.Exit(1)
-	}
-
-	targetConfigurer := &physicalmeasurement.PrometheusTargetConfigurer{
-		Client:              mgr.GetClient(),
-		Scheme:              mgr.GetScheme(),
-		SNMPExporterAddress: net.JoinHostPort(config.ValidatedEnv.SnmpExporterServiceHost, config.ValidatedEnv.SnmpExporterServicePort),
-	}
-	if err = (&controller.PhysicalMeasurementReconciler{
-		Client:           mgr.GetClient(),
-		TargetConfigurer: targetConfigurer,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PhysicalMeasurement")
-		os.Exit(1)
-	}
-
-	ruleConfigurer := &datacenterresource.PrometheusRecordingRuleConfigurer{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}
-	if err := (&controller.DataCenterResourceReconciler{
-		Client:         mgr.GetClient(),
-		RuleConfigurer: ruleConfigurer,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DataCenterResource")
-		os.Exit(1)
-	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

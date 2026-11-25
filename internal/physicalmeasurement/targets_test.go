@@ -90,6 +90,17 @@ func TestKubePrometheusTargetsReconcile_UpdatesTarget(t *testing.T) {
 	}
 }
 
+func TestKubePrometheusTargetsReconcile_UsesConfiguredMetricsPath(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	measurement.Spec.MetricsPath = "/custom"
+
+	observed := reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+
+	if observed.Spec.MetricsPath == nil || *observed.Spec.MetricsPath != "/custom" {
+		t.Fatalf("expected configured metrics path, got %v", observed.Spec.MetricsPath)
+	}
+}
+
 func TestKubePrometheusTargetsReconcile_SetsOwnerReference(t *testing.T) {
 	targets, measurement := setupKubePrometheusTargetsTest(t)
 

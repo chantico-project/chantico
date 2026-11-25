@@ -18,23 +18,19 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	chantico "chantico/api/v1alpha1"
 	"chantico/internal/steps"
 
-	"github.com/go-logr/logr"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	util "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type TargetConfigurer interface {
@@ -58,13 +54,7 @@ func (r *PhysicalMeasurementReconciler) SetupWithManager(mgr ctrl.Manager) error
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chantico.PhysicalMeasurement{}).
 		Owns(&monitoringv1alpha1.ScrapeConfig{}).
-		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
-			log := mgr.GetLogger().WithName("PhysicalMeasurementController")
-			if req != nil {
-				log = log.WithValues("resource", req.Name)
-			}
-			return log
-		}).
+		WithLogConstructor(controllerLogConstructor(mgr, "PhysicalMeasurementController")).
 		Complete(r)
 }
 
@@ -82,16 +72,11 @@ func (r *PhysicalMeasurementReconciler) Reconcile(ctx context.Context, req ctrl.
 	l = l.WithValues("generation", physicalMeasurement.GetGeneration())
 	ctx = log.IntoContext(ctx, l)
 
-	// Patches the changes to the PhysicalMeasurement at the end of reconciliation. This updates the observedGeneration and conditions in the status.
-	patcher, err := patch.NewHelper(physicalMeasurement, r.Client)
+	patchStatus, err := newStatusPatcher(ctx, r.Client, physicalMeasurement)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	defer func() {
-		if err := patcher.Patch(ctx, physicalMeasurement, patch.WithStatusObservedGeneration{}); err != nil {
-			reterr = errors.Join(reterr, err)
-		}
-	}()
+	defer patchStatus(&reterr)
 
 	physicalMeasurement.UpdateStatusCondition(chantico.ConditionReady, metav1.ConditionUnknown, chantico.ReasonReconciling, "Reconciliation is in progress")
 	return steps.Run(ctx, physicalMeasurement,

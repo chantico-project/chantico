@@ -33,6 +33,18 @@ const (
 	PhysicalMeasurementTypePrometheusExporter PhysicalMeasurementType = "prometheus-exporter"
 )
 
+var defaultPaths = map[PhysicalMeasurementType]string{
+	PhysicalMeasurementTypePrometheusExporter: "/metrics",
+	PhysicalMeasurementTypeSNMP:               "/snmp",
+}
+
+func DefaultMetricsPath(measurementType PhysicalMeasurementType) string {
+	if path, ok := defaultPaths[measurementType]; ok {
+		return path
+	}
+	return ""
+}
+
 // PhysicalMeasurementSpec defines the desired state of PhysicalMeasurement
 // +kubebuilder:validation:XValidation:rule="self.type != \"snmp\" || (has(self.measurementDevice) && self.measurementDevice != \"\")",message="measurementDevice is required when type is snmp"
 type PhysicalMeasurementSpec struct {
@@ -41,9 +53,12 @@ type PhysicalMeasurementSpec struct {
 
 	// +kubebuilder:default:=snmp
 	// +kubebuilder:validation:Enum=snmp;prometheus-exporter;
-	Type              PhysicalMeasurementType `json:"type"`
-	Ip                string                  `json:"ip"`
-	MeasurementDevice string                  `json:"measurementDevice,omitempty"`
+	Type PhysicalMeasurementType `json:"type"`
+	Ip   string                  `json:"ip"`
+	// MetricsPath is the HTTP path scraped for this measurement.
+	// +kubebuilder:validation:Pattern=`^(/[^/].*|/)$`
+	MetricsPath       string `json:"metricsPath,omitempty"`
+	MeasurementDevice string `json:"measurementDevice,omitempty"`
 
 	// AdditionalLabels are applied directly to the prometheus time series for this resource to
 	// add additional identification information. If a label conflicts with existing labels, the additional label is skipped.

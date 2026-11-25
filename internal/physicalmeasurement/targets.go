@@ -27,12 +27,9 @@ func (targets *PrometheusTargetConfigurer) Reconcile(
 	ctx context.Context,
 	measurement *chantico.PhysicalMeasurement,
 ) error {
-	var metricsPath string
-	// TODO: Add this to the PhysicalMeasurementSpec as a configurable field
-	if measurement.Spec.Type == chantico.PhysicalMeasurementTypePrometheusExporter {
-		metricsPath = "/metrics"
-	} else {
-		metricsPath = "/snmp"
+	metricsPath := measurement.Spec.MetricsPath
+	if metricsPath == "" {
+		metricsPath = chantico.DefaultMetricsPath(measurement.Spec.Type)
 	}
 
 	scrapeConfig := &monitoringv1alpha1.ScrapeConfig{

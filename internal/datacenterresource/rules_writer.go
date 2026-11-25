@@ -26,18 +26,9 @@ func (f *PrometheusRecordingRuleConfigurer) Reconcile(ctx context.Context, resou
 		return err
 	}
 
-	promRuleSpec := convertPrometheusRuleSpec(generatedRules)
+	rule := convertPrometheusRuleSpec(resource, generatedRules)
 
-	rule := &monitoringv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      resource.Name,
-			Namespace: resource.Namespace,
-			Labels:    k8s.ManagedResourceLabels,
-		},
-		Spec: promRuleSpec,
-	}
-
-	err = k8s.ApplyWithOwner(ctx, f.Client, f.Scheme, resource, rule, func(existing, desired *monitoringv1.PrometheusRule) {
+	err = k8s.ApplyWithOwner(ctx, f.Client, f.Scheme, resource, &rule, func(existing, desired *monitoringv1.PrometheusRule) {
 		existing.Spec = desired.Spec
 	})
 	if err != nil {
@@ -70,26 +61,41 @@ func generateRules(ctx context.Context, client client.Client, resource *chantico
 	return NewRuleBuilder(resource, resolvedExpressions).BuildRuleFile(), nil
 }
 
-func convertPrometheusRuleSpec(generatedRules *RuleFile) monitoringv1.PrometheusRuleSpec {
+func convertPrometheusRule(rule *RecordingRule) monitoringv1.Rule {
+	return monitoringv1.Rule{
+		Expr:   intstr.FromString(rule.Expr),
+		Labels: rule.Labels,
+		Record: rule.Record,
+	}
+}
+
+func convertPrometheusGroup(group *RuleGroup) monitoringv1.RuleGroup {
+	promRules := []monitoringv1.Rule{}
+	for _, rule := range group.Rules {
+		promRules = append(promRules, convertPrometheusRule(&rule))
+	}
+	return monitoringv1.RuleGroup{
+		Name:  group.Name,
+		Rules: promRules,
+	}
+}
+
+func convertPrometheusRuleSpec(resource *chantico.DataCenterResource, generatedRules *RuleFile) monitoringv1.PrometheusRule {
 	promGroups := []monitoringv1.RuleGroup{}
 	for _, group := range generatedRules.Groups {
-		promRules := []monitoringv1.Rule{}
-		for _, rule := range group.Rules {
-			promRules = append(promRules, monitoringv1.Rule{
-				Expr:   intstr.FromString(rule.Expr),
-				Labels: rule.Labels,
-				Record: rule.Record,
-			})
-		}
-		promGroups = append(promGroups, monitoringv1.RuleGroup{
-			Name:  group.Name,
-			Rules: promRules,
-		})
+		promGroups = append(promGroups, convertPrometheusGroup(&group))
 	}
 
-	spec := monitoringv1.PrometheusRuleSpec{
-		Groups: promGroups,
+	rule := monitoringv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resource.Name,
+			Namespace: resource.Namespace,
+			Labels:    k8s.ManagedResourceLabels,
+		},
+		Spec: monitoringv1.PrometheusRuleSpec{
+			Groups: promGroups,
+		},
 	}
 
-	return spec
+	return rule
 }
