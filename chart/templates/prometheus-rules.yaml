@@ -1,0 +1,54 @@
+# This file contains the static Prometheus recording rules for Chantico
+{{- $watchNamespace := .Values.controller.watchNamespace | default .Release.Namespace }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: chantico-overhead-rules
+  namespace: {{ if eq $watchNamespace "*" }}{{ .Release.Namespace }}{{ else }}{{ $watchNamespace }}{{ end }}
+  labels:
+    app.kubernetes.io/managed-by: chantico
+    chantico-project.io/prometheus-rule: "true"
+spec:
+  groups:
+    - name: overhead-attribution-coefficients
+      rules:
+      - record: chantico_power_coefficient
+        expr: |
+          sum by (resource) (
+            label_replace(
+              1 - sum by (parent) (
+                chantico_power_coefficient{kind="attribution"}
+              ),
+              "resource", "$1", "parent", "(.*)"
+            )
+          )
+        labels:
+          kind: overhead
+      - record: chantico_power_watts
+        expr: |
+          chantico_power_watts{kind="total"}
+          * on(resource) group_left()
+          sum by(resource) (
+            label_replace(
+              1 - sum by(parent) (
+                chantico_power_coefficient{kind="attribution"}
+              ),
+              "resource", "$1", "parent", "(.*)"
+            )
+          )
+        labels:
+          kind: overhead
+      - record: chantico_power_watts
+        expr: |
+          chantico_power_watts{kind="total"}
+          * on(resource) group_left()
+          sum by(resource) (
+            label_replace(
+              sum by(parent) (
+                chantico_power_coefficient{kind="attribution"}
+              ),
+              "resource", "$1", "parent", "(.*)"
+            )
+          )
+        labels:
+          kind: attributed
