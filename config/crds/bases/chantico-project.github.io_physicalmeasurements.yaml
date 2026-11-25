@@ -66,6 +66,7 @@ spec:
                 type: string
               metricsPath:
                 description: MetricsPath is the HTTP path scraped for this measurement.
+                pattern: ^(/[^/].*|/)$
                 type: string
               type:
                 default: snmp
