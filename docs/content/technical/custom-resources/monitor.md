@@ -36,8 +36,8 @@ alerts set two health conditions on the resource:
 
 | Condition | `False` when |
 |---|---|
-| `ScrapeConfigLoaded` | Prometheus has no scrape pool for the `ScrapeConfig` for 2 minutes (`ChanticoScrapeConfigNotLoaded`). |
-| `EndpointReachable` | The scrape of the target fails for 1 minute (`ChanticoEndpointUnreachable`). |
+| `ScrapeConfigLoaded` | Prometheus has no scrape pool for the `ScrapeConfig` for 15 seconds (`ChanticoScrapeConfigNotLoaded`). |
+| `EndpointReachable` | The scrape of the target fails for 25 seconds (`ChanticoEndpointUnreachable`). |
 
 The controller sets both conditions to `True` when they are missing after the 
 `ScrapeConfig` is applied. Afterwards, only alerts change them; see 

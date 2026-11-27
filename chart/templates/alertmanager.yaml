@@ -48,7 +48,7 @@ spec:
   replicas: 1
   alertmanagerConfigSelector:
     matchLabels:
-      app.kubernetes.io/managed-by: chantico
+      app.kubernetes.io/part-of: chantico
   alertmanagerConfigNamespaceSelector:
     matchLabels:
       kubernetes.io/metadata.name: {{ .Release.Namespace }}
@@ -62,7 +62,7 @@ metadata:
   name: chantico-health
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/managed-by: chantico
+    app.kubernetes.io/part-of: chantico
 spec:
   route:
     receiver: chantico-controller

@@ -175,15 +175,15 @@ spec:
 1. `Reconcile` calls `BuildRuleFile` to generate the recording rules and
   converts them into a `PrometheusRule` (`monitoring.coreos.com/v1`) with the
   same name and namespace as the `DataCenterResource`. The `PrometheusRule`
-  is created or updated, and carries the label
-  `app.kubernetes.io/managed-by: chantico`.
+  is created or updated, and carries the labels
+  `app.kubernetes.io/managed-by: chantico` and `app.kubernetes.io/part-of: chantico`.
 1. The `Prometheus` resource deployed by the Chantico chart selects
-  `PrometheusRule`s with that label in the release namespace. Prometheus
+  `PrometheusRule`s with the `part-of` label in the release namespace. Prometheus
   Operator renders them into the Prometheus configuration and reloads
   Prometheus, which evaluates them every `evaluationInterval` (5s).
 1. The `PrometheusRule` also contains a group `chantico_<name>_health` with 
   alerts that set the `RecordingRuleHealthy` condition to `False` when 
-  `chantico_power_watts` has no series for the resource for 2 minutes 
+  `chantico_power_watts` has no series for the resource for 30 seconds 
   (`ChanticoRecordingRuleNoData`), or when the evaluation of its recording 
   rules fails (`ChanticoRecordingRuleFailing`). See 
   [health tracking](../prometheus-operator.md#health-tracking).
@@ -207,6 +207,7 @@ metadata:
   namespace: chantico
   labels:
     app.kubernetes.io/managed-by: chantico
+    app.kubernetes.io/part-of: chantico
 spec:
   groups:
   - name: chantico_datacenterresource_misd_gbm_01

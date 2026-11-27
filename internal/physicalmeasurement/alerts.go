@@ -42,14 +42,14 @@ func HealthRules(measurement *chantico.PhysicalMeasurement) []alerts.Rule {
 		{
 			Alert:     "ChanticoScrapeConfigNotLoaded",
 			Expr:      fmt.Sprintf("absent(prometheus_target_scrape_pool_targets{scrape_pool=%s})", alerts.QuoteString(ScrapePoolName(measurement))),
-			For:       "2m",
+			For:       "15s",
 			Condition: chantico.ConditionScrapeConfigLoaded,
 			Summary:   "Prometheus has not loaded the scrape configuration",
 		},
 		{
 			Alert:     "ChanticoEndpointUnreachable",
 			Expr:      fmt.Sprintf("up{name=%s, instance=%s} == 0", alerts.QuoteString(measurement.Name), alerts.QuoteString(measurement.Spec.Ip)),
-			For:       "1m",
+			For:       "25s",
 			Condition: chantico.ConditionEndpointReachable,
 			Summary:   fmt.Sprintf("Scraping endpoint %s fails", measurement.Spec.Ip),
 		},

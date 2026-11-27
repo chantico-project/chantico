@@ -23,8 +23,8 @@ configuration to share the same Prometheus.
 Chantico creates, updates and deletes these resources during reconciliation.
 Each one has the same name and namespace as the Chantico resource that it is
 generated from, except the `PrometheusRule` of a `PhysicalMeasurement`, which 
-is named `physicalmeasurement-<name>`. All of them carry the label 
-`app.kubernetes.io/managed-by: chantico`.
+is named `physicalmeasurement-<name>`. All of them carry the labels 
+`app.kubernetes.io/managed-by: chantico` and `app.kubernetes.io/part-of: chantico`.
 
 ```kroki {_type=d2 _output=embed}
 direction: right
@@ -73,13 +73,13 @@ that only selects the resources managed by Chantico:
 ```yaml
 ruleSelector:
   matchLabels:
-    app.kubernetes.io/managed-by: chantico
+    app.kubernetes.io/part-of: chantico
 ruleNamespaceSelector:
   matchLabels:
     kubernetes.io/metadata.name: <release namespace>
 scrapeConfigSelector:
   matchLabels:
-    app.kubernetes.io/managed-by: chantico
+    app.kubernetes.io/part-of: chantico
 scrapeConfigNamespaceSelector:
   matchExpressions:
     - key: kubernetes.io/metadata.name

@@ -43,7 +43,7 @@ func HealthRules(resource *chantico.DataCenterResource) []alerts.Rule {
 		{
 			Alert:     "ChanticoRecordingRuleNoData",
 			Expr:      fmt.Sprintf("absent(%s{resource=%s})", EnergyMetricName, alerts.QuoteString(resource.Name)),
-			For:       "2m",
+			For:       "30s",
 			Condition: chantico.ConditionRecordingRuleHealthy,
 			Summary:   fmt.Sprintf("Recording rules produce no %s data", EnergyMetricName),
 		},

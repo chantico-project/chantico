@@ -37,7 +37,7 @@ spec:
   {{- $watchNamespace := .Values.controller.watchNamespace | default .Release.Namespace }}
   ruleSelector:
     matchLabels:
-      app.kubernetes.io/managed-by: chantico
+      app.kubernetes.io/part-of: chantico
   ruleNamespaceSelector:
     {{- if eq $watchNamespace "*" }}
     {}
@@ -47,7 +47,7 @@ spec:
     {{- end }}
   scrapeConfigSelector:
     matchLabels:
-      app.kubernetes.io/managed-by: chantico
+      app.kubernetes.io/part-of: chantico
   scrapeConfigNamespaceSelector:
     {{- if eq $watchNamespace "*" }}
     {}
@@ -88,7 +88,7 @@ metadata:
   name: chantico-prometheus-self
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/managed-by: chantico
+    app.kubernetes.io/part-of: chantico
 spec:
   jobName: chantico-prometheus-self
   staticConfigs:
