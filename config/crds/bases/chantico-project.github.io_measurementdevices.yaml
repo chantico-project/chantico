@@ -15,14 +15,11 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.conditions[-1].status
-      name: Status
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
       type: string
-    - jsonPath: .status.conditions[-1].reason
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
       name: Reason
-      type: string
-    - jsonPath: .status.conditions[-1].type
-      name: Type
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
