@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	chanticov1alpha1 "chantico/api/v1alpha1"
+	"chantico/internal/alerts"
 	config "chantico/internal/configuration"
 	"chantico/internal/controller"
 	"chantico/internal/datacenterresource"
@@ -92,6 +93,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var webhookCertDir string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -103,6 +105,9 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&webhookCertDir, "webhook-cert-dir", "",
+		"The directory with the tls.crt, tls.key and ca.crt files of the webhook server, which receives "+
+			"Alertmanager notifications. Defaults to the controller-runtime directory, where the chart mounts them.")
 
 	opts := zap.Options{
 		Development: true,
@@ -127,9 +132,10 @@ func main() {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
 
-	webhookServer := webhook.NewServer(webhook.Options{
+	webhookServer := alerts.NewServer(webhook.Options{
 		TLSOpts: tlsOpts,
-	})
+		CertDir: webhookCertDir,
+	}, ctrl.Log.WithName("AlertWebhook"))
 
 	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
 	// More info:
@@ -232,6 +238,11 @@ func main() {
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
+
+	mgr.GetWebhookServer().Register(alerts.WebhookPath, &alerts.Handler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("AlertWebhook"),
+	})
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

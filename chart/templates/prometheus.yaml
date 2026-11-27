@@ -52,10 +52,50 @@ spec:
     {{- if eq $watchNamespace "*" }}
     {}
     {{- else }}
-    matchLabels:
-      kubernetes.io/metadata.name: {{ $watchNamespace }}
+    # The release namespace holds the self-scrape config
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values:
+          - {{ $watchNamespace }}
+          {{- if ne $watchNamespace .Release.Namespace }}
+          - {{ .Release.Namespace }}
+          {{- end }}
     {{- end }}
+  {{- if include "chantico.alertWebhookEnabled" . }}
+  alerting:
+    alertmanagers:
+      - namespace: {{ .Release.Namespace }}
+        name: alertmanager-operated
+        port: web
+        apiVersion: v2
+  {{- end }}
   {{- if .Values.victoriaMetrics.include }}
   remoteWrite:
     - url: http://chantico-victoriametrics:8428/api/v1/write
+      # Self-scraped series are only used for health tracking
+      writeRelabelConfigs:
+        - sourceLabels:
+            - job
+          regex: chantico-prometheus-self
+          action: drop
   {{- end }}
+---
+# Prometheus scrapes its own rule evaluation and target metrics, for tracking the health of alerting
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: chantico-prometheus-self
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: chantico
+spec:
+  jobName: chantico-prometheus-self
+  staticConfigs:
+    - targets:
+        - localhost:9090
+  metricRelabelings:
+    - sourceLabels:
+        - __name__
+      regex: prometheus_rule_evaluation_failures_total|prometheus_rule_group_last_evaluation_timestamp_seconds|prometheus_target_scrape_pool_targets|prometheus_config_last_reload_successful|up
+      action: keep

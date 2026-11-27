@@ -149,8 +149,11 @@ func TestReconcileWriteRule_NonRootNode(t *testing.T) {
 	}
 	groups := prometheusRule.Spec.Groups
 
-	if len(groups) != 1 {
-		t.Fatalf("expected 1 group, got %d", len(groups))
+	if len(groups) != 2 {
+		t.Fatalf("expected recording and health groups, got %d", len(groups))
+	}
+	if groups[1].Name != "chantico_"+bm.Name+"_health" {
+		t.Errorf("expected health group name %q, got %q", "chantico_"+bm.Name+"_health", groups[1].Name)
 	}
 	if groups[0].Name != "chantico_"+bm.Name {
 		t.Errorf("expected group name %q, got %q", "chantico_"+bm.Name, groups[0].Name)
@@ -219,8 +222,8 @@ func TestReconcileWriteRule_OverwritesExisting(t *testing.T) {
 	}
 	assertDataCenterResourceCondition(t, bm, chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled)
 
-	if len(data.Spec.Groups) != 1 {
-		t.Fatalf("expected 1 group in PrometheusRule, got %d", len(data.Spec.Groups))
+	if len(data.Spec.Groups) != 2 {
+		t.Fatalf("expected recording and health groups in PrometheusRule, got %d", len(data.Spec.Groups))
 	}
 
 	found := false

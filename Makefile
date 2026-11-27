@@ -29,6 +29,12 @@ VISUALISATION_WEBAPP_IMG ?= $(VISUALISATION_WEBAPP_REPOSITORY):$(VISUALISATION_W
 
 LOCAL_DEVELOPMENT_STORAGE_CLASS_NAME ?= local-development
 LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
+# Directory of the webhook server certificates of a controller run with `make run`.
+CHANTICO_WEBHOOK_CERT_DIR ?= .chantico-webhook-certs
+# Address at which the kind cluster reaches the controller run with `make run`: host.docker.internal as resolved by the
+# kind node (Docker Desktop), otherwise the gateway of the kind network (Docker Engine).
+KIND_HOST_ADDRESS ?= $(firstword $(shell docker exec $(KIND_CLUSTER_NAME)-control-plane getent ahostsv4 host.docker.internal) \
+	$(shell docker network inspect kind -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}'))
 
 SNMP_MOCK_TAG ?= $(IMAGE_TAG)
 SNMP_MOCK_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-snmp-mock$(IMAGE_SUFFIX)
@@ -171,8 +177,17 @@ cluster-configure: sync-deployment-crds ## Configure cluster with namespace and 
 		--set visualisationWebapp.include=true \
 		--set visualisationWebapp.image.repository="$(VISUALISATION_WEBAPP_REPOSITORY)" \
 		--set visualisationWebapp.image.tag="$(VISUALISATION_WEBAPP_TAG)" \
-		--set visualisationWebapp.service.type="NodePort"
+		--set visualisationWebapp.service.type="NodePort" \
+		--set alertWebhook.hostAddress="$(KIND_HOST_ADDRESS)"
 
+CHANTICO_WEBHOOK_CERT_FILES = $(addprefix $(CHANTICO_WEBHOOK_CERT_DIR)/,tls.crt tls.key ca.crt)
+
+.PHONY: cluster-webhook-certs $(CHANTICO_WEBHOOK_CERT_FILES)
+cluster-webhook-certs: $(CHANTICO_WEBHOOK_CERT_FILES) ## Copy the webhook server certificates from the cluster to CHANTICO_WEBHOOK_CERT_DIR.
+
+$(CHANTICO_WEBHOOK_CERT_FILES): $(CHANTICO_WEBHOOK_CERT_DIR)/%:
+	mkdir -p $(@D)
+	-$(KUBECTL) get secret chantico-webhook-server-cert -n $(CHANTICO_NAMESPACE) -o go-template='{{index .data "$*" | base64decode}}' > $@
 .PHONY: cluster-load-visualisation-webapp
 cluster-load-visualisation-webapp: kind ## Load the visualisation webapp image into the Kind cluster.
 	$(call kind_load,$(VISUALISATION_WEBAPP_IMG),$(KIND_CLUSTER_NAME))
@@ -213,8 +228,8 @@ build: manifests generate ## Build manager binary.
 	go build -o bin/manager cmd/operator/main.go
 
 .PHONY: run
-run: manifests generate ## Run a controller from your host.
-	go run ./cmd/operator/main.go
+run: manifests generate cluster-webhook-certs ## Run a controller from your host.
+	go run ./cmd/operator/main.go --webhook-cert-dir=$(CHANTICO_WEBHOOK_CERT_DIR)
 
 # The docker-build* targets build images with docker buildx bake using the targets in docker-bake.hcl.
 # ARCH optionally sets comma-separated target architectures (i.e. make docker-build ARCH=arm64).

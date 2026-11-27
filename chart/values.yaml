@@ -76,6 +76,10 @@ controller:
     repository: "ghcr.io/chantico-project/images/chantico"
     tag: "" # defaults to Chart.version
   watchNamespace: "" # defaults to the namespace of the release, "*" to watch resources in all namespaces
+alertWebhook:
+  # IP address of a controller outside the cluster (e.g. on the development machine) that receives health
+  # alerts on port 9443. When empty, alerts are sent to the included controller, if any.
+  hostAddress: ""
 snmp:
   service:
     type: "ClusterIP"

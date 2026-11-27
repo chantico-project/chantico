@@ -1,0 +1,45 @@
+{{- if include "chantico.alertWebhookEnabled" . }}
+{{- $serverSecretName := "chantico-webhook-server-cert" }}
+{{- $clientSecretName := "chantico-webhook-client-cert" }}
+{{- $existingServer := lookup "v1" "Secret" .Release.Namespace $serverSecretName }}
+{{- $existingClient := lookup "v1" "Secret" .Release.Namespace $clientSecretName }}
+{{- $existingCA := dig "data" "ca.crt" "" $existingServer }}
+{{- $serverData := dict }}
+{{- $clientData := dict }}
+{{- /* Reuse existing certificates only when both Secrets share the same CA, so upgrades do not rotate them. */}}
+{{- if and $existingCA (eq $existingCA (dig "data" "ca.crt" "" $existingClient)) }}
+{{- $serverData = $existingServer.data }}
+{{- $clientData = $existingClient.data }}
+{{- else }}
+{{- $service := "chantico-controller-webhook" }}
+{{- $altNames := list $service (printf "%s.%s" $service .Release.Namespace) (printf "%s.%s.svc" $service .Release.Namespace) (printf "%s.%s.svc.cluster.local" $service .Release.Namespace) }}
+{{- $ca := genCA "chantico-webhook-ca" 3650 }}
+{{- $server := genSignedCert $service nil $altNames 3650 $ca }}
+{{- $client := genSignedCert "chantico-alertmanager" nil nil 3650 $ca }}
+{{- $serverData = dict "tls.crt" ($server.Cert | b64enc) "tls.key" ($server.Key | b64enc) "ca.crt" ($ca.Cert | b64enc) }}
+{{- $clientData = dict "tls.crt" ($client.Cert | b64enc) "tls.key" ($client.Key | b64enc) "ca.crt" ($ca.Cert | b64enc) }}
+{{- end }}
+# Server certificate of the controller-manager webhook server, with the CA used to verify client certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $serverSecretName }}
+  namespace: {{ .Release.Namespace }}
+type: kubernetes.io/tls
+data:
+  tls.crt: {{ index $serverData "tls.crt" }}
+  tls.key: {{ index $serverData "tls.key" }}
+  ca.crt: {{ index $serverData "ca.crt" }}
+---
+# Client certificate of Alertmanager for sending alerts to the controller-manager webhook server
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $clientSecretName }}
+  namespace: {{ .Release.Namespace }}
+type: kubernetes.io/tls
+data:
+  tls.crt: {{ index $clientData "tls.crt" }}
+  tls.key: {{ index $clientData "tls.key" }}
+  ca.crt: {{ index $clientData "ca.crt" }}
+{{- end }}

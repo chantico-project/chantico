@@ -181,6 +181,12 @@ spec:
   `PrometheusRule`s with that label in the release namespace. Prometheus
   Operator renders them into the Prometheus configuration and reloads
   Prometheus, which evaluates them every `evaluationInterval` (5s).
+1. The `PrometheusRule` also contains a group `chantico_<name>_health` with 
+  alerts that set the `RecordingRuleHealthy` condition to `False` when 
+  `chantico_power_watts` has no series for the resource for 2 minutes 
+  (`ChanticoRecordingRuleNoData`), or when the evaluation of its recording 
+  rules fails (`ChanticoRecordingRuleFailing`). See 
+  [health tracking](../prometheus-operator.md#health-tracking).
 1. When a `DataCenterResource` is deleted, the controller deletes the 
   `PrometheusRule` and Prometheus Operator stops the
   evaluation of those rules.

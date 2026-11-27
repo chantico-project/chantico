@@ -253,7 +253,7 @@ func (b *RuleBuilder) BuildRuleFile() *RuleFile {
 	return &RuleFile{
 		Groups: []RuleGroup{
 			{
-				Name:  fmt.Sprintf("chantico_%s", SanitizeMetricName(b.resource.Name)),
+				Name:  RecordingRuleGroupName(b.resource),
 				Rules: rules,
 			},
 		},
