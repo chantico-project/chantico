@@ -205,7 +205,7 @@ func TestKubePrometheusTargetsReconcile_CreatesAndDeletesHealthRule(t *testing.T
 		t.Fatalf("unexpected managed-by label: %v", rule.Labels)
 	}
 	wantExprs := map[string]string{
-		"ChanticoScrapeConfigNotLoaded": `absent(prometheus_target_scrape_pool_targets{scrape_pool="scrapeConfig/chantico/measurement"})`,
+		"ChanticoScrapeConfigNotLoaded": `absent(prometheus_target_scrape_pool_targets{scrape_job="scrapeConfig/chantico/measurement"})`,
 		"ChanticoEndpointUnreachable":   `up{name="measurement", instance="192.0.2.1:9100"} == 0`,
 	}
 	rules := rule.Spec.Groups[0].Rules

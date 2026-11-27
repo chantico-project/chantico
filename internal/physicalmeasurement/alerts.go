@@ -41,7 +41,7 @@ func HealthRules(measurement *chantico.PhysicalMeasurement) []alerts.Rule {
 	return []alerts.Rule{
 		{
 			Alert:     "ChanticoScrapeConfigNotLoaded",
-			Expr:      fmt.Sprintf("absent(prometheus_target_scrape_pool_targets{scrape_pool=%s})", alerts.QuoteString(ScrapePoolName(measurement))),
+			Expr:      fmt.Sprintf("absent(prometheus_target_scrape_pool_targets{scrape_job=%s})", alerts.QuoteString(ScrapePoolName(measurement))),
 			For:       "15s",
 			Condition: chantico.ConditionScrapeConfigLoaded,
 			Summary:   "Prometheus has not loaded the scrape configuration",
