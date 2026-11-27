@@ -25,6 +25,7 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -32,7 +33,7 @@ import (
 func setupKubePrometheusTargetsTest(t *testing.T) (*PrometheusTargetConfigurer, *chantico.PhysicalMeasurement) {
 	t.Helper()
 
-	kubeClient := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1alpha1.AddToScheme).Build()
+	kubeClient := testutil.NewFakeClientBuilder(t, chantico.AddToScheme, monitoringv1.AddToScheme, monitoringv1alpha1.AddToScheme).Build()
 	targets := &PrometheusTargetConfigurer{Client: kubeClient, Scheme: kubeClient.Scheme()}
 	measurement := &chantico.PhysicalMeasurement{
 		ObjectMeta: metav1.ObjectMeta{Name: "measurement", Namespace: "chantico"},
@@ -188,5 +189,42 @@ func TestKubePrometheusTargetsDelete_MissingScrapeConfig(t *testing.T) {
 	targets, measurement := setupKubePrometheusTargetsTest(t)
 	if err := targets.Delete(t.Context(), measurement); err != nil {
 		t.Fatalf("deleting an absent scrape config failed: %v", err)
+	}
+}
+
+func TestKubePrometheusTargetsReconcile_CreatesAndDeletesHealthRule(t *testing.T) {
+	targets, measurement := setupKubePrometheusTargetsTest(t)
+	reconcileKubePrometheusTargetsForTest(t, targets, measurement)
+
+	key := client.ObjectKey{Namespace: measurement.Namespace, Name: "physicalmeasurement-measurement"}
+	rule := &monitoringv1.PrometheusRule{}
+	if err := targets.Client.Get(t.Context(), key, rule); err != nil {
+		t.Fatalf("health rule not created: %v", err)
+	}
+	if rule.Labels["app.kubernetes.io/managed-by"] != "chantico" {
+		t.Fatalf("unexpected managed-by label: %v", rule.Labels)
+	}
+	wantExprs := map[string]string{
+		"ChanticoScrapeConfigNotLoaded": `absent(prometheus_target_scrape_pool_targets{scrape_job="scrapeConfig/chantico/measurement"})`,
+		"ChanticoEndpointUnreachable":   `up{name="measurement", instance="192.0.2.1:9100"} == 0`,
+	}
+	rules := rule.Spec.Groups[0].Rules
+	if len(rules) != len(wantExprs) {
+		t.Fatalf("expected %d alerts, got %d", len(wantExprs), len(rules))
+	}
+	for _, alert := range rules {
+		if got := alert.Expr.String(); got != wantExprs[alert.Alert] {
+			t.Errorf("alert %s expr = %q, want %q", alert.Alert, got, wantExprs[alert.Alert])
+		}
+		if alert.Labels["chantico_kind"] != "PhysicalMeasurement" || alert.Labels["chantico_name"] != "measurement" || alert.Labels["namespace"] != "chantico" {
+			t.Errorf("alert %s has unexpected labels %v", alert.Alert, alert.Labels)
+		}
+	}
+
+	if err := targets.Delete(t.Context(), measurement); err != nil {
+		t.Fatal(err)
+	}
+	if err := targets.Client.Get(t.Context(), key, rule); !apierrors.IsNotFound(err) {
+		t.Fatalf("expected health rule to be deleted, got %v", err)
 	}
 }

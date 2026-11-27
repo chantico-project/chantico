@@ -25,6 +25,7 @@ import (
 	"chantico/internal/steps"
 
 	"github.com/go-logr/logr"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +48,7 @@ type TargetConfigurer interface {
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=physicalmeasurements/finalizers,verbs=create;update;patch
 // +kubebuilder:rbac:groups=chantico-project.github.io,resources=measurementdevices,verbs=get;list;watch
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=scrapeconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch;create;update;patch;delete
 
 // PhysicalMeasurementReconciler reconciles a PhysicalMeasurement object
 type PhysicalMeasurementReconciler struct {
@@ -58,6 +60,7 @@ func (r *PhysicalMeasurementReconciler) SetupWithManager(mgr ctrl.Manager) error
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&chantico.PhysicalMeasurement{}).
 		Owns(&monitoringv1alpha1.ScrapeConfig{}).
+		Owns(&monitoringv1.PrometheusRule{}).
 		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
 			log := mgr.GetLogger().WithName("PhysicalMeasurementController")
 			if req != nil {
@@ -88,7 +91,7 @@ func (r *PhysicalMeasurementReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 	defer func() {
-		if err := patcher.Patch(ctx, physicalMeasurement, patch.WithStatusObservedGeneration{}); err != nil {
+		if err := patcher.Patch(ctx, physicalMeasurement, patch.WithStatusObservedGeneration{}, patch.WithOwnedConditions{Conditions: chantico.ControllerConditions}); err != nil {
 			reterr = errors.Join(reterr, err)
 		}
 	}()
@@ -182,6 +185,7 @@ func (r *PhysicalMeasurementReconciler) reconcileTargets(ctx context.Context, ph
 	}
 
 	physicalMeasurement.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Target configuration is up to date")
+	initHealthConditions(physicalMeasurement)
 	return steps.Continue()
 }
 

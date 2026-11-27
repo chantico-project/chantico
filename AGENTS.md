@@ -50,3 +50,4 @@ and documentation that is not compatible with these respective licenses.
 - Refer to any issue that is resolved by the PR in the description, if any.
 - Include in PR a reproducible execution flow, either as a test file or as 
   a list of steps to run in the PR description.
+- Do not edit changelog files; the semantic-release CI updates the changelog.

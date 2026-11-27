@@ -88,9 +88,9 @@ type DataCenterResourceStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[-1].status`
-// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[-1].reason`
-// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.status.conditions[-1].type`
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`
+// +kubebuilder:printcolumn:name="RecordingRuleHealthy",type=string,JSONPath=`.status.conditions[?(@.type=="RecordingRuleHealthy")].status`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // DataCenterResource is the Schema for the datacenterresources API
@@ -127,10 +127,21 @@ const (
 	DataCenterResourceGraphFinalizer = "datacenterresource.finalizer.chantico-project.github.io/graph"
 )
 
-func (m *DataCenterResource) GetConditions() *[]metav1.Condition { return &m.Status.Conditions }
+// GetConditions and SetConditions implement the cluster-api conditions.Setter, so that the patch helper merges
+// conditions per type instead of overwriting conditions set concurrently by the alert webhook.
+func (m *DataCenterResource) GetConditions() []metav1.Condition { return m.Status.Conditions }
+
+func (m *DataCenterResource) SetConditions(conditions []metav1.Condition) {
+	m.Status.Conditions = conditions
+}
+
+// HealthConditions are the condition types set by Prometheus alerts.
+func (m *DataCenterResource) HealthConditions() []ConditionType {
+	return []ConditionType{ConditionRecordingRuleHealthy}
+}
 
 func (m *DataCenterResource) UpdateStatusCondition(t ConditionType, s metav1.ConditionStatus, reason ConditionReason, msg string) {
-	meta.SetStatusCondition(m.GetConditions(), metav1.Condition{
+	meta.SetStatusCondition(&m.Status.Conditions, metav1.Condition{
 		Type: string(t), Status: s, Reason: string(reason), Message: msg,
 		ObservedGeneration: m.GetGeneration(),
 	})

@@ -7,7 +7,15 @@ const (
 	ConditionValidated ConditionType = "Validated" // Used in DataCenterResource and PhysicalMeasurement CRDs. True only when the spec has been validated.
 	ConditionGenerated ConditionType = "Generated" // Used in MeasurementDevice CRD. True only when the spec has been generated.
 	ConditionApplied   ConditionType = "Applied"   // Used in Both DataCenterResource and MeasurementDevice CRDs. True only when runtime config has been written/applied.
+
+	// Health conditions are set by Prometheus alerts received through Alertmanager. The controller only initializes them.
+	ConditionScrapeConfigLoaded   ConditionType = "ScrapeConfigLoaded"   // Used in PhysicalMeasurement CRD. False while Prometheus has not loaded the scrape config.
+	ConditionEndpointReachable    ConditionType = "EndpointReachable"    // Used in PhysicalMeasurement CRD. False while the scrape target is down.
+	ConditionRecordingRuleHealthy ConditionType = "RecordingRuleHealthy" // Used in DataCenterResource CRD. False while the recording rules fail or produce no data.
 )
+
+// ControllerConditions are the condition types that the reconcilers own; health conditions are owned by the alert webhook.
+var ControllerConditions = []string{string(ConditionReady), string(ConditionValidated), string(ConditionGenerated), string(ConditionApplied)}
 
 type ConditionReason string
 
@@ -22,4 +30,6 @@ const (
 	ReasonCleanupFailed            ConditionReason = "CleanupFailed"
 	ReasonReloadFailed             ConditionReason = "ReloadFailed"
 	ReasonTemplateResolutionFailed ConditionReason = "TemplateResolutionFailed"
+	ReasonAlertFiring              ConditionReason = "AlertFiring"
+	ReasonAlertResolved            ConditionReason = "AlertResolved"
 )

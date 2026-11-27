@@ -67,6 +67,18 @@ its Grafana sidecars. The `chantico-grafana` Service is available on port
 
 After setting up the local development environment, you are ready to run the demo in [How to run the mock snmp device](how-to-run-the-mock-snmp-device.md).
 
+#### Health alerts
+
+`make cluster-configure` points the Alertmanager webhook of the health alerts at the controller on your computer. It uses the address of `host.docker.internal` as resolved by the kind node (Docker Desktop), or otherwise the gateway of the `kind` Docker network (e.g. `172.18.0.1`). Set `KIND_HOST_ADDRESS` to override this address. `make run` copies the webhook server certificates from the cluster to `.chantico-webhook-certs` and then listens for alerts on port 9443. Without the certificates, for example when `make cluster-configure` has not run yet, the controller logs an error for the alert webhook server and runs without it; restart `make run` to copy them again. Your firewall needs to allow connections from the `kind` network to port 9443.
+
+To see a health condition change, apply a `PhysicalMeasurement` with an IP address that does not respond and wait a few minutes:
+
+```bash
+kubectl get physicalmeasurement <name> -n chantico -o jsonpath='{.status.conditions}'
+```
+
+The `EndpointReachable` condition becomes `False` with reason `AlertFiring`. Alertmanager is available with `kubectl port-forward -n chantico svc/alertmanager-operated 9093`.
+
 ### Removing the environment
 
 To stop the environment we have the following commands:

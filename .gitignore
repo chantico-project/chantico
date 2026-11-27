@@ -61,4 +61,5 @@ dist/
 chart/crds
 
 .chantico-persistent-volume
+.chantico-webhook-certs
 chart/charts

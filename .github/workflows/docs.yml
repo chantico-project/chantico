@@ -63,7 +63,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: docs-${{ steps.clean_name.outputs.clean_ref }}
-          path: docs/public
+          path: docs/public/chantico
 
     services:
       kroki:

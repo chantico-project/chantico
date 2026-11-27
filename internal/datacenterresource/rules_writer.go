@@ -27,6 +27,7 @@ func (f *PrometheusRecordingRuleConfigurer) Reconcile(ctx context.Context, resou
 	}
 
 	promRuleSpec := convertPrometheusRuleSpec(generatedRules)
+	promRuleSpec.Groups = append(promRuleSpec.Groups, HealthRuleGroup(resource))
 
 	rule := &monitoringv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{

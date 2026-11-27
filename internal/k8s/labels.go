@@ -16,6 +16,11 @@ limitations under the License.
 
 package k8s
 
+// ManagedResourceLabels are set on the resources that the controllers generate.
+// The Prometheus resource selects them by the part-of label, which the chart's own
+// resources share, because Helm overrides the managed-by label of chart resources.
+// Keep in sync with the selectors in chart/templates/prometheus.yaml.
 var ManagedResourceLabels = map[string]string{
 	"app.kubernetes.io/managed-by": "chantico",
+	"app.kubernetes.io/part-of":    "chantico",
 }

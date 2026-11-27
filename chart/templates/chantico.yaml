@@ -69,6 +69,9 @@ spec:
             - containerPort: 8443
               name: https
               protocol: TCP
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /healthz
@@ -98,10 +101,16 @@ spec:
           volumeMounts:
             - name: chantico-volume
               mountPath: /data
+            - name: webhook-certs
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
       volumes:
         - name: chantico-volume
           persistentVolumeClaim:
             claimName: {{ .Values.persistentVolumeClaimName | quote }}
+        - name: webhook-certs
+          secret:
+            secretName: chantico-webhook-server-cert
       {{- if .Values.imagePullSecretName }}
       imagePullSecrets:
         - name: {{ .Values.imagePullSecretName }}

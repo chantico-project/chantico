@@ -1,0 +1,96 @@
+{{- if include "chantico.alertWebhookEnabled" . }}
+{{- $hostAddress := .Values.alertWebhook.hostAddress }}
+# Receives alerts from Alertmanager on the webhook server of the controller-manager
+apiVersion: v1
+kind: Service
+metadata:
+  name: chantico-controller-webhook
+  namespace: {{ .Release.Namespace }}
+  labels:
+    control-plane: controller-manager
+spec:
+  type: ClusterIP
+  {{- if not $hostAddress }}
+  selector:
+    control-plane: controller-manager
+  {{- end }}
+  ports:
+    - name: webhook-server
+      protocol: TCP
+      port: 9443
+      targetPort: 9443
+{{- if $hostAddress }}
+---
+# Routes the Service to a controller outside the cluster
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: chantico-controller-webhook-host
+  namespace: {{ .Release.Namespace }}
+  labels:
+    kubernetes.io/service-name: chantico-controller-webhook
+addressType: {{ ternary "IPv6" "IPv4" (contains ":" $hostAddress) }}
+ports:
+  - name: webhook-server
+    protocol: TCP
+    port: 9443
+endpoints:
+  - addresses:
+      - {{ $hostAddress | quote }}
+{{- end }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  name: alertmanager
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  alertmanagerConfigSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: chantico
+  alertmanagerConfigNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: {{ .Release.Namespace }}
+  # Route alerts from all watched namespaces, not only the namespace of the AlertmanagerConfig
+  alertmanagerConfigMatcherStrategy:
+    type: None
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: chantico-health
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: chantico
+spec:
+  route:
+    receiver: chantico-controller
+    # Each condition of a custom resource is its own group
+    groupBy:
+      - chantico_kind
+      - chantico_name
+      - namespace
+      - chantico_condition
+    groupWait: 10s
+    groupInterval: 30s
+    repeatInterval: 1h
+  receivers:
+    - name: chantico-controller
+      webhookConfigs:
+        - url: https://chantico-controller-webhook.{{ .Release.Namespace }}.svc:9443/alertmanager/health
+          sendResolved: true
+          httpConfig:
+            tlsConfig:
+              ca:
+                secret:
+                  name: chantico-webhook-client-cert
+                  key: ca.crt
+              cert:
+                secret:
+                  name: chantico-webhook-client-cert
+                  key: tls.crt
+              keySecret:
+                name: chantico-webhook-client-cert
+                key: tls.key
+{{- end }}

@@ -78,6 +78,31 @@ func (targets *PrometheusTargetConfigurer) Reconcile(
 	if err != nil {
 		return fmt.Errorf("reconcile scrape config: %w", err)
 	}
+	return targets.reconcileHealthRule(ctx, measurement)
+}
+
+func healthRule(measurement *chantico.PhysicalMeasurement) *monitoringv1.PrometheusRule {
+	return &monitoringv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      HealthRuleName(measurement),
+			Namespace: measurement.Namespace,
+		},
+	}
+}
+
+func (targets *PrometheusTargetConfigurer) reconcileHealthRule(
+	ctx context.Context,
+	measurement *chantico.PhysicalMeasurement,
+) error {
+	rule := healthRule(measurement)
+	rule.Labels = k8s.ManagedResourceLabels
+	rule.Spec = HealthRuleSpec(measurement)
+	err := k8s.ApplyWithOwner(ctx, targets.Client, targets.Scheme, measurement, rule, func(existing, desired *monitoringv1.PrometheusRule) {
+		existing.Spec = desired.Spec
+	})
+	if err != nil {
+		return fmt.Errorf("reconcile health rule: %w", err)
+	}
 	return nil
 }
 
@@ -93,6 +118,9 @@ func (targets *PrometheusTargetConfigurer) Delete(
 	}
 	if err := client.IgnoreNotFound(targets.Client.Delete(ctx, scrapeConfig)); err != nil {
 		return fmt.Errorf("delete scrape config: %w", err)
+	}
+	if err := client.IgnoreNotFound(targets.Client.Delete(ctx, healthRule(measurement))); err != nil {
+		return fmt.Errorf("delete health rule: %w", err)
 	}
 	return nil
 }

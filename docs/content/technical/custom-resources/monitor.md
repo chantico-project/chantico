@@ -30,6 +30,19 @@ The controller checks the measurement type during validation, before configuring
 scrape targets. Unsupported types set the `Validated` condition to `False` with
 reason `InvalidSpec` and stop reconciliation with an error.
 
+Besides the `ScrapeConfig`, the controller creates a `PrometheusRule` named 
+`physicalmeasurement-<name>` with health alerts for the measurement. These 
+alerts set two health conditions on the resource:
+
+| Condition | `False` when |
+|---|---|
+| `ScrapeConfigLoaded` | Prometheus has no scrape pool for the `ScrapeConfig` for 15 seconds (`ChanticoScrapeConfigNotLoaded`). |
+| `EndpointReachable` | The scrape of the target fails for 25 seconds (`ChanticoEndpointUnreachable`). |
+
+The controller sets both conditions to `True` when they are missing after the 
+`ScrapeConfig` is applied. Afterwards, only alerts change them; see 
+[health tracking](../prometheus-operator.md#health-tracking).
+
 Note that the `ip` field may be anything that is resolvable by the SNMP exporter 
 instance, including hostnames, fully qualified domain names and IP addresses. 
 Hostnames are only used in mock/development/demonstration environments, where 

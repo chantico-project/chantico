@@ -132,18 +132,18 @@ If all the resources are created correctly, you should see the following when qu
 
 ```bash
 $ kubectl get datacenterresource,measurementdevice,physicalmeasurement -n chantico
-NAME                                                                           STATUS   REASON       TYPE      AGE
-datacenterresource.chantico-project.github.io/datacenterresource-misd-gbm-01   True     Reconciled   Applied   
-datacenterresource.chantico-project.github.io/datacenterresource-pdu1          True     Reconciled   Applied   
-datacenterresource.chantico-project.github.io/datacenterresource-pdu2          True     Reconciled   Applied   
+NAME                                                                           READY   REASON       RECORDINGRULEHEALTHY   AGE
+datacenterresource.chantico-project.github.io/datacenterresource-misd-gbm-01   True    Reconciled   True                   
+datacenterresource.chantico-project.github.io/datacenterresource-pdu1          True    Reconciled   True                   
+datacenterresource.chantico-project.github.io/datacenterresource-pdu2          True    Reconciled   True                   
 
-NAME                                                 STATUS   REASON      TYPE             AGE
-measurementdevice.chantico-project.github.io/tno     True     Succeeded   ExporterReload
-measurementdevice.chantico-project.github.io/tno-2   True     Succeeded   ExporterReload
+NAME                                                 READY   REASON       AGE
+measurementdevice.chantico-project.github.io/tno     True    Reconciled   
+measurementdevice.chantico-project.github.io/tno-2   True    Reconciled   
 
-NAME                                                                          STATUS   REASON       TYPE      AGE
-physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu1-out   True     Reconciled   Applied   
-physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu2-out   True     Reconciled   Applied
+NAME                                                                          READY   REASON       SCRAPECONFIGLOADED   ENDPOINTREACHABLE   AGE
+physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu1-out   True    Reconciled   True                 True                
+physicalmeasurement.chantico-project.github.io/physicalmeasurement-pdu2-out   True    Reconciled   True                 True                
 ```
 
 Additionally, you can verify in [Prometheus](http://localhost:19090) that the metrics are being scraped from the mock SNMP devices and aggregated into the `DataCenterResource` metrics. These will show up in the "Rule health" section as the following rules containing the subsequent metrics:

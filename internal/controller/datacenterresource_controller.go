@@ -156,7 +156,7 @@ func (r *DataCenterResourceReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, err
 	}
 	defer func() {
-		if err := patcher.Patch(ctx, dataCenterResource, patch.WithStatusObservedGeneration{}); err != nil {
+		if err := patcher.Patch(ctx, dataCenterResource, patch.WithStatusObservedGeneration{}, patch.WithOwnedConditions{Conditions: chantico.ControllerConditions}); err != nil {
 			reterr = errors.Join(reterr, err)
 		}
 	}()
@@ -269,6 +269,7 @@ func (r *DataCenterResourceReconciler) reconcileWriteRule(ctx context.Context, d
 	}
 
 	dataCenterResource.UpdateStatusCondition(chantico.ConditionApplied, metav1.ConditionTrue, chantico.ReasonReconciled, "Recording rule applied successfully")
+	initHealthConditions(dataCenterResource)
 	return steps.Continue()
 }
 
@@ -309,9 +310,8 @@ func (r *DataCenterResourceReconciler) clearReferencedValidation(
 	referenced *chantico.DataCenterResource,
 	l logr.Logger,
 ) {
-	referenced.GetConditions()
 	// Revalidate if previously failed or current item is being removed
-	if meta.IsStatusConditionFalse(*referenced.GetConditions(), string(chantico.ConditionValidated)) || meta.IsStatusConditionFalse(*dataCenterResource.GetConditions(), string(chantico.ConditionValidated)) {
+	if meta.IsStatusConditionFalse(referenced.GetConditions(), string(chantico.ConditionValidated)) || meta.IsStatusConditionFalse(dataCenterResource.GetConditions(), string(chantico.ConditionValidated)) {
 		patcher, err := patch.NewHelper(referenced, r.Client)
 		if err != nil {
 			l.Error(err, "Failed to create patch helper for referenced DataCenterResource", "referenced", referenced.Name)
