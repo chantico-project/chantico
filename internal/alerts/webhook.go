@@ -93,13 +93,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var errs []error
-	for target, update := range collectUpdates(message.Alerts) {
-		if err := h.apply(r.Context(), target, update); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if err := errors.Join(errs...); err != nil {
+	if err := h.applyUpdates(r.Context(), collectUpdates(message.Alerts)); err != nil {
 		h.Log.Error(err, "Failed to update health conditions")
 		// Alertmanager retries the notification on a server error.
 		http.Error(w, "failed to update health conditions", http.StatusInternalServerError)
@@ -108,16 +102,39 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (h *Handler) applyUpdates(ctx context.Context, updates map[conditionTarget]*conditionUpdate) error {
+	var errs []error
+	for target, update := range updates {
+		if err := h.apply(ctx, target, update); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func targetOf(alert Alert) (conditionTarget, bool) {
+	target := conditionTarget{
+		kind:      alert.Labels[LabelKind],
+		key:       types.NamespacedName{Namespace: alert.Labels[LabelNamespace], Name: alert.Labels[LabelName]},
+		condition: chantico.ConditionType(alert.Labels[LabelCondition]),
+	}
+	valid := target.kind != "" && target.key.Name != "" && target.key.Namespace != "" && target.condition != ""
+	return target, valid
+}
+
+func alertSummary(alert Alert) string {
+	if summary := alert.Annotations[AnnotationSummary]; summary != "" {
+		return summary
+	}
+	return alert.Labels["alertname"]
+}
+
 // collectUpdates combines the alerts per resource condition: the condition is unhealthy when any of its alerts fire.
 func collectUpdates(alerts []Alert) map[conditionTarget]*conditionUpdate {
 	updates := make(map[conditionTarget]*conditionUpdate)
 	for _, alert := range alerts {
-		target := conditionTarget{
-			kind:      alert.Labels[LabelKind],
-			key:       types.NamespacedName{Namespace: alert.Labels[LabelNamespace], Name: alert.Labels[LabelName]},
-			condition: chantico.ConditionType(alert.Labels[LabelCondition]),
-		}
-		if target.kind == "" || target.key.Name == "" || target.key.Namespace == "" || target.condition == "" {
+		target, ok := targetOf(alert)
+		if !ok {
 			continue
 		}
 		update, ok := updates[target]
@@ -125,15 +142,12 @@ func collectUpdates(alerts []Alert) map[conditionTarget]*conditionUpdate {
 			update = &conditionUpdate{}
 			updates[target] = update
 		}
-		if alert.Status == statusFiring {
-			update.firing = true
-			summary := alert.Annotations[AnnotationSummary]
-			if summary == "" {
-				summary = alert.Labels["alertname"]
-			}
-			if !slices.Contains(update.summaries, summary) {
-				update.summaries = append(update.summaries, summary)
-			}
+		if alert.Status != statusFiring {
+			continue
+		}
+		update.firing = true
+		if summary := alertSummary(alert); !slices.Contains(update.summaries, summary) {
+			update.summaries = append(update.summaries, summary)
 		}
 	}
 	return updates
@@ -150,23 +164,33 @@ func newResource(kind string) healthResource {
 	}
 }
 
-func (h *Handler) apply(ctx context.Context, target conditionTarget, update *conditionUpdate) error {
-	log := h.Log.WithValues("kind", target.kind, "resource", target.key, "condition", target.condition)
+// getHealthResource returns the resource of the target, or nil when the alert does not apply to an existing
+// resource with that health condition.
+func (h *Handler) getHealthResource(ctx context.Context, target conditionTarget, log logr.Logger) (healthResource, error) {
 	resource := newResource(target.kind)
 	if resource == nil {
 		log.Info("Ignoring alert for unknown kind")
-		return nil
+		return nil, nil
 	}
 	if err := h.Client.Get(ctx, target.key, resource); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info("Ignoring alert for resource that does not exist")
-			return nil
+			return nil, nil
 		}
-		return fmt.Errorf("get %s %s: %w", target.kind, target.key, err)
+		return nil, fmt.Errorf("get %s %s: %w", target.kind, target.key, err)
 	}
 	if !slices.Contains(resource.HealthConditions(), target.condition) {
 		log.Info("Ignoring alert for condition that is not a health condition")
-		return nil
+		return nil, nil
+	}
+	return resource, nil
+}
+
+func (h *Handler) apply(ctx context.Context, target conditionTarget, update *conditionUpdate) error {
+	log := h.Log.WithValues("kind", target.kind, "resource", target.key, "condition", target.condition)
+	resource, err := h.getHealthResource(ctx, target, log)
+	if resource == nil || err != nil {
+		return err
 	}
 
 	patcher, err := patch.NewHelper(resource, h.Client)
