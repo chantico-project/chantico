@@ -32,9 +32,9 @@ LOCAL_DEVELOPMENT_STORAGE ?= 3Gi
 # Directory of the webhook server certificates of a controller run with `make run`.
 CHANTICO_WEBHOOK_CERT_DIR ?= .chantico-webhook-certs
 # Address at which the kind cluster reaches the controller run with `make run`: host.docker.internal as resolved by the
-# kind node (Docker Desktop), otherwise the gateway of the kind network (Docker Engine).
+# kind node (Docker Desktop), otherwise the IPv4 gateway of the kind network (Docker Engine).
 KIND_HOST_ADDRESS ?= $(firstword $(shell docker exec $(KIND_CLUSTER_NAME)-control-plane getent ahostsv4 host.docker.internal) \
-	$(shell docker network inspect kind -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}'))
+	$(shell docker network inspect kind -f '{{range .IPAM.Config}}{{if eq (len (split .Gateway ":")) 1}}{{.Gateway}} {{end}}{{end}}'))
 
 SNMP_MOCK_TAG ?= $(IMAGE_TAG)
 SNMP_MOCK_REPOSITORY ?= ghcr.io/chantico-project/images/chantico-snmp-mock$(IMAGE_SUFFIX)
